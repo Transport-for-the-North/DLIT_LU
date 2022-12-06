@@ -1,0 +1,3 @@
+# Required libraries
+numpy>=1.19.0
+pandas>=1.4.0
