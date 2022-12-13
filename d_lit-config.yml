@@ -1,0 +1,22 @@
+dlog_input_file: C:\Users\UKKXF022\Documents\DLOG\DLog_data\DLog21_v8_issued_v1.xlsx
+combined_sheet_name: "2021 Combined"
+residential_sheet_name: "2021 Residential"
+employment_sheet_name: "2021 Employment"
+mixed_sheet_name: "2021 Mixed"
+lookups_sheet_name: "Lookups"
+
+combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\combined_column_names.csv
+residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
+employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv
+mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_column_names.csv
+
+
+output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
+data_report_file_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\data_report.xlsx
+land_use_codes_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\land_use_codes.xlsx
+regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
+
+
+
+
+
