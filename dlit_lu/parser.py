@@ -221,7 +221,10 @@ def parse_lookup(
 
 
 def read_auxiliary_data(
-    luc_path: pathlib.Path, lpa_shapefile_path: pathlib.Path
+    valid_luc_path: pathlib.Path,
+    out_of_date_luc_path: pathlib.Path,
+    incomplete_luc_path: pathlib.Path,
+    lpa_shapefile_path: pathlib.Path
 ) -> global_classes.AuxiliaryData:
     """reads in auxilliary data
 
@@ -241,21 +244,15 @@ def read_auxiliary_data(
     """
     LOG.info("Parsing auxiliary files")
     #parse land use code file
-    allowed_land_use_codes = pd.read_excel(
-        luc_path, sheet_name="allowed_codes", engine="openpyxl"
-    )
+    allowed_land_use_codes = pd.read_csv(valid_luc_path)
     allowed_land_use_codes.loc[:, "land_use_codes"] = allowed_land_use_codes[
         "land_use_codes"
     ].str.lower()
-    out_of_date_luc = pd.read_excel(
-        luc_path, sheet_name="out_of_date_codes", engine="openpyxl"
-    )
+    out_of_date_luc = pd.read_csv(out_of_date_luc_path)
     out_of_date_luc.loc[:, "out_of_date_land_use_codes"] = out_of_date_luc[
         "out_of_date_land_use_codes"
     ].str.lower()
-    incomplete_luc = pd.read_excel(
-        luc_path, sheet_name="incomplete_codes", engine="openpyxl"
-    )
+    incomplete_luc = pd.read_csv(incomplete_luc_path)
     incomplete_luc.loc[:, "incomplete_land_use_codes"] = incomplete_luc[
         "incomplete_land_use_codes"
     ].str.lower()

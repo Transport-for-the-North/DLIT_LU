@@ -1,11 +1,12 @@
 """handles reading config file
 """
-#standard imports
+# standard imports
 import json
 import pathlib
-#third party imports
+# third party imports
 import strictyaml
 import pydantic
+
 
 class BaseConfig(pydantic.BaseModel):
     r"""Base class for storing model parameters.
@@ -85,6 +86,7 @@ class BaseConfig(pydantic.BaseModel):
         with open(path, "wt") as file:
             file.write(self.to_yaml())
 
+
 class DLitConfig(BaseConfig):
     """Manages reading / writing the tool's config file.
 
@@ -108,20 +110,23 @@ class DLitConfig(BaseConfig):
     data_report_file_path: pathlib.Path
         file path where the data report should be saved
     combined_column_names_path: pathlib.Path
-        a CSV containing the column names for the combined sheet in the DLog
+        path to a CSV containing the column names for the combined sheet in the DLog
         excel spreadsheet
     residential_column_names_path: pathlib.Path
-        a CSV containing the column names for the residential sheet in the 
+        path to a CSV containing the column names for the residential sheet in the 
         DLog excel spreadsheet
     employment_column_names_path: pathlib.Path
-        a CSV containing the column names for the employment sheet in the 
+        path to a CSV containing the column names for the employment sheet in the 
         DLog excel spreadsheet
     mixed_column_names_path: pathlib.Pat
-        a CSV containing the column names for the mixed sheet in the 
+        path to a CSV containing the column names for the mixed sheet in the 
         DLogexcel spreadsheet
-    combined_column_names: list[str]
-    land_use_codes_path: pathlib.Path
-        file path for the land use code spread sheet
+    valid_luc_path: pathlib.Path
+        path to a CSV containing valid land use codes 
+    out_of_date_luc_path: pathlib.Path
+        path to a CSV containing out of date land use codes 
+    incomplete_luc_path: pathlib.Path
+        path to a CSV containing incomplete land use codes 
     regions_shapefiles_path: pathlib.Path
         file path for the regions shape file
 
@@ -142,15 +147,25 @@ class DLitConfig(BaseConfig):
     residential_column_names_path: pathlib.Path
     employment_column_names_path: pathlib.Path
     mixed_column_names_path: pathlib.Path
-    land_use_codes_path: pathlib.Path
+    valid_luc_path: pathlib.Path
+    out_of_date_luc_path: pathlib.Path
+    incomplete_luc_path: pathlib.Path
     regions_shapefiles_path: pathlib.Path
 
-    @pydantic.validator("dlog_input_file","regions_shapefiles_path","land_use_codes_path")
+    @pydantic.validator(
+        "dlog_input_file", 
+        "regions_shapefiles_path",
+        "combined_column_names_path",
+        "residential_column_names_path",
+        "employment_column_names_path",
+        "mixed_column_names_path",
+        "valid_luc_path",
+        "out_of_date_luc_path",
+        "incomplete_luc_path",
+    )
     def _file_exists(  # Validator is class method pylint: disable=no-self-argument
         cls, value: pathlib.Path
     ) -> pathlib.Path:
         if not value.is_file():
             raise ValueError(f"file doesn't exist: {value}")
         return value
-
-

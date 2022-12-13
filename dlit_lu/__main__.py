@@ -51,7 +51,9 @@ def main(log: utilities.DLitLog) -> None:
         mix_column_names_path=config.mixed_column_names_path,
     )
     auxiliary_data = parser.read_auxiliary_data(
-        config.land_use_codes_path,
+        config.valid_luc_path,
+        config.out_of_date_luc_path,
+        config.incomplete_luc_path,
         config.regions_shapefiles_path,
         )
     #TODO testing setup for syntax fixes
