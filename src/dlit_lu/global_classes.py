@@ -1,7 +1,7 @@
 """contains NamedTuple subclasses and other classes used globally
 """#docstring
 #standard imports
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 #third party imports
 import pandas as pd
 import geopandas as gpd
@@ -55,18 +55,18 @@ class DLogData(NamedTuple):
     note that the DataFrames do not have identical column names
     Parameters
     ----------
-    combined_data: pd.DataFrame
+    combined_data: Optional[pd.DataFrame]
         the combined data set
     residential_data: pd.DataFrame
         the residential data set
     employment_data: pd.DataFrame
         the employment data set
-    mixed_data: pd.DataFrame
+    mixed_data: Optional[pd.DataFrame]
         sites which have residential and employment developments
     lookup: Lookup
         a look up table for the IDs used in the data
     """    
-    combined_data: pd.DataFrame
+    combined_data: Optional[pd.DataFrame]
     residential_data: pd.DataFrame
     employment_data: pd.DataFrame
     mixed_data: pd.DataFrame

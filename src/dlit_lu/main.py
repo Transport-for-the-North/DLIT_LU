@@ -61,7 +61,12 @@ def main(log: utilities.DLitLog) -> None:
         config.incomplete_luc_path,
         config.regions_shapefiles_path,
         )
-    #TODO testing setup for syntax fixes
-    syntax_fixes.fix_inavlid_syntax(dlog_data,auxiliary_data)
-     
-    analyse.data_report(dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data)
+
+    
+    
+    data_filter_columns = analyse.data_report(dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data)
+    #TODO finalise data pipeline: currently testing setup for syntax fixes
+    fixed_data = syntax_fixes.fix_inavlid_syntax(data_filter_columns, auxiliary_data)
+    post_fix_output_path = config.output_folder / "post_auto_fix"
+    post_fix_output_path.mkdir(exist_ok=True)
+    post_fix_data_filter_columns = analyse.data_report(fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data)
