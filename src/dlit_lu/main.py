@@ -22,6 +22,11 @@ CONFIG_PATH = pathlib.Path("d_lit-config.yml")
 LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
 
+def run()-> None:
+    with utilities.DLitLog() as dlit_log:
+        with tqdm_log.logging_redirect_tqdm([dlit_log.logger]):
+            main(dlit_log)
+
 def main(log: utilities.DLitLog) -> None:
     """DLit DLog land use analysis and repair tool
 
@@ -60,8 +65,3 @@ def main(log: utilities.DLitLog) -> None:
     syntax_fixes.fix_inavlid_syntax(dlog_data,auxiliary_data)
      
     analyse.data_report(dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data)
-if __name__ == "__main__":
-    # Initialise the program logger and setup to work with tqdm
-    with utilities.DLitLog() as dlit_log:
-        with tqdm_log.logging_redirect_tqdm([dlit_log.logger]):
-            main(dlit_log)

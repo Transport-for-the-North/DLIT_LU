@@ -22,6 +22,7 @@ ValueError
 import logging
 from typing import Optional
 import pathlib
+import os
 
 
 # third party imports
@@ -35,7 +36,11 @@ from dlit_lu import global_classes, utilities
 
 # constants
 LOG = logging.getLogger(__name__)
+#sets the tolerance for the geopandas simplify function
+SIMPLIFY_TOLERANCE = 100
 
+#makes CRS conversions more robust but less accurate
+os.environ['PROJ_NETWORK'] = 'OFF'
 
 def data_report(
     dlog_data: global_classes.DLogData,
@@ -155,7 +160,6 @@ def data_report(
         {
             "residential": [
                 "total_units",
-                "units_(dwellings)",
             ],
             "employment": ["total_area_sqm"],
             "mixed": ["floorspace_sqm", "dwellings"],
@@ -871,14 +875,16 @@ def plot_data(
         folder path to save the plots
     """
     LOG.info("Producing site_locations explorer & plot")
+    simplified_base = base.copy()
+    simplified_base.loc[:,"geometry"] = base.simplify(SIMPLIFY_TOLERANCE)
     geo_explorer(
         "site_locations",
         folder_path,
         points=data,
         colour=colour,
-        base=base,
+        base=simplified_base,
     )
-
+    
     geo_plotter(
         "site_locations",
         folder_path,
@@ -904,6 +910,7 @@ def plot_data(
         "units_(dwellings)",
         "total_dwellings",
     )
+    total_dwellings.loc[:,"geometry"] = total_dwellings.simplify(SIMPLIFY_TOLERANCE)
     total_floorspace = spatial_analysis(
         pd.concat(
             [
@@ -917,6 +924,8 @@ def plot_data(
         "units_(floorspace)",
         "total_floorspace",
     )
+    total_floorspace.loc[:,"geometry"] = total_floorspace.simplify(SIMPLIFY_TOLERANCE)
+
     total_dwellings.loc[:, "total_dwellings"] = total_dwellings["total_dwellings"] / 1e3
     total_dwellings.rename(
         columns={"total_dwellings": "total dwellings (units: thousand dwellings)"},
@@ -1142,9 +1151,11 @@ def geo_explorer(
         base = None
     explorer = None
     if base is not None:  # plot base
+        base = base.to_crs(epsg = 4326)
         explorer = base.explore()
 
     if choropleth is not None:
+        choropleth = choropleth.to_crs(epsg = 4326)
         if column is None:
             raise ValueError(
                 "if a chloropleth is passesd, a column should be passed too"
@@ -1164,16 +1175,18 @@ def geo_explorer(
                 temp = value[
                     ["site_reference_id", "site_name", "geometry"]
                 ].set_geometry("geometry")
-                explorer = temp.explore(name=key, color=colour[key], legend=True)
+                temp = temp.to_crs(epsg = 4326)
+                explorer = temp.explore(name=key, color=colour[key], legend=True, show = False)
         else:
             for key, value in points.items():
                 temp = value[
                     ["site_reference_id", "site_name", "geometry"]
                 ].set_geometry("geometry")
+                temp = temp.to_crs(epsg = 4326)
                 if len(temp) == 0:
                     continue
                 explorer = temp.explore(
-                    m=explorer, color=colour[key], name=key, legend=True
+                    m=explorer, color=colour[key], name=key, legend=True, show = False
                 )
 
     if explorer is None:

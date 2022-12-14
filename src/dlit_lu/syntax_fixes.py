@@ -34,5 +34,6 @@ def incorrect_luc_formatting(invalid_luc_format: dict[str, pd.DataFrame], column
                         format_lookup["incorrect_format"]==invalid_code, "land_use_code"
                     ]
             
+            
 
             
