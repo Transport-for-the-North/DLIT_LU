@@ -48,6 +48,7 @@ def data_report(
     report_file_path: pathlib.Path,
     output_folder_path: pathlib.Path,
     auxiliary_data: global_classes.AuxiliaryData,
+    plot_maps: bool 
 ) -> global_classes.DLogData:
     """Produces a data report to the provided file path
 
@@ -64,6 +65,8 @@ def data_report(
         location of the output folder
     auxiliary_data : global_classes.AuxiliaryData
         data required for the analysis that is not in DLog
+    plot_maps: bool 
+        whether the function create visual outputs, this takes some time
     """
     res_data = dlog_data.residential_data
     emp_data = dlog_data.employment_data
@@ -290,74 +293,6 @@ def data_report(
         user_intervention_required,
         non_fatal_columns
     )
-    split_data = {
-        "R invalid": gpd.GeoDataFrame(
-            classified_data["invalid"]["residential"],
-            geometry=gpd.points_from_xy(
-                classified_data["invalid"]["residential"]["easting"],
-                classified_data["invalid"]["residential"]["northing"],
-                crs=27700,
-            ),
-        ),
-        "R No invalid": gpd.GeoDataFrame(
-            classified_data["valid"]["residential"],
-            geometry=gpd.points_from_xy(
-                classified_data["valid"]["residential"]["easting"],
-                classified_data["valid"]["residential"]["northing"],
-                crs=27700,
-            ),
-        ),
-        "E invalid": gpd.GeoDataFrame(
-            classified_data["invalid"]["employment"],
-            geometry=gpd.points_from_xy(
-                classified_data["invalid"]["employment"]["easting"],
-                classified_data["invalid"]["employment"]["northing"],
-                crs=27700,
-            ),
-        ),
-        "E No invalid": gpd.GeoDataFrame(
-            classified_data["valid"]["employment"],
-            geometry=gpd.points_from_xy(
-                classified_data["valid"]["employment"]["easting"],
-                classified_data["valid"]["employment"]["northing"],
-                crs=27700,
-            ),
-        ),
-        "M invalid": gpd.GeoDataFrame(
-            classified_data["invalid"]["mixed"],
-            geometry=gpd.points_from_xy(
-                classified_data["invalid"]["mixed"]["easting"],
-                classified_data["invalid"]["mixed"]["northing"],
-                crs=27700,
-            ),
-        ),
-        "M No invalid": gpd.GeoDataFrame(
-            classified_data["valid"]["mixed"],
-            geometry=gpd.points_from_xy(
-                classified_data["valid"]["mixed"]["easting"],
-                classified_data["valid"]["mixed"]["northing"],
-                crs=27700,
-            ),
-        ),
-    }
-    # visualisation parameters
-    plot_colours = {
-        "R invalid": "red",
-        "R No invalid": "black",
-        "E invalid": "red",
-        "E No invalid": "black",
-        "M invalid": "red",
-        "M No invalid": "black",
-    }
-    plot_markers = {
-        "R invalid": "*",
-        "R No invalid": "*",
-        "E invalid": "^",
-        "E No invalid": "^",
-        "M invalid": "o",
-        "M No invalid": "o",
-    }
-    plot_limits = {"x": [280000, 550000], "y": [325000, 670000]}
 
     # process data summary
     analysis_summary = results_report.analysis_summary
@@ -418,16 +353,85 @@ def data_report(
     summary["Total"] = summary.sum(axis=1)
     summary["Notes"] = analysis_summary_notes
     # plot results
-    LOG.info("Plotting results")
-    plot_data(
-        split_data,
-        plot_colours,
-        plot_markers,
-        auxiliary_data.regions.to_crs("27700"),
-        plot_limits,
-        False,
-        output_folder_path,
-    )
+    if plot_maps:
+        split_data = {
+            "R invalid": gpd.GeoDataFrame(
+                classified_data["invalid"]["residential"],
+                geometry=gpd.points_from_xy(
+                    classified_data["invalid"]["residential"]["easting"],
+                    classified_data["invalid"]["residential"]["northing"],
+                    crs=27700,
+                ),
+            ),
+            "R No invalid": gpd.GeoDataFrame(
+                classified_data["valid"]["residential"],
+                geometry=gpd.points_from_xy(
+                    classified_data["valid"]["residential"]["easting"],
+                    classified_data["valid"]["residential"]["northing"],
+                    crs=27700,
+                ),
+            ),
+            "E invalid": gpd.GeoDataFrame(
+                classified_data["invalid"]["employment"],
+                geometry=gpd.points_from_xy(
+                    classified_data["invalid"]["employment"]["easting"],
+                    classified_data["invalid"]["employment"]["northing"],
+                    crs=27700,
+                ),
+            ),
+            "E No invalid": gpd.GeoDataFrame(
+                classified_data["valid"]["employment"],
+                geometry=gpd.points_from_xy(
+                    classified_data["valid"]["employment"]["easting"],
+                    classified_data["valid"]["employment"]["northing"],
+                    crs=27700,
+                ),
+            ),
+            "M invalid": gpd.GeoDataFrame(
+                classified_data["invalid"]["mixed"],
+                geometry=gpd.points_from_xy(
+                    classified_data["invalid"]["mixed"]["easting"],
+                    classified_data["invalid"]["mixed"]["northing"],
+                    crs=27700,
+                ),
+            ),
+            "M No invalid": gpd.GeoDataFrame(
+                classified_data["valid"]["mixed"],
+                geometry=gpd.points_from_xy(
+                    classified_data["valid"]["mixed"]["easting"],
+                    classified_data["valid"]["mixed"]["northing"],
+                    crs=27700,
+                ),
+            ),
+        }
+        # visualisation parameters
+        plot_colours = {
+            "R invalid": "red",
+            "R No invalid": "black",
+            "E invalid": "red",
+            "E No invalid": "black",
+            "M invalid": "red",
+            "M No invalid": "black",
+        }
+        plot_markers = {
+            "R invalid": "*",
+            "R No invalid": "*",
+            "E invalid": "^",
+            "E No invalid": "^",
+            "M invalid": "o",
+            "M No invalid": "o",
+        }
+        plot_limits = {"x": [280000, 550000], "y": [325000, 670000]}
+        LOG.info("Plotting results")
+        plot_data(
+            split_data,
+            plot_colours,
+            plot_markers,
+            auxiliary_data.regions.to_crs("27700"),
+            plot_limits,
+            False,
+            output_folder_path,
+        )
     # output data report
     utilities.write_to_excel(
         report_file_path,
@@ -1710,56 +1714,6 @@ def analyse_invalid_luc(
         "incomplete": incomplete_output,
         "other_issues": other_issues_output,
     }
-
-
-def compare_record_lengths(data: global_classes.DLogData) -> pd.Series:
-    """compares the length of combined with the other records
-
-    This is to check the consistency of the data set
-
-    Parameters
-    ----------
-    data : global_classes.DLogData
-        the dlog data set
-    """
-    comb = data.combined_data
-    rec = data.residential_data
-    emp = data.employment_data
-    mix = data.mixed_data
-
-    if len(comb) < len(rec) + len(emp) + len(mix):
-        LOG.info(
-            f"combined data ({len(comb)}) has less records as "
-            f"the other sheets combined ({len(rec)+len(emp)+len(mix)})"
-        )
-        missing_ids = find_missing_ids(
-            pd.concat(
-                [
-                    rec["site_reference_id"],
-                    emp["site_reference_id"],
-                    mix["site_reference_id"],
-                ]
-            ),
-            comb["site_reference_id"],
-        )
-    elif len(comb) > len(rec) + len(emp) + len(mix):
-        LOG.info(
-            f"combined data ({len(comb)}) has more records as"
-            f"the other sheets combined ({len(rec)+len(emp)+len(mix)})"
-        )
-        missing_ids = find_missing_ids(
-            comb["site_reference_id"],
-            pd.concat(
-                [
-                    rec["site_reference_id"],
-                    emp["site_reference_id"],
-                    mix["site_reference_id"],
-                ]
-            ),
-        )
-    else:
-        missing_ids = None
-    return missing_ids
 
 
 def find_missing_ids(ids_l: pd.Series, ids_s: pd.Series) -> Optional[pd.Series]:

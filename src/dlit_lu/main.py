@@ -21,6 +21,7 @@ from dlit_lu import inputs, parser, utilities, analyse, syntax_fixes
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
 LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
+PLOT_GRAPHS = False
 
 def run()-> None:
     with utilities.DLitLog() as dlit_log:
@@ -64,9 +65,14 @@ def main(log: utilities.DLitLog) -> None:
 
     
     
-    data_filter_columns = analyse.data_report(dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data)
+    data_filter_columns = analyse.data_report(dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data, PLOT_GRAPHS)
+    
     #TODO finalise data pipeline: currently testing setup for syntax fixes
     fixed_data = syntax_fixes.fix_inavlid_syntax(data_filter_columns, auxiliary_data)
+    utilities.write_to_excel(config.output_folder / "pre_fix_data.xlsx", utilities.to_dict(data_filter_columns))
     post_fix_output_path = config.output_folder / "post_auto_fix"
     post_fix_output_path.mkdir(exist_ok=True)
-    post_fix_data_filter_columns = analyse.data_report(fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data)
+    post_fix_data_filter_columns = analyse.data_report(fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data, PLOT_GRAPHS)
+    
+    #temp outputs for debugging
+    utilities.write_to_excel(config.output_folder / "post_fix_data.xlsx", utilities.to_dict(post_fix_data_filter_columns))

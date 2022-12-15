@@ -1,17 +1,20 @@
-#TODO header
-#standard imports
+# TODO header
+# standard imports
 import logging
 import pathlib
 from typing import Optional
 import os
 
-#third party imports
+# third party imports
 import pandas as pd
 
-#constants
+# local imports
+from dlit_lu import global_classes
+# constants
 LOG = logging.getLogger(__name__)
 
-class  DLitLog:
+
+class DLitLog:
     """Manages the DLit tool log file.
 
     Parameters
@@ -20,6 +23,7 @@ class  DLitLog:
         File to save the log file to, if not given doesn't create
         a file. Can be done later with `DlitLog.add_file_handler`.
     """
+
     def __init__(self, file: Optional[pathlib.Path] = None):
         self.logger = logging.getLogger(__package__)
         self.logger.setLevel(logging.DEBUG)
@@ -81,12 +85,14 @@ class  DLitLog:
         """
         # Write exception to logfile
         if excepType is not None or excepVal is not None or traceback is not None:
-            self.logger.critical("Oh no a critical error occurred", exc_info=True)
+            self.logger.critical(
+                "Oh no a critical error occurred", exc_info=True)
         else:
             self.logger.info("Program completed without any fatal errors")
 
         self.logger.info("Closing log file")
         logging.shutdown()
+
 
 def output_file_checks(output_function):
     """decorator for out put fuctions
@@ -111,8 +117,9 @@ def output_file_checks(output_function):
         # Do something after the function.
     return wrapper_func
 
+
 @output_file_checks
-def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame])-> None:
+def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) -> None:
     """write a dict of pandas DF to a excel spreadsheet
 
     the keys will become the sheet names 
@@ -129,3 +136,42 @@ def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame])-> 
             LOG.info(f"Writing {key}")
             value.to_excel(writer, sheet_name=key)
     
+
+def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
+    """converts dlog_data to a dictionary
+
+    only contains residential, employment and mixed data
+
+    Parameters
+    ----------
+    dlog_data : global_classes.DLogData
+        dlog data to convert to dict
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        converted data
+    """
+    return {
+        "residential": dlog_data.residential_data,
+        "employment": dlog_data.employment_data,
+        "mixed": dlog_data.mixed_data,
+        }
+
+def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Lookup)->global_classes.DLogData:
+    try:
+        return global_classes.DLogData(
+            dlog_data["combined"],
+            dlog_data["residential"],
+            dlog_data["employment"],
+            dlog_data["mixed"],
+            lookup,
+            )
+    except KeyError:
+        return global_classes.DLogData(
+            None,
+            dlog_data["residential"],
+            dlog_data["employment"],
+            dlog_data["mixed"],
+            lookup,
+            )

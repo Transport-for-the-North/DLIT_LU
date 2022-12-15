@@ -252,10 +252,16 @@ def read_auxiliary_data(
     out_of_date_luc.loc[:, "out_of_date_land_use_codes"] = out_of_date_luc[
         "out_of_date_land_use_codes"
     ].str.lower()
+    out_of_date_luc.loc[:, "replacement_codes"] = parse_landuse_codes(out_of_date_luc[
+        "replacement_codes"
+    ])
     incomplete_luc = pd.read_csv(incomplete_luc_path)
     incomplete_luc.loc[:, "incomplete_land_use_codes"] = incomplete_luc[
         "incomplete_land_use_codes"
     ].str.lower()
+    incomplete_luc.loc[:, "land_use_code"] = parse_landuse_codes(incomplete_luc[
+        "land_use_code"
+    ])
     #parse local planning regions
     regions = gpd.read_file(lpa_shapefile_path)#TODO add column names to config file
     return global_classes.AuxiliaryData(
