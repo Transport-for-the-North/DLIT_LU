@@ -222,6 +222,7 @@ def parse_lookup(
 
 def read_auxiliary_data(
     valid_luc_path: pathlib.Path,
+    known_invalid_luc_path: pathlib.Path,
     out_of_date_luc_path: pathlib.Path,
     incomplete_luc_path: pathlib.Path,
     lpa_shapefile_path: pathlib.Path
@@ -247,23 +248,30 @@ def read_auxiliary_data(
     allowed_land_use_codes = pd.read_csv(valid_luc_path)
     allowed_land_use_codes.loc[:, "land_use_codes"] = allowed_land_use_codes[
         "land_use_codes"
-    ].str.lower()
+    ].str.lower().str.replace(r"\s+", "")
     out_of_date_luc = pd.read_csv(out_of_date_luc_path)
     out_of_date_luc.loc[:, "out_of_date_land_use_codes"] = out_of_date_luc[
         "out_of_date_land_use_codes"
-    ].str.lower()
+    ].str.lower().str.replace(r"\s+", "")
     out_of_date_luc.loc[:, "replacement_codes"] = parse_landuse_codes(out_of_date_luc[
         "replacement_codes"
     ])
     incomplete_luc = pd.read_csv(incomplete_luc_path)
     incomplete_luc.loc[:, "incomplete_land_use_codes"] = incomplete_luc[
         "incomplete_land_use_codes"
-    ].str.lower()
+    ].str.lower().str.replace(r"\s+", "")
     incomplete_luc.loc[:, "land_use_code"] = parse_landuse_codes(incomplete_luc[
         "land_use_code"
+    ])
+    known_invalid_luc = pd.read_csv(known_invalid_luc_path)
+    known_invalid_luc.loc[:, "known_invalid_code"] = known_invalid_luc[
+        "known_invalid_code"
+    ].str.lower().str.replace(r"\s+", "")
+    known_invalid_luc.loc[:, "corrected_code"] = parse_landuse_codes(known_invalid_luc[
+        "corrected_code"
     ])
     #parse local planning regions
     regions = gpd.read_file(lpa_shapefile_path)#TODO add column names to config file
     return global_classes.AuxiliaryData(
-        allowed_land_use_codes, out_of_date_luc, incomplete_luc, regions
+        allowed_land_use_codes, known_invalid_luc, out_of_date_luc, incomplete_luc, regions
     )

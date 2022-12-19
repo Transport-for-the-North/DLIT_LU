@@ -148,6 +148,7 @@ class DLitConfig(BaseConfig):
     employment_column_names_path: pathlib.Path
     mixed_column_names_path: pathlib.Path
     valid_luc_path: pathlib.Path
+    known_invalid_luc_path: pathlib.Path
     out_of_date_luc_path: pathlib.Path
     incomplete_luc_path: pathlib.Path
     regions_shapefiles_path: pathlib.Path

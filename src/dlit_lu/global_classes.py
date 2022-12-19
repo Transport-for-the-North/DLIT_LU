@@ -87,6 +87,7 @@ class AuxiliaryData(NamedTuple):
     lpa_regions: gpd.GeoDataFrame
     """    
     allowed_codes:pd.DataFrame
+    known_invalid_luc: pd.DataFrame
     out_of_date_luc: pd.DataFrame
     incomplete_luc: pd.DataFrame
     regions: gpd.GeoDataFrame

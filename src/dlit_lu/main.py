@@ -15,7 +15,7 @@ import logging
 #third party imports 
 from tqdm.contrib import logging as tqdm_log
 # local imports
-from dlit_lu import inputs, parser, utilities, analyse, syntax_fixes
+from dlit_lu import data_repair, inputs, parser, utilities, analyse
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -58,6 +58,7 @@ def main(log: utilities.DLitLog) -> None:
     )
     auxiliary_data = parser.read_auxiliary_data(
         config.valid_luc_path,
+        config.known_invalid_luc_path,
         config.out_of_date_luc_path,
         config.incomplete_luc_path,
         config.regions_shapefiles_path,
@@ -68,7 +69,7 @@ def main(log: utilities.DLitLog) -> None:
     data_filter_columns = analyse.data_report(dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data, PLOT_GRAPHS)
     
     #TODO finalise data pipeline: currently testing setup for syntax fixes
-    fixed_data = syntax_fixes.fix_inavlid_syntax(data_filter_columns, auxiliary_data)
+    fixed_data = data_repair.fix_inavlid_syntax(data_filter_columns, auxiliary_data)
     utilities.write_to_excel(config.output_folder / "pre_fix_data.xlsx", utilities.to_dict(data_filter_columns))
     post_fix_output_path = config.output_folder / "post_auto_fix"
     post_fix_output_path.mkdir(exist_ok=True)

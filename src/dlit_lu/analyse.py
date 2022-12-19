@@ -48,7 +48,7 @@ def data_report(
     report_file_path: pathlib.Path,
     output_folder_path: pathlib.Path,
     auxiliary_data: global_classes.AuxiliaryData,
-    plot_maps: bool 
+    plot_maps: bool
 ) -> global_classes.DLogData:
     """Produces a data report to the provided file path
 
@@ -156,6 +156,23 @@ def data_report(
         results_report,
         "missing_years",
         "Entries where a start and/or end years have not been provided",
+    )
+    # ---------------------find missing areas--------------------------------------
+
+    missing_area = find_multiple_missing_values(
+        data,
+        {
+            "residential": ["total_site_area_size_hectares"],
+            "employment": ["site_area_ha"],
+            "mixed": ["total_area_ha"],
+        },
+        {"residential": [0, "-"], "employment": [0, "-"], "mixed": [0, "-"]},
+    )
+    results_report = parse_analysis_results(
+        missing_area,
+        results_report,
+        "missing_area",
+        "NON FATAL: Entries where site area have not been provided. Only becomes critical error if dwellings/floorspace have not been provided.",
     )
 
     # ------------------- find missing areas_dwellings------------------------------
@@ -284,8 +301,12 @@ def data_report(
         "missing_areas_or_dwellings_no_site_area",
     ]
 
-    non_fatal_columns = ["contradictory_webtag_and_planning_status",
-                         "contradictory_local_authority_name_id", "inactive_entries"]
+    non_fatal_columns = [
+        "contradictory_webtag_and_planning_status",
+        "contradictory_local_authority_name_id",
+        "inactive_entries",
+        "missing_area",
+    ]
 
     # filter for only entries with issues
     classified_data = classify_data(
@@ -1051,7 +1072,7 @@ def plot_data(
 
 def geo_plotter(
     file_name: str,
-    title: str, 
+    title: str,
     path: pathlib.Path,
     limits: dict[str, list[int]],
     points: Optional[dict[str, gpd.GeoDataFrame]] = None,
@@ -1130,11 +1151,11 @@ def geo_plotter(
     ax.set_xticks([])  # turn off axis labels
     ax.set_yticks([])
     plt.title(title)
-    ax.text(0.01,0.01,
-        s="Source: Office for National Statistics licensed under the Open Government Licence v.3.0\n"
-             "Contains OS data © Crown copyright and database right [2021]",
-        transform=fig.transFigure,
-    )
+    ax.text(0.01, 0.01,
+            s="Source: Office for National Statistics licensed under the Open Government Licence v.3.0\n"
+            "Contains OS data © Crown copyright and database right [2021]",
+            transform=fig.transFigure,
+            )
     if limits is not None:  # set limits
         ax.set_xlim(limits["x"][0], limits["x"][1])
         ax.set_ylim(limits["y"][0], limits["y"][1])

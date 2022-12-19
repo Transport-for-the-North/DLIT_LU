@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/run.py",
             "console": "integratedTerminal",
-            "env": {"PYHTONPATH": "${workspaceFolder}/src"}
+            "env": {"PYHTONPATH": "${workspaceFolder}/src"}, 
             "justMyCode": true
         },
     ]

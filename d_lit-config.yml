@@ -13,9 +13,13 @@ mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_c
 
 output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
 data_report_file_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\data_report.xlsx
+
+
 valid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\valid_luc.csv
 out_of_date_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\out_of_date_luc.csv
 incomplete_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\incomplete_luc.csv
+known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_invalid_luc.csv
+
 regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
 
 

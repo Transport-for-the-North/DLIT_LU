@@ -131,7 +131,7 @@ def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) ->
     outputs : dict[str, pd.DataFrame]
         data to output, str = sheet names, DF = data to write
     """
-    with pd.ExcelWriter(file_path) as writer:
+    with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
         for key, value in outputs.items():
             LOG.info(f"Writing {key}")
             value.to_excel(writer, sheet_name=key)
