@@ -10,11 +10,11 @@ ValueError
 ValueError
     goe_explorer: column: str must be passed if a chloroperg has been given
 ValueError
-    goe_explorer: colour must be passed if points has been given 
+    goe_explorer: colour must be passed if points has been given
 ValueError
     add_filter_column: no column found
 ValueError
-    analyse_invalid_luc: no column found 
+    analyse_invalid_luc: no column found
 ValueError
     find_invalid_land_use_codes: no column found
 """
@@ -152,10 +152,38 @@ def data_report(
         },
     )
     results_report = parse_analysis_results(
-        missing_years,
+        missing_years, 
         results_report,
-        "missing_years",
-        "Entries where a start and/or end years have not been provided",
+        "missing_years", 
+        "Entries with start and end years not defined",
+    )
+    #find missing years without a tag-certainty specified
+    missing_years_no_webtag = find_multiple_missing_values(missing_years,{
+            "residential": ["web_tag_certainty_id"],
+            "employment": ["web_tag_certainty_id"],
+            "mixed": ["web_tag_certainty_id"],
+        }, 
+        {
+            "residential": [0, "-"],
+            "employment": [0, "-"],
+            "mixed": [0, "-"],
+        }
+    )
+    results_report = parse_analysis_results(
+        missing_years_no_webtag, 
+        results_report,
+        "missing_years_no_webtag", 
+        "Entries with missing years and no WEBTAG certainity status, infilling not possible"
+    )
+    missing_years_with_webtag = {}
+    for key, value in missing_years.items():
+        missing_years_with_webtag[key] = value.drop(index = missing_years_no_webtag[key].index)
+
+    results_report = parse_analysis_results(
+        missing_years_with_webtag, 
+        results_report,
+        "missing_years_with_webtag", 
+        "Entries with missing years that do have WEBTAG certainity status, infilling possible"
     )
     # ---------------------find missing areas--------------------------------------
 
@@ -215,14 +243,14 @@ def data_report(
     results_report = parse_analysis_results(
         missing_d_a_no_sa,
         results_report,
-        "missing_areas_or_dwellings_no_site_area",
+        "missing_gfa_or_dwellings_no_site_area",
         "Entries where areas (employment/mixed) or dwellings (residential/mixed) are"
         " not provided or are 0 where no site area is provided. User intervention required.",
     )
     results_report = parse_analysis_results(
         missing_d_a_with_sa,
         results_report,
-        "missing_areas_or_dwellings_with_site_area",
+        "missing_gfa_or_dwellings_with_site_area",
         "Entries where areas (employment/mixed) or dwellings (residential/mixed) are not provided"
         " or are 0 where site area is provided. Assumptions can be made",
     )
@@ -294,11 +322,8 @@ def data_report(
     )
     # used to calculate the number of entries with user intervention required
     user_intervention_required = [
-        "other_issues_existing_land_use_code",
-        "other_issues_proposed_land_use_code",
-        "missing_years",
         "missing_coords",
-        "missing_areas_or_dwellings_no_site_area",
+        "missing_years_no_webtag",
     ]
 
     non_fatal_columns = [
@@ -308,9 +333,20 @@ def data_report(
         "missing_area",
     ]
 
+    autofix_columns = [
+        "missing_site_ref",
+        "all_invalid_existing_land_use_code",
+        "all_invalid_proposed_land_use_code",
+        "missing_gfa_or_dwellings_with_site_area",
+        "missing_dist",
+        "missing_years_with_webtag",
+        "missing_gfa_or_dwellings_no_site_area",
+    ]
+
     # filter for only entries with issues
     classified_data = classify_data(
         results_report,
+        autofix_columns, 
         user_intervention_required,
         non_fatal_columns
     )
@@ -468,6 +504,7 @@ def data_report(
 
 def classify_data(
     results_report: global_classes.ResultsReport,
+    auto_fix_columns: list[str], 
     intervention_required_columns: list[str],
     non_fatal_columns: list[str] = [],
 ) -> dict[str, dict[str, pd.DataFrame]]:
@@ -507,9 +544,8 @@ def classify_data(
         ]
         non_fatal[key] = value[value.loc[:, non_fatal_columns].any(axis=1)
                                ]
-        auto_fixes[key] = invalid_output[key].drop(
-            index=intervention_required[key].index
-        )
+        auto_fixes[key] = value[value.loc[:, auto_fix_columns].any(axis=1)]
+
     return {
         "invalid": invalid_output,
         "valid": valid_output,
@@ -896,7 +932,7 @@ def plot_data(
     limits: dict[str, list[int]],
     show_graph: bool,
     folder_path: pathlib.Path,
-) -> None:  # TODO comments and docstring
+) -> None:
     """plots Geodataframes in data onto a base
 
     Parameters
@@ -1413,10 +1449,28 @@ def find_multiple_missing_values(
     test_columns: dict[str, list[str]],
     not_allowed: dict[str, list[str | int]],
 ) -> dict[str, pd.DataFrame]:
+    """finds missing values in each datafram contained within a dictionary
+
+    wrapper for find_missing_values
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to be analysed
+    test_columns : dict[str, list[str]]
+        column to be analysed needs idetical keys to data
+    not_allowed : dict[str, list[str  |  int]]
+        invalid values to be analysed needs idetical keys to data
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        the entries with missing values to be tested
+    """
     missing_values = {}
     for key, value in data.items():
         missing_values[key] = find_missing_values(
-            value, test_columns[key], not_allowed[key]
+            value, [test_columns[key]], not_allowed[key]
         )
     return missing_values
 
@@ -1549,7 +1603,7 @@ def check_id_value_consistency(
         check_record = item.merge(
             lookup_table,
             left_on=id_name,
-            right_on="ID",
+            right_on="id",
             how="left",
             suffixes=["", "_table"],
         )

@@ -175,7 +175,7 @@ def parse_lookup(
             input_file_path,
             sheet_name=lookup_sheet_name,
             engine="openpyxl",
-            names=[key, "ID"],
+            names=[key, "id"],
             index_col=1,
             usecols=value,
         )
@@ -201,8 +201,8 @@ def parse_lookup(
         usecols="Z:AA",
     )
     # ^ No header in worksheet, id and value switched wrt others
-    local_authority.columns = ["ID", "local_authority"]
-    local_authority.set_index("ID", drop=True, inplace=True)
+    local_authority.columns = ["id", "local_authority"]
+    local_authority.set_index("id", drop=True, inplace=True)
     local_authority.dropna(how="any", inplace=True)
 
     lookup_exit_variable = global_classes.Lookup(
