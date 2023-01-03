@@ -12,10 +12,11 @@
 # standard imports
 import pathlib
 import logging
+import os
 # third party imports
 from tqdm.contrib import logging as tqdm_log
 # local imports
-from dlit_lu import data_repair, inputs, parser, utilities, analyse
+from dlit_lu import data_repair, inputs, parser, utilities, analyse, user_fixes, global_classes
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -64,22 +65,105 @@ def main(log: utilities.DLitLog) -> None:
         config.incomplete_luc_path,
         config.regions_shapefiles_path,
     )
-
-    data_filter_columns = analyse.data_report(
-        dlog_data, config.data_report_file_path, config.output_folder, auxiliary_data, PLOT_GRAPHS)
-
-    # TODO finalise data pipeline: currently testing setup for syntax fixes
-    fixed_data = data_repair.fix_inavlid_syntax(
-        data_filter_columns, auxiliary_data)
-
+    data_to_fix = dlog_data
+    while True:
+        fixed_data = implement_user_fixes(config, data_to_fix, auxiliary_data)
+        report_path = config.output_folder / "post_user_fix_data_report.xlsx"
+        data_filter_columns =  analyse.data_report(
+            fixed_data,
+            report_path,
+            config.output_folder,
+            auxiliary_data,
+            PLOT_GRAPHS,
+            True,
+            )
+        LOG.info(f"post user fix report outputted to {report_path}")
+        continue_analysis = utilities.y_n_user_input("A data report has been outputted"
+        ", please review this. Are you happy with the changes made or would you like to"
+        " add further changes? (Y/N)\n")
+        if continue_analysis:
+            break
+        else:
+            data_to_fix = fixed_data
     fixed_data = data_repair.infill_data(fixed_data, auxiliary_data)
     utilities.write_to_excel(
         config.output_folder / "pre_fix_data.xlsx", utilities.to_dict(data_filter_columns))
     post_fix_output_path = config.output_folder / "post_auto_fix"
     post_fix_output_path.mkdir(exist_ok=True)
+
     post_fix_data_filter_columns = analyse.data_report(
-        fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data, PLOT_GRAPHS)
+        fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data, PLOT_GRAPHS, True)
 
     # temp outputs for debugging
     utilities.write_to_excel(config.output_folder / "post_fix_data.xlsx",
                              utilities.to_dict(post_fix_data_filter_columns))
+
+
+def implement_user_fixes(
+    config: inputs.DLitConfig,
+    dlog_data: global_classes.DLogData,
+    auxiliary_data: global_classes.AuxiliaryData,
+    )->global_classes.DLogData:
+
+    if os.path.exists(config.user_input_path):
+        modification_file_ready = utilities.y_n_user_input(
+            f"Do you have a modifications file at {config.user_input_path}"
+            " that you would like to integrate to the data? (y/n)\n")
+    else:
+        modification_file_ready = False
+    
+    data_filter_columns = analyse.data_report(
+                dlog_data,
+                config.data_report_file_path,
+                config.output_folder,
+                auxiliary_data,
+                False,
+                False,
+            )
+
+    fixed_data = data_repair.fix_inavlid_syntax(
+        data_filter_columns, auxiliary_data)
+
+    if modification_file_ready:
+        user_changes = True
+    else:
+        data_filter_columns = analyse.data_report(
+            data_filter_columns,
+            config.data_report_file_path,
+            config.output_folder,
+            auxiliary_data,
+            PLOT_GRAPHS,
+            True,
+        )
+
+        LOG.info(f"Intial data quality report saved as {config.data_report_file_path}")
+        user_changes = utilities.y_n_user_input("Do you wish to"
+            "manually fix data before it is infilled? (Y/N)\n")
+
+        if user_changes:
+            if os.path.exists(config.user_input_path):
+                input(f"Overwriting {config.user_input_path}, if you wish to store any changes made"
+                    "make a copy with a different name and press enter, otherwise press enter.")
+
+            user_fixes.user_input_file_builder(
+                config.user_input_path, fixed_data)
+
+            end_program = utilities.y_n_user_input(f"A file has been created at "
+                    f"{config.user_input_path} for you to manually infill data. Would "
+                    "you like to end the program and rerun when you have finished ? Y "
+                    "(end the program, modify the data then rerun) or N (data has been"
+                    " modified)\n")
+
+            if end_program:
+                LOG.info("Ending program")
+                return
+
+    if user_changes:
+        fixed_data = user_fixes.infill_user_inputs(
+            dict((k, utilities.to_dict(fixed_data)[k]) for k in (["residential","employment", "mixed"])),
+            config.user_input_path)
+        fixed_data = utilities.to_dlog_data(fixed_data, dlog_data.lookup)
+    return fixed_data
+    
+    
+        

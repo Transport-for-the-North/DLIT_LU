@@ -3,6 +3,7 @@
 # standard imports
 import pathlib
 import logging
+from typing import Optional
 
 # third party imports
 import pandas as pd
@@ -90,7 +91,7 @@ def parse_sheet(
     input_file_path: pathlib.Path,
     sheet_name: str,
     skip_rows: int,
-    column_names: list[str],
+    column_names: Optional[list[str]]=None,
 ) -> pd.DataFrame:
     """parses a sheet in a excel spread sheet
 
@@ -102,7 +103,8 @@ def parse_sheet(
         the name of the sheet to parse
     skip_rows : int
         number of rows to skip
-    column_names : list[str]
+    column_names : Optional[list[str]] optional
+        , by default None
         the column names of the excel spread sheet
 
     Returns
@@ -115,8 +117,12 @@ def parse_sheet(
     )
     data.loc[:, "site_name"] = data["site_name"].astype("string")
     data["existing_land_use"] = parse_landuse_codes(data["existing_land_use"])
-    data["proposed_land_use"] = parse_landuse_codes(data["proposed_land_use"])
-    data.columns = [name.lower() for name in column_names]
+    data["proposed_land_use"] = parse_landuse_codes(data["proposed_land_use"])    
+    
+    if column_names is not None:
+        data.columns = [name.lower() for name in column_names]
+    else:
+        data.columns = data.columns.str.lower()
     return data
 
 
@@ -138,6 +144,7 @@ def parse_landuse_codes(codes: pd.Series) -> pd.Series:
     codes = codes.astype("string")
     codes = codes.str.lower()
     codes = codes.str.replace("and", ",").str.replace("/", ",").str.replace(r"\s+", "")
+    codes = codes.str.replace("[", "").str.replace("]", "").str.replace("\'", "")
     codes = codes.str.split(",")
     return codes
 

@@ -13,7 +13,7 @@ mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_c
 
 output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
 data_report_file_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\data_report.xlsx
-
+user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
 
 valid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\valid_luc.csv
 out_of_date_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\out_of_date_luc.csv

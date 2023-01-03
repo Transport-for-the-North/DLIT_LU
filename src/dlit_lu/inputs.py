@@ -152,6 +152,7 @@ class DLitConfig(BaseConfig):
     out_of_date_luc_path: pathlib.Path
     incomplete_luc_path: pathlib.Path
     regions_shapefiles_path: pathlib.Path
+    user_input_path: pathlib.Path
 
     @pydantic.validator(
         "dlog_input_file", 

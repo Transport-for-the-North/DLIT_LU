@@ -493,8 +493,6 @@ def fix_missing_lucs(
     missing_values_lookup.loc[:, "fill_value"] = pd.Series(
         [fill_value]).repeat(len(missing_values_lookup)).reset_index(drop=True)
     fixed_codes = {}
-    filter_codes = {"existing_land_use": "other_issues_existing_land_use_code",
-                    "proposed_land_use": "other_issues_proposed_land_use_code"}
     for key, value in data.items():
         fixed_codes[key] = value.copy()
         for column in columns[key]:

@@ -48,7 +48,8 @@ def data_report(
     report_file_path: pathlib.Path,
     output_folder_path: pathlib.Path,
     auxiliary_data: global_classes.AuxiliaryData,
-    plot_maps: bool
+    plot_maps: bool,
+    write_report: bool, 
 ) -> global_classes.DLogData:
     """Produces a data report to the provided file path
 
@@ -490,15 +491,16 @@ def data_report(
             output_folder_path,
         )
     # output data report
-    utilities.write_to_excel(
-        report_file_path,
-        {
-            "report_summary": summary,
-            "Residential": classified_data["invalid"]["residential"],
-            "Employment": classified_data["invalid"]["employment"],
-            "Mixed": classified_data["invalid"]["mixed"],
-        },
-    )
+    if write_report:
+        utilities.write_to_excel(
+            report_file_path,
+            {
+                "report_summary": summary,
+                "Residential": classified_data["invalid"]["residential"],
+                "Employment": classified_data["invalid"]["employment"],
+                "Mixed": classified_data["invalid"]["mixed"],
+            },
+        )
     return global_classes.DLogData(None, results_report.data_filter["residential"], results_report.data_filter["employment"], results_report.data_filter["mixed"], dlog_data.lookup)
 
 
