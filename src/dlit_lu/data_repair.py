@@ -60,7 +60,24 @@ def fix_inavlid_syntax(
         data.lookup,
     )
 
-def infill_data(data: global_classes.DLogData, auxiliary_data: global_classes.AuxiliaryData) -> global_classes.DLogData:
+def infill_data(data: global_classes.DLogData, 
+    auxiliary_data: global_classes.AuxiliaryData) -> global_classes.DLogData:
+    """Infills data for which assumptions are required
+
+    infills missing areas, units, land use codes with multiple possible values
+
+    Parameters
+    ----------
+    data : global_classes.DLogData
+        data to infill
+    auxiliary_data : global_classes.AuxiliaryData
+        auxiliary data from parser
+
+    Returns
+    -------
+    global_classes.DLogData
+        infilled data
+    """
     LOG.info("performing automatic infilling fixes")
     data_dict = {"residential": data.residential_data,
                  "employment": data.employment_data, "mixed": data.mixed_data}

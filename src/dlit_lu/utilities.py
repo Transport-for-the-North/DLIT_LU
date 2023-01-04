@@ -200,3 +200,14 @@ def y_n_user_input(message: str)->bool:
             return False
         else:
             LOG.warning(f"{answer_lower} does not look like \"y\" or \"n\" to me...")
+
+def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
+    
+    mix = data["mixed"]
+    res = data["residential"]
+    emp = data["employment"]
+
+    res_new = pd.concat([res, mix.loc[:,res.columns]])
+    emp_new = pd.concat([emp, mix.loc[:,emp.columns]])
+
+    return {"residential":res_new, "employment":emp_new}

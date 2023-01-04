@@ -142,7 +142,6 @@ class DLitConfig(BaseConfig):
     mixed_sheet_name: str
     lookups_sheet_name: str
     output_folder: pathlib.Path
-    data_report_file_path: pathlib.Path
     combined_column_names_path: pathlib.Path
     residential_column_names_path: pathlib.Path
     employment_column_names_path: pathlib.Path
