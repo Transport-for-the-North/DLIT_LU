@@ -15,7 +15,10 @@ from dlit_lu import global_classes, utilities, analyse
 LOG = logging.getLogger(__name__)
 
 
-def fix_inavlid_syntax(data: global_classes.DLogData, auxiliary_data: global_classes.AuxiliaryData) -> global_classes.DLogData:
+def fix_inavlid_syntax(
+    data: global_classes.DLogData,
+    auxiliary_data: global_classes.AuxiliaryData,
+    ) -> global_classes.DLogData:
     """fixes invalid syntax issues with inputted data data
 
     IN PROGRESS
@@ -39,7 +42,8 @@ def fix_inavlid_syntax(data: global_classes.DLogData, auxiliary_data: global_cla
     #define columns
 
     land_use_columns = {"residential": ["existing_land_use"], "employment": [
-        "existing_land_use", "proposed_land_use"], "mixed": ["existing_land_use", "proposed_land_use"]}
+        "existing_land_use", "proposed_land_use"],
+        "mixed": ["existing_land_use", "proposed_land_use"]}
 
     #TODO does not include dwelling units for mixed, currently fixed manually
     data_dict = utilities.to_dict(data)
@@ -73,8 +77,9 @@ def infill_data(data: global_classes.DLogData, auxiliary_data: global_classes.Au
 
     units_columnns = {"residential": ["units_(dwellings)", "total_units"], "employment": [
         "total_area_sqm", "units_(floorspace)"], "mixed": ["floorspace_sqm", "units_(floorspace)"]}
-
+    
     #calculate ratios
+
     calc_luc_ratio = luc_ratio(data_dict, auxiliary_data)
 
     dwelling_area_ratio = unit_area_ratio(
@@ -299,7 +304,7 @@ def infill_units(
         unit_columns,
         dict((k, missing_values) for k in data.keys()),
     )
-    area_columns_list = dict((k, area_columns[k]) for k in area_columns.keys())
+    area_columns_list = dict((k, [area_columns[k]]) for k in area_columns.keys())
     filtered_data_missing_area = analyse.find_multiple_missing_values(
         filtered_data,
         area_columns_list,
