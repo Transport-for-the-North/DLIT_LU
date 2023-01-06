@@ -278,8 +278,8 @@ def data_report(
     missing_dist = find_multiple_missing_values(
         data,
         {
-            "residential": ["distribution"],
-            "employment": ["distribution"],
+            "residential": ["res_distribution"],
+            "employment": ["emp_distribution"],
             "mixed": ["res_distribution", "emp_distribution"],
         },
         {"residential": [0], "employment": [0], "mixed": [0]},

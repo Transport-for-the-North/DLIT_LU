@@ -84,7 +84,7 @@ def main(log: utilities.DLitLog) -> None:
             )
         LOG.info(f"post user fix report outputted to {report_path}")
         continue_analysis = utilities.y_n_user_input("A data report has been outputted"
-        ", please review this. Woudl you like to continue (or add further changes)? (Y/N)\n")
+        ", please review this. Would you like to continue (or add further changes)? (Y/N)\n")
         if continue_analysis:
             break
         else:
@@ -101,9 +101,6 @@ def main(log: utilities.DLitLog) -> None:
     # temp outputs for debugging
     utilities.write_to_excel(config.output_folder / "post_fix_data.xlsx",
                              utilities.to_dict(post_fix_data_filter_columns))
-    #dissag_fixed_data = utilities.disagg_mixed(utilities.to_dict(post_fix_data_filter_columns))
-    print("this is temporary")
-
+    #TODO finalise disagg mixed pipeline
+    disagg_fixed_data = utilities.disagg_mixed(utilities.to_dict(post_fix_data_filter_columns))
     
-    
-        

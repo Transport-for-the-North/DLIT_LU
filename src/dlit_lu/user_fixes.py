@@ -124,8 +124,8 @@ def implement_user_fixes(
     #determines if user wishes to infill using exisiting file
     if os.path.exists(config.user_input_path):
         modification_file_ready = utilities.y_n_user_input(
-            f"A file already existings at {config.user_input_path}."
-            " does this contain the fixes you wish to implement? (Y/N)\n")
+            f"A file already exists at {config.user_input_path}."
+            " Does this contain the fixes you wish to implement? (Y/N)\n")
     else:
         modification_file_ready = False
     
@@ -148,7 +148,7 @@ def implement_user_fixes(
     else:
         report_path = config.output_folder / "initial_data_quality_report.xlsx"
         data_filter_columns = analyse.data_report(
-            data_filter_columns,
+            fixed_data,
             report_path,
             config.output_folder,
             auxiliary_data,
@@ -176,7 +176,7 @@ def implement_user_fixes(
             #allows user to end program to to edit data
             end_program = utilities.y_n_user_input(f"A file has been created at "
                     f"{config.user_input_path} for you to manually infill data. Would "
-                    "you like to end the program and rerun when you have finished ? Y "
+                    "you like to end the program and rerun when you have finished? Y "
                     "(end the program, modify the data then rerun) or N (data has been"
                     " modified)\n")
 
@@ -190,7 +190,7 @@ def implement_user_fixes(
             dict((k, utilities.to_dict(fixed_data)[k]) for k in (["residential","employment", "mixed"])),
             config.user_input_path)
         infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
-        create_user_changes_audit(config.output_folder/"user_changes_audit.xlsx", infilled_data, fixed_data)
+        #create_user_changes_audit(config.output_folder/"user_changes_audit.xlsx", infilled_data, fixed_data)
     return infilled_data
 
 def create_user_changes_audit(
@@ -205,8 +205,8 @@ def create_user_changes_audit(
         value_colour = value.copy()
         differences = value_colour.eq(original[key])
         modified_colour_coded[key]=value_colour.style.applymap(color_different_red, subset=differences)
-    utilities.write_to_excel(file_path,modified_colour_coded)
+    utilities.write_to_excel(file_path, modified_colour_coded)
 
 def color_different_red(val):
-    color = 'red' if val == False else "background-color: none"
-    return 'color: %s' % color
+    colour = 'red' if val == False else 'none'
+    return 'background-color: %s' % colour

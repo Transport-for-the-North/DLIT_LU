@@ -7,6 +7,7 @@ import os
 
 # third party imports
 import pandas as pd
+import openpyxl
 
 # local imports
 from dlit_lu import global_classes
@@ -204,10 +205,14 @@ def y_n_user_input(message: str)->bool:
 def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
     
     mix = data["mixed"]
-    res = data["residential"]
-    emp = data["employment"]
+    res = data["residential"].reset_index(drop=True)
+    emp = data["employment"].reset_index(drop=True)
+    
+    mix_res = mix.loc[:,res.columns.unique()].reset_index(drop=True)
+    mix_emp = mix.loc[:, emp.columns.unique()].reset_index(drop=True)
 
-    res_new = pd.concat([res, mix.loc[:,res.columns]])
-    emp_new = pd.concat([emp, mix.loc[:,emp.columns]])
+
+    res_new = pd.concat([res, mix_res],  ignore_index= True)
+    emp_new = pd.concat([emp, mix_emp], ignore_index= True)
 
     return {"residential":res_new, "employment":emp_new}
