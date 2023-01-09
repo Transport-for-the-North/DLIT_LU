@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 # third party imports
 import pandas as pd
+import openpyxl
 
 # local imports
 from dlit_lu import global_classes, utilities, parser, analyse, inputs, data_repair
@@ -130,25 +131,14 @@ def implement_user_fixes(
         modification_file_ready = False
     
     #adds filter columns without producing report
-    data_filter_columns = analyse.data_report(
-                dlog_data,
-                config.output_folder/"not_needed.xlsx",
-                config.output_folder,
-                auxiliary_data,
-                False,
-                False,
-            )
-
-    fixed_data = data_repair.fix_inavlid_syntax(
-        data_filter_columns, auxiliary_data)
 
     if modification_file_ready:
         user_changes = True
         LOG.info(f"Existing file {config.user_input_path} set as user infill input.")
     else:
         report_path = config.output_folder / "initial_data_quality_report.xlsx"
-        data_filter_columns = analyse.data_report(
-            fixed_data,
+        analyse.data_report(
+            dlog_data,
             report_path,
             config.output_folder,
             auxiliary_data,
@@ -171,7 +161,7 @@ def implement_user_fixes(
                     " enter.")
 
             user_input_file_builder(
-                config.user_input_path, fixed_data)
+                config.user_input_path, dlog_data)
 
             #allows user to end program to to edit data
             end_program = utilities.y_n_user_input(f"A file has been created at "
@@ -187,26 +177,69 @@ def implement_user_fixes(
     if user_changes:
         LOG.info("Implementing user fixes")
         infilled_data = infill_user_inputs(
-            dict((k, utilities.to_dict(fixed_data)[k]) for k in (["residential","employment", "mixed"])),
+            dict((k, utilities.to_dict(dlog_data)[k]) for k in (["residential","employment", "mixed"])),
             config.user_input_path)
         infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
-        #create_user_changes_audit(config.output_folder/"user_changes_audit.xlsx", infilled_data, fixed_data)
     return infilled_data
 
+@utilities.output_file_checks
 def create_user_changes_audit(
     file_path:pathlib.Path,
-    modified: global_classes.DLogData,
-    original:global_classes.DLogData,
+    input_modified: global_classes.DLogData,
+    input_original:global_classes.DLogData,
     )->None:
-    modified = utilities.to_dict(modified)
-    original = utilities.to_dict(original)
-    modified_colour_coded = {}
-    for key, value in modified.items():
-        value_colour = value.copy()
-        differences = value_colour.eq(original[key])
-        modified_colour_coded[key]=value_colour.style.applymap(color_different_red, subset=differences)
-    utilities.write_to_excel(file_path, modified_colour_coded)
+    modified = utilities.to_dict(input_modified)
+    original = utilities.to_dict(input_original)
+    workbook = openpyxl.Workbook()
 
-def color_different_red(val):
-    colour = 'red' if val == False else 'none'
-    return 'background-color: %s' % colour
+    # Iterate over the dictionaries
+    for key, modified_df_ in modified.items():
+
+        LOG.info(f"Writing {key} sheet")
+
+        # convert lists to strings, otherwise openpyxl throws a wobbly
+        original_df = original[key].applymap(convert_list_to_string)
+        modified_df = modified_df_.applymap(convert_list_to_string)
+        
+        # Create a new sheet
+        sheet = workbook.create_sheet(key)
+        sheet.append(modified_df.columns.tolist())
+        sheet_index = 2
+
+        # Iterate over the rows of modified_df
+        for index, modified_row in modified_df.iterrows():
+            original_row = original_df.loc[index]
+            # Compare the values in each column
+            altered = False
+            altered_columns = []
+            for column in modified_df.columns:
+                if pd.isna(original_df[column][index]) and pd.isna(modified_df[column][index]):
+                    continue
+
+                # If the column is not a list, compare the values directly
+                elif original_df[column][index] != modified_df[column][index]:
+                    altered = True
+                    altered_columns.append(column)
+                    break
+
+            # If the row has been modified, add it to the sheet and color the cells red
+
+
+            if altered:
+                for i, value in enumerate(modified_row):
+                    cell = sheet.cell(row=sheet_index, column=i+1)
+                    if pd.isna(value):
+                        cell.value = None
+                    else:
+                        cell.value = value
+                    if modified_df.columns[i] in altered_columns:
+                        cell.font = openpyxl.styles.Font(color='FF0000')
+                sheet_index += 1
+
+    # Save the workbook
+    workbook.save(file_path)
+
+def convert_list_to_string(value):
+    if isinstance(value, list):
+        return ', '.join(value)
+    return value

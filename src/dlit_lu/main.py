@@ -68,14 +68,26 @@ def main(log: utilities.DLitLog) -> None:
         config.regions_shapefiles_path,
     )
     #implement syntax and automatic fixes
-    data_to_fix = dlog_data
+    data_filter_columns = analyse.data_report(
+            dlog_data,
+            config.output_folder/"DLOG_data_quality_assessment.xlsx",
+            config.output_folder,
+            auxiliary_data,
+            PLOT_GRAPHS,
+            False,
+        )
+
+    syntax_fixed_data = data_repair.fix_inavlid_syntax(
+        data_filter_columns, auxiliary_data)
+
+    data_to_fix = syntax_fixed_data
     while True:
-        fixed_data = user_fixes.implement_user_fixes(config, data_to_fix, auxiliary_data, PLOT_GRAPHS)
-        if fixed_data is None:
+        user_fixed_data = user_fixes.implement_user_fixes(config, data_to_fix, auxiliary_data, PLOT_GRAPHS)
+        if user_fixed_data is None:
             return
         report_path = config.output_folder / "post_user_fix_data_report.xlsx"
         analyse.data_report(
-            fixed_data,
+            user_fixed_data,
             report_path,
             config.output_folder,
             auxiliary_data,
@@ -86,19 +98,19 @@ def main(log: utilities.DLitLog) -> None:
         continue_analysis = utilities.y_n_user_input("A data report has been outputted"
         ", please review this. Would you like to continue (or add further changes)? (Y/N)\n")
         if continue_analysis:
+            user_fixes.create_user_changes_audit(config.output_folder/"user_changes_audit.xlsx", user_fixed_data, syntax_fixed_data)
             break
         else:
-            data_to_fix = fixed_data
+            data_to_fix = user_fixed_data
     #infill invalid data 
-    fixed_data = data_repair.infill_data(fixed_data, auxiliary_data)
+    infilled_fixed_data = data_repair.infill_data(user_fixed_data, auxiliary_data)
 
     post_fix_output_path = config.output_folder / "post_auto_fix"
     post_fix_output_path.mkdir(exist_ok=True)
 
     post_fix_data_filter_columns = analyse.data_report(
-        fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data, PLOT_GRAPHS, True)
+        infilled_fixed_data, post_fix_output_path / "post_fix_data_report.xlsx", post_fix_output_path, auxiliary_data, PLOT_GRAPHS, True)
 
-    # temp outputs for debugging
     utilities.write_to_excel(config.output_folder / "post_fix_data.xlsx",
                              utilities.to_dict(post_fix_data_filter_columns))
     #TODO finalise disagg mixed pipeline

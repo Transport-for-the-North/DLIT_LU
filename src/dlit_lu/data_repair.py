@@ -198,7 +198,9 @@ def incorrect_luc_formatting(
 
 
 def calc_average_years_webtag_certainty(
-    data: pd.DataFrame, lookup: pd.DataFrame) -> dict[int, list[int]]:
+    data: dict[str, pd.DataFrame],
+    webtag_lookup: pd.DataFrame,
+    years_lookup: pd.DataFrame) -> dict[int, list[int]]:
     """calculates the mode start and end year for each catergory of webtag certainty
 
     ignores "not specified", uses the webtag certainty id as the key 
@@ -208,8 +210,10 @@ def calc_average_years_webtag_certainty(
     ----------
     data : pd.DataFrame
         data to analyse
-    lookup : pd.DataFrame
+    webtag_lookup : pd.DataFrame
         webtag lookup
+    years_lookup : pd.DataFrame
+        years lookup
 
     Returns
     -------
@@ -218,24 +222,29 @@ def calc_average_years_webtag_certainty(
     """    
     average_years = {}
 
-    for id in lookup.index:
+    for id in webtag_lookup.index:
         if id == 0:
             continue
-        all_start_years = np.array([])
-        all_end_years = np.array([])
-
+        all_start_years = pd.Series([])
+        all_end_years = pd.Series([])
         for _, value in data.items():
             # filter df for each webtag status without missing years
             filtered_value = value[value["missing_years"] == False]
             filtered_value = filtered_value[value["web_tag_certainty_id"] == id]
 
-            all_start_years = np.append(
-                all_start_years, filtered_value["start_year_id"])
-            all_end_years = np.append(
-                all_end_years, filtered_value["end_year_id"])
-
-        average_years[id] = [pd.Series(all_start_years).mode(
-        ).values[0], pd.Series(all_end_years).mode().values[0]]
+            all_start_years = all_start_years.append(filtered_value["start_year"],
+                ignore_index = True)
+            all_end_years = all_end_years.append(filtered_value["end_year"],
+                ignore_index = True)
+        mode_start_year = all_start_years.mode().values[0]
+        mode_end_year = all_end_years.mode().values[0]
+        if int(mode_start_year.split("-")[0])>int(mode_end_year.split("-")[0]):
+            LOG.warning(f"infilled years for TAG status {webtag_lookup[id]} have end years"
+             " that are before start years, setting end year equal to start year ({startyear})")
+            mode_end_year = mode_start_year
+        mode_start_year_id = years_lookup.index[years_lookup["years"] == mode_start_year].values[0]
+        mode_end_year_id =  years_lookup.index[years_lookup["years"] == mode_end_year].values[0]
+        average_years[id] = [mode_start_year_id, mode_end_year_id]
 
     return average_years
 
@@ -257,7 +266,7 @@ def infill_missing_years(data: dict[str, pd.DataFrame], lookup: global_classes.L
     dict[str, pd.DataFrame]
         infilled data
     """    
-    average_years = calc_average_years_webtag_certainty(data, lookup.webtag)
+    average_years = calc_average_years_webtag_certainty(data, lookup.webtag, lookup.years)
 
     years_lookup = lookup.years
     fixed_data = {}
