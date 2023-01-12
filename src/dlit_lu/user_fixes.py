@@ -5,10 +5,10 @@ import logging
 from typing import Optional
 # third party imports
 import pandas as pd
-import openpyxl
+import numpy as np
 
 # local imports
-from dlit_lu import global_classes, utilities, parser, analyse, inputs, data_repair
+from dlit_lu import global_classes, utilities, parser, analyse, inputs
 
 LOG = logging.getLogger(__name__)
 
@@ -95,12 +95,12 @@ def infill_user_inputs(
                     f"values in {uneditable_columns[key]} within {modified_path} have been modified, these values must remain constant")
     return infilled_data
 
+
 def implement_user_fixes(
     config: inputs.DLitConfig,
     dlog_data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
-    plot_graphs: bool,
-    )->Optional[global_classes.DLogData]:
+) -> Optional[global_classes.DLogData]:
     """intergrates user fixes into data
 
     handles user preferences writes the file for the user to edit,
@@ -120,21 +120,22 @@ def implement_user_fixes(
     -------
     Optional[global_classes.DLogData]
         infilled data, None if user wishes to end program
-    """    
+    """
 
-    #determines if user wishes to infill using exisiting file
+    # determines if user wishes to infill using exisiting file
     if os.path.exists(config.user_input_path):
         modification_file_ready = utilities.y_n_user_input(
             f"A file already exists at {config.user_input_path}."
             " Does this contain the fixes you wish to implement? (Y/N)\n")
     else:
         modification_file_ready = False
-    
-    #adds filter columns without producing report
+
+    # adds filter columns without producing report
 
     if modification_file_ready:
         user_changes = True
-        LOG.info(f"Existing file {config.user_input_path} set as user infill input.")
+        LOG.info(
+            f"Existing file {config.user_input_path} set as user infill input.")
     else:
         report_path = config.output_folder / "initial_data_quality_report.xlsx"
         analyse.data_report(
@@ -142,33 +143,33 @@ def implement_user_fixes(
             report_path,
             config.output_folder,
             auxiliary_data,
-            plot_graphs,   
+            False,
             True,
         )
 
         LOG.info(f"Intial data quality report saved as {report_path}")
 
-        #checks if user wishes to infill data
+        # checks if user wishes to infill data
         user_changes = utilities.y_n_user_input("Do you wish to "
-            "manually fix data before it is infilled? (Y/N)\n")
+                                                "manually fix data before it is infilled? (Y/N)\n")
 
         if user_changes:
             if os.path.exists(config.user_input_path):
                 LOG.info("Creating file for user to edit.")
-                #pauses to allow user to save existing file
+                # pauses to allow user to save existing file
                 input(f"Overwriting {config.user_input_path}, if you wish to store any changes made"
-                    ", please make a copy with a different name and press enter, otherwise press"
-                    " enter.")
+                      ", please make a copy with a different name and press enter, otherwise press"
+                      " enter.")
 
             user_input_file_builder(
                 config.user_input_path, dlog_data)
 
-            #allows user to end program to to edit data
+            # allows user to end program to to edit data
             end_program = utilities.y_n_user_input(f"A file has been created at "
-                    f"{config.user_input_path} for you to manually infill data. Would "
-                    "you like to end the program and rerun when you have finished? Y "
-                    "(end the program, modify the data then rerun) or N (data has been"
-                    " modified)\n")
+                                                   f"{config.user_input_path} for you to manually infill data. Would "
+                                                   "you like to end the program and rerun when you have finished? Y "
+                                                   "(end the program, modify the data then rerun) or N (data has been"
+                                                   " modified)\n")
 
             if end_program:
                 LOG.info("Ending program")
@@ -177,69 +178,133 @@ def implement_user_fixes(
     if user_changes:
         LOG.info("Implementing user fixes")
         infilled_data = infill_user_inputs(
-            dict((k, utilities.to_dict(dlog_data)[k]) for k in (["residential","employment", "mixed"])),
+            dict((k, utilities.to_dict(dlog_data)[k]) for k in (
+                ["residential", "employment", "mixed"])),
             config.user_input_path)
         infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
-    return infilled_data
+        return infilled_data
+    return dlog_data
 
-@utilities.output_file_checks
+
 def create_user_changes_audit(
-    file_path:pathlib.Path,
+    file_path: pathlib.Path,
     input_modified: global_classes.DLogData,
-    input_original:global_classes.DLogData,
-    )->None:
+    input_original: global_classes.DLogData
+    ) -> None:
+    """create user audit of changes implemented by the user
+
+    produces an excel spreadsheet of the changed rows of 
+    input_modified when compared to input original, with the changed
+    values highlighted in red.
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        location to output audit file
+    input_modified : global_classes.DLogData
+        user modified data
+    input_original : global_classes.DLogData
+        original data
+    """    
     modified = utilities.to_dict(input_modified)
     original = utilities.to_dict(input_original)
-    workbook = openpyxl.Workbook()
-
     # Iterate over the dictionaries
-    for key, modified_df_ in modified.items():
+    modified_colour_coded = {}
 
-        LOG.info(f"Writing {key} sheet")
+    pd.options.display.float_format = "{:.3f}".format
+    for key, value in modified.items():
+        modified_colour = value.copy()
 
-        # convert lists to strings, otherwise openpyxl throws a wobbly
+        # convert to lists and datetime strings
+        modified_colour = modified_colour.applymap(convert_list_to_string)
         original_df = original[key].applymap(convert_list_to_string)
-        modified_df = modified_df_.applymap(convert_list_to_string)
+
+        datetime_columns = modified_colour.select_dtypes(
+            include="datetime").columns
+        modified_colour[datetime_columns] = modified_colour[datetime_columns].astype(
+            "string")
+        original_df[datetime_columns] = original_df[datetime_columns].astype(
+            "string")
+
+        # seperate out numeric
+
+        modified_number = modified_colour.select_dtypes(include="number")
+        original_number = original_df.select_dtypes(include="number")
+
+        # use np.isclose() to solve rounding errors
+
+        differences_number = np.isclose(
+            modified_number, original_number, rtol=1e-4, atol=0.001, equal_nan=True)
+
+        differences_number = pd.DataFrame(
+            differences_number, columns=modified_number.columns)
+
+        # seperate out other
+
+        modified_other = modified_colour.select_dtypes(exclude="number")
+        original_other = original_df.select_dtypes(exclude="number")
+
+        # replace nans with ""
+
+        modified_other = modified_other.fillna("")
+        original_other = original_other.fillna("")
+
+        differences_other = modified_other.eq(original_other)
+
+        # mash numerical and other back together
+        differences = pd.concat(
+            [differences_number, differences_other], axis=1)
+
+        # reorder to match the df
+        differences = differences[modified_colour.columns]
+
+        # just get modified values
+        modified_colour = modified_colour[~differences.all(axis=1)]
+        # apply colour map
+        modified_colour_coded[key] = modified_colour.style.apply(
+            color_different_red, axis=None, differences=differences[~differences.all(axis=1)])
+    utilities.write_to_excel(file_path, modified_colour_coded)
+
+
+def color_different_red(_:pd.DataFrame, 
+    differences:pd.DataFrame)->pd.DataFrame:
+    """used to highlight values in red based on a array of bools 
+
+    used when formatting an excel spread sheet
+
+    Parameters
+    ----------
+    _ : pd.DataFrame
+        not used
+    differences : pd.DataFrame
+        bool array with same dimensions as the dataframe for which this
+        is applied 
+
+    Returns
+    -------
+    
+    pd.DataFrame
+        array of colours used to apply formatting in an excel spread sheet
+    """    
+    output = np.where(differences, "", "background-color: red")
+    return output
+
+
+def convert_list_to_string(value: list[str])->str:
+    """converts a list of strings to a string
+
+    seperates values with ", "
+
+    Parameters
+    ----------
+    value : list[str]
         
-        # Create a new sheet
-        sheet = workbook.create_sheet(key)
-        sheet.append(modified_df.columns.tolist())
-        sheet_index = 2
 
-        # Iterate over the rows of modified_df
-        for index, modified_row in modified_df.iterrows():
-            original_row = original_df.loc[index]
-            # Compare the values in each column
-            altered = False
-            altered_columns = []
-            for column in modified_df.columns:
-                if pd.isna(original_df[column][index]) and pd.isna(modified_df[column][index]):
-                    continue
-
-                # If the column is not a list, compare the values directly
-                elif original_df[column][index] != modified_df[column][index]:
-                    altered = True
-                    altered_columns.append(column)
-                    break
-
-            # If the row has been modified, add it to the sheet and color the cells red
-
-
-            if altered:
-                for i, value in enumerate(modified_row):
-                    cell = sheet.cell(row=sheet_index, column=i+1)
-                    if pd.isna(value):
-                        cell.value = None
-                    else:
-                        cell.value = value
-                    if modified_df.columns[i] in altered_columns:
-                        cell.font = openpyxl.styles.Font(color='FF0000')
-                sheet_index += 1
-
-    # Save the workbook
-    workbook.save(file_path)
-
-def convert_list_to_string(value):
+    Returns
+    -------
+    str
+        list converted to string
+    """    
     if isinstance(value, list):
         return ', '.join(value)
     return value

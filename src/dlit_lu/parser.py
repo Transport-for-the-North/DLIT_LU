@@ -10,23 +10,14 @@ import pandas as pd
 import geopandas as gpd
 
 # local imports
-from dlit_lu import global_classes
+from dlit_lu import global_classes, inputs
 
 # constants
 LOG = logging.getLogger(__name__)
 
 
 def parse_dlog(
-    input_file_path: pathlib.Path,
-    comb_sheet_name: str,
-    res_sheet_name: str,
-    emp_sheet_name: str,
-    mix_sheet_name: str,
-    lookup_sheet_name: str,
-    comb_column_names_path: pathlib.Path,
-    res_column_names_path: pathlib.Path,
-    emp_column_names_path: pathlib.Path,
-    mix_column_names_path: pathlib.Path,
+    config: inputs.DLitConfig
 ) -> global_classes.DLogData:
     """parses the dlog excel spreadsheet
 
@@ -34,64 +25,55 @@ def parse_dlog(
 
     Parameters
     ----------
-    input_file_path : pathlib.Path
-        file path for dlog excel file
-    comb_sheet_name : str
-        combined sheet name in spreadsheet
-    res_sheet_name : str
-        residential sheet name in spreadsheet
-    emp_sheet_name : str
-        employment sheet name in spreadsheet
-    mix_sheet_name : str
-        mixed sheet name in spreadsheet
-    lookup_sheet_name : str
-        lookup sheet name in spreadsheet
-    comb_column_names : list[str]
-        combined column names
-    res_column_names : list[str]
-        residential column names
-    emp_column_names : list[str]
-        employment column names
-    mix_column_names : list[str]
-        mixed column names
+    config: inputs.DLit.Config
+        config object generated from the config yaml file
 
     Returns
     -------
     global_classes.DLogData
         the parsed data
     """
+    # read in column names
+    res_column_names = pd.read_csv(
+        config.residential_column_names_path).iloc[:, 0].tolist()
+    emp_column_names = pd.read_csv(
+        config.employment_column_names_path).iloc[:, 0].tolist()
+    mix_column_names = pd.read_csv(
+        config.mixed_column_names_path).iloc[:, 0].tolist()
 
-    comb_column_names= pd.read_csv(comb_column_names_path).iloc[:,0].tolist()
-    res_column_names= pd.read_csv(res_column_names_path).iloc[:,0].tolist()
-    emp_column_names= pd.read_csv(emp_column_names_path).iloc[:,0].tolist()
-    mix_column_names= pd.read_csv(mix_column_names_path).iloc[:,0].tolist()
+    #read in column to remove from data 
+    ignore_columns = pd.read_csv(
+        config.ignore_columns_path).iloc[:, 0].str.lower().tolist()
 
+    #parse sheets
     LOG.info("Parsing Residential sheet")
-    residential_data = parse_sheet(input_file_path, res_sheet_name, 2, res_column_names)
+    residential_data = parse_sheet(
+        config.dlog_input_file, config.residential_sheet_name, 2, res_column_names, ignore_columns)
     LOG.info("Parsing Employment sheet")
-    employment_data = parse_sheet(input_file_path, emp_sheet_name, 2, emp_column_names)
+    employment_data = parse_sheet(
+        config.dlog_input_file, config.employment_sheet_name, 2, emp_column_names, ignore_columns)
     LOG.info("Parsing Mixed sheet")
-    mixed_data = parse_sheet(input_file_path, mix_sheet_name, 2, mix_column_names)
-    LOG.info("Parsing Combined sheet")
-    combined_data = parse_sheet(input_file_path, comb_sheet_name, 1, comb_column_names)
+    mixed_data = parse_sheet(
+        config.dlog_input_file, config.mixed_sheet_name, 2, mix_column_names, ignore_columns)
     LOG.info("Parsing Lookup sheet")
-    lookup = parse_lookup(input_file_path, lookup_sheet_name)
+    lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
 
-    data_exit = global_classes.DLogData(
-        combined_data=combined_data,
+    data_output = global_classes.DLogData(
+        combined_data=None,
         residential_data=residential_data,
         employment_data=employment_data,
         mixed_data=mixed_data,
         lookup=lookup,
     )
-    return data_exit
+    return data_output
 
 
 def parse_sheet(
     input_file_path: pathlib.Path,
     sheet_name: str,
     skip_rows: int,
-    column_names: Optional[list[str]]=None,
+    column_names: Optional[list[str]] = None,
+    ignore_columns: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     """parses a sheet in a excel spread sheet
 
@@ -106,6 +88,10 @@ def parse_sheet(
     column_names : Optional[list[str]] optional
         , by default None
         the column names of the excel spread sheet
+    ignore_columns : Optional[list[str]] optional
+        , by default None
+        the column names of columns that will be returned in the
+        output. If None all columns are returned
 
     Returns
     -------
@@ -115,21 +101,24 @@ def parse_sheet(
     data = pd.read_excel(
         input_file_path, sheet_name=sheet_name, engine="openpyxl", skiprows=skip_rows
     )
-    data.loc[:, "site_name"] = data["site_name"].astype("string")
     data["existing_land_use"] = parse_landuse_codes(data["existing_land_use"])
-    data["proposed_land_use"] = parse_landuse_codes(data["proposed_land_use"])    
-    
+    data["proposed_land_use"] = parse_landuse_codes(data["proposed_land_use"])
+
     if column_names is not None:
         data.columns = [name.lower() for name in column_names]
     else:
         data.columns = data.columns.str.lower()
+
+    if ignore_columns is not None:
+        data = data.drop(columns=ignore_columns)
+
     return data
 
 
 def parse_landuse_codes(codes: pd.Series) -> pd.Series:
     """parses the land use code columns into lists
 
-    some minor formatting ammendments to aid parsing
+    some formatting ammendments to aid parsing and analysis
 
     Parameters
     ----------
@@ -141,10 +130,13 @@ def parse_landuse_codes(codes: pd.Series) -> pd.Series:
     pd.Series
         a land use code column parsed into a list
     """
+
     codes = codes.astype("string")
     codes = codes.str.lower()
-    codes = codes.str.replace("and", ",").str.replace("/", ",").str.replace(r"\s+", "")
-    codes = codes.str.replace("[", "").str.replace("]", "").str.replace("\'", "")
+    codes = codes.str.replace("and", ",").str.replace(
+        "/", ",").str.replace(r"\s+", "")
+    codes = codes.str.replace(
+        "[", "").str.replace("]", "").str.replace("\'", "")
     codes = codes.str.split(",")
     return codes
 
@@ -176,6 +168,7 @@ def parse_lookup(
         "distribution_profile": "S:T",
         "adoption_status": "X:Y",
     }
+    #parse standard format sheets
     standard_format_tables = {}
     for key, value in table_location.items():
         table = pd.read_excel(
@@ -189,7 +182,8 @@ def parse_lookup(
         table.dropna(how="any", inplace=True)
         standard_format_tables[key] = table
 
-    # tables not formatted as standard
+    #parse no standard format sheets
+
     land_use_codes = pd.read_excel(
         input_file_path,
         sheet_name=lookup_sheet_name,
@@ -197,6 +191,7 @@ def parse_lookup(
         usecols="V",
     ).squeeze("columns")
     # ^ series as 1 col and squeeze called
+
     land_use_codes.dropna(how="any", inplace=True)
     land_use_codes = land_use_codes.str.lower()
 
@@ -208,6 +203,7 @@ def parse_lookup(
         usecols="Z:AA",
     )
     # ^ No header in worksheet, id and value switched wrt others
+
     local_authority.columns = ["id", "local_authority"]
     local_authority.set_index("id", drop=True, inplace=True)
     local_authority.dropna(how="any", inplace=True)
@@ -234,28 +230,41 @@ def read_auxiliary_data(
     incomplete_luc_path: pathlib.Path,
     lpa_shapefile_path: pathlib.Path
 ) -> global_classes.AuxiliaryData:
-    """reads in auxilliary data
+    """
+    reads in auxilliary data
 
     e.g. incorrect land use codes and LPA regions
 
     Parameters
     ----------
-    incorrect_luc_file_path : pathlib.Path
-        path for incorrect luc excel spreadsheet
-    LPA_shapefile_path : pathlib.Path
-        lpa regions shapefile
+    valid_luc_path : pathlib.Path
+        path to csv file containing allowed land use codes
+    known_invalid_luc_path : pathlib.Path
+        path to csv file that contains a lookup for known errors
+        that cannot be fixed automatically. 
+    out_of_date_luc_path : pathlib.Path
+        path to csv file that contains a lookup for out of date codes
+        and their indate replacements
+    incomplete_luc_path : pathlib.Path
+        path to csv file that contains a lookup incomplete codes and 
+        their possible replacements
+    lpa_shapefile_path : pathlib.Path
+        path to the LPA shape file, used for analysis results graph
 
     Returns
     -------
-    global_classes.auxiliary_data
-        named tuple to contain the auxiliary data
+    global_classes.AuxiliaryData
+        auxiliary data parsed into pd.Dataframes contained within the 
+        object
     """
     LOG.info("Parsing auxiliary files")
-    #parse land use code file
+    # parse land use code file
     allowed_land_use_codes = pd.read_csv(valid_luc_path)
     allowed_land_use_codes.loc[:, "land_use_codes"] = allowed_land_use_codes[
         "land_use_codes"
     ].str.lower().str.replace(r"\s+", "")
+
+    #parse out of date land use codes
     out_of_date_luc = pd.read_csv(out_of_date_luc_path)
     out_of_date_luc.loc[:, "out_of_date_land_use_codes"] = out_of_date_luc[
         "out_of_date_land_use_codes"
@@ -263,6 +272,8 @@ def read_auxiliary_data(
     out_of_date_luc.loc[:, "replacement_codes"] = parse_landuse_codes(out_of_date_luc[
         "replacement_codes"
     ])
+
+    #parse incomplete land use codes
     incomplete_luc = pd.read_csv(incomplete_luc_path)
     incomplete_luc.loc[:, "incomplete_land_use_codes"] = incomplete_luc[
         "incomplete_land_use_codes"
@@ -270,6 +281,8 @@ def read_auxiliary_data(
     incomplete_luc.loc[:, "land_use_code"] = parse_landuse_codes(incomplete_luc[
         "land_use_code"
     ])
+
+    #parse known invalid land use codes
     known_invalid_luc = pd.read_csv(known_invalid_luc_path)
     known_invalid_luc.loc[:, "known_invalid_code"] = known_invalid_luc[
         "known_invalid_code"
@@ -277,8 +290,10 @@ def read_auxiliary_data(
     known_invalid_luc.loc[:, "corrected_code"] = parse_landuse_codes(known_invalid_luc[
         "corrected_code"
     ])
-    #parse local planning regions
-    regions = gpd.read_file(lpa_shapefile_path)#TODO add column names to config file
+    
+    # parse local planning regions
+    # TODO add column names to config file
+    regions = gpd.read_file(lpa_shapefile_path)
     return global_classes.AuxiliaryData(
         allowed_land_use_codes, known_invalid_luc, out_of_date_luc, incomplete_luc, regions
     )

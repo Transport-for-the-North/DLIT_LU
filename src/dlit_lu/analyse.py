@@ -1,16 +1,18 @@
-"""Analyses a DLog data object for invalid/missing/contradictory data
-
-IN PROGRESS
+"""Analyses a DLog data object for invalid/missing/contradictory data 
+when data report is called, returns inputted object with additional/
+ammended filter columns, which contain bool values corresponding to 
+the type of invalid data found in each row. data_report also has the 
+out to write a data report and plot graphs displaying the findings.
 
 
 Raises
 ------
 ValueError
-    goe_plotter: column: str must be passed if a chloroperg has been given
+    geo_plotter: column: str must be passed if a chloropleth has been given
 ValueError
-    goe_explorer: column: str must be passed if a chloroperg has been given
+    geo_plotter: column: str must be passed if a chloropleth has been given
 ValueError
-    goe_explorer: colour must be passed if points has been given
+    geo_plotter: colour must be passed if points has been given
 ValueError
     add_filter_column: no column found
 ValueError
@@ -36,6 +38,7 @@ from dlit_lu import global_classes, utilities
 
 # constants
 LOG = logging.getLogger(__name__)
+
 # sets the tolerance for the geopandas simplify function
 SIMPLIFY_TOLERANCE = 100
 
@@ -49,7 +52,7 @@ def data_report(
     output_folder_path: pathlib.Path,
     auxiliary_data: global_classes.AuxiliaryData,
     plot_maps: bool,
-    write_report: bool, 
+    write_report: bool,
 ) -> global_classes.DLogData:
     """Produces a data report to the provided file path
 
@@ -67,6 +70,9 @@ def data_report(
     auxiliary_data : global_classes.AuxiliaryData
         data required for the analysis that is not in DLog
     plot_maps: bool 
+        whether the function should create visual outputs,
+        this takes some time
+    write_report: bool 
         whether the function create visual outputs, this takes some time
     """
     res_data = dlog_data.residential_data
@@ -132,11 +138,8 @@ def data_report(
 
     missing_years_columns = [
         "start_year_id",
-        "start_year",
-        "end_year",
         "end_year_id",
-        "start",
-        "end",
+
     ]
 
     missing_years = find_multiple_missing_values(
@@ -153,37 +156,38 @@ def data_report(
         },
     )
     results_report = parse_analysis_results(
-        missing_years, 
+        missing_years,
         results_report,
-        "missing_years", 
+        "missing_years",
         "Entries with start and end years not defined",
     )
-    #find missing years without a tag-certainty specified
-    missing_years_no_webtag = find_multiple_missing_values(missing_years,{
-            "residential": ["web_tag_certainty_id"],
-            "employment": ["web_tag_certainty_id"],
-            "mixed": ["web_tag_certainty_id"],
-        }, 
+    # find missing years without a tag-certainty specified
+    missing_years_no_webtag = find_multiple_missing_values(missing_years, {
+        "residential": ["web_tag_certainty_id"],
+        "employment": ["web_tag_certainty_id"],
+        "mixed": ["web_tag_certainty_id"],
+    },
         {
             "residential": [0, "-"],
             "employment": [0, "-"],
             "mixed": [0, "-"],
-        }
+    }
     )
     results_report = parse_analysis_results(
-        missing_years_no_webtag, 
+        missing_years_no_webtag,
         results_report,
-        "missing_years_no_webtag", 
+        "missing_years_no_webtag",
         "Entries with missing years and no WEBTAG certainity status, infilling not possible"
     )
     missing_years_with_webtag = {}
     for key, value in missing_years.items():
-        missing_years_with_webtag[key] = value.drop(index = missing_years_no_webtag[key].index)
+        missing_years_with_webtag[key] = value.drop(
+            index=missing_years_no_webtag[key].index)
 
     results_report = parse_analysis_results(
-        missing_years_with_webtag, 
+        missing_years_with_webtag,
         results_report,
-        "missing_years_with_webtag", 
+        "missing_years_with_webtag",
         "Entries with missing years that do have WEBTAG certainity status, infilling possible"
     )
     # ---------------------find missing areas--------------------------------------
@@ -301,17 +305,7 @@ def data_report(
         " yet planning_status = not permissioned or not specified (fixes are"
         " not required on these entries for them to be included in the analysis)",
     )
-    # ---------------------------find contradictory lpa name and id
-    contra_lpa_name_id = check_id_value_consistency(
-        data, dlog_data.lookup.local_authority, "local_authority_id", "local_authority")
 
-    results_report = parse_analysis_results(
-        contra_lpa_name_id,
-        results_report,
-        "contradictory_local_authority_name_id",
-        "NON FATAL: local_authority and do not"
-        " refer to the same entry, according to the lookup table",
-    )
     # --------------------------find inactive entries------------------------
     inactive_entries = find_inactivate_entries(data)
 
@@ -324,12 +318,10 @@ def data_report(
     # used to calculate the number of entries with user intervention required
     user_intervention_required = [
         "missing_coords",
-        "missing_years_no_webtag",
     ]
 
     non_fatal_columns = [
         "contradictory_webtag_and_planning_status",
-        "contradictory_local_authority_name_id",
         "inactive_entries",
         "missing_area",
     ]
@@ -342,12 +334,13 @@ def data_report(
         "missing_dist",
         "missing_years_with_webtag",
         "missing_gfa_or_dwellings_no_site_area",
+        "missing_years_no_webtag",
     ]
 
     # filter for only entries with issues
     classified_data = classify_data(
         results_report,
-        autofix_columns, 
+        autofix_columns,
         user_intervention_required,
         non_fatal_columns
     )
@@ -506,7 +499,7 @@ def data_report(
 
 def classify_data(
     results_report: global_classes.ResultsReport,
-    auto_fix_columns: list[str], 
+    auto_fix_columns: list[str],
     intervention_required_columns: list[str],
     non_fatal_columns: list[str] = [],
 ) -> dict[str, dict[str, pd.DataFrame]]:
@@ -1554,6 +1547,7 @@ def find_missing_values(
         entries with missing values
 
     """
+
     missing_values_df = []
     for column in columns:
 

@@ -118,9 +118,12 @@ class DLitConfig(BaseConfig):
     employment_column_names_path: pathlib.Path
         path to a CSV containing the column names for the employment sheet in the 
         DLog excel spreadsheet
-    mixed_column_names_path: pathlib.Pat
+    mixed_column_names_path: pathlib.Path
         path to a CSV containing the column names for the mixed sheet in the 
-        DLogexcel spreadsheet
+        DLog excel spreadsheet
+    ignore_columns_path: pathlib.Path
+        path to a csv containing the columns in the dlog to ignore when reading
+        in
     valid_luc_path: pathlib.Path
         path to a CSV containing valid land use codes 
     out_of_date_luc_path: pathlib.Path
@@ -146,6 +149,7 @@ class DLitConfig(BaseConfig):
     residential_column_names_path: pathlib.Path
     employment_column_names_path: pathlib.Path
     mixed_column_names_path: pathlib.Path
+    ignore_columns_path: pathlib.Path
     valid_luc_path: pathlib.Path
     known_invalid_luc_path: pathlib.Path
     out_of_date_luc_path: pathlib.Path
@@ -154,7 +158,7 @@ class DLitConfig(BaseConfig):
     user_input_path: pathlib.Path
 
     @pydantic.validator(
-        "dlog_input_file", 
+        "dlog_input_file",
         "regions_shapefiles_path",
         "combined_column_names_path",
         "residential_column_names_path",

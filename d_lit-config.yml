@@ -9,7 +9,7 @@ combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\comb
 residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
 employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv
 mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_column_names.csv
-
+ignore_columns_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\drop_columns.csv
 
 output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
 user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
