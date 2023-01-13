@@ -315,6 +315,15 @@ def data_report(
         "inactive_entries",
         "NON FATAL: entries where active has not been specified as \"t\""
     )
+    #---------------------------contra constr, planning, tag------------------
+    contra_constr_planning_tag = find_contradictory_tag_const_plan(data)
+
+    results_report = parse_analysis_results(
+        contra_constr_planning_tag,
+        results_report,
+        "contra_construction_planning_tag",
+        "NON FATAL: entries with contradictor construction_status, planning_status and or web_tag_certainty"
+    )
     # used to calculate the number of entries with user intervention required
     user_intervention_required = [
         "missing_coords",
@@ -324,6 +333,7 @@ def data_report(
         "contradictory_webtag_and_planning_status",
         "inactive_entries",
         "missing_area",
+        "contra_construction_planning_tag",
     ]
 
     autofix_columns = [
@@ -1660,6 +1670,25 @@ def find_invalid_land_use_codes(
             .sort_values("site_reference_id")
         )
 
+def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame]):
+    contra = {}
+    for key, value in data.items():
+
+        construction_started_completed = pd.DataFrame(
+            [value["construction_status_id"]==2, value[
+                "construction_status_id"]==3]).transpose().any(axis=1)
+        not_permissioned = value["planning_status_id"]==1
+        near_certain =  value["web_tag_certainty_id"]==1
+        more_than_likely = value["web_tag_certainty_id"]==2
+        greater_than_mtl = pd.DataFrame(
+            [near_certain, more_than_likely]).transpose().any(axis=1)
+
+        contra_constr_perm = construction_started_completed[construction_started_completed.isin(not_permissioned)]
+        contra_plan_perm = not_permissioned[not_permissioned.isin(near_certain)]
+        contra_constr_tag = construction_started_completed[~construction_started_completed.isin(greater_than_mtl)]
+
+        contra[key] = pd.concat([contra_constr_perm, contra_plan_perm, contra_constr_tag]).drop_duplicates()
+    return contra
 
 def analyse_invalid_luc(
     invalid_luc: dict[str, pd.DataFrame],

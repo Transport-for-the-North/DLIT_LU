@@ -83,8 +83,13 @@ class AuxiliaryData(NamedTuple):
     allowed_codes:pd.DataFrame
 
     out_of_date_luc: pd.DataFrame
+        out of date landuse codes lookup
+    known_invalid_lucs:pd.DataFrame
+        known issues landuse code lookup
     incomplete_luc: pd.DataFrame
-    lpa_regions: gpd.GeoDataFrame
+        incomplete land use codes lookup
+    regions: gpd.GeoDataFrame
+        regions shape file
     """    
     allowed_codes:pd.DataFrame
     known_invalid_luc: pd.DataFrame

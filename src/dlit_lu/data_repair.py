@@ -139,7 +139,8 @@ def infill_data(data: global_classes.DLogData,
                                                      "proposed_land_use": "other_issues_proposed_land_use_code"})
     corrected_format = infill_missing_tag(corrected_format)
 
-    corrected_format = infill_missing_years(corrected_format, data.lookup.webtag)
+    corrected_format = infill_missing_years(
+        corrected_format, data.lookup.webtag)
 
     return global_classes.DLogData(
         None,
@@ -203,7 +204,7 @@ def incorrect_luc_formatting(
 def calc_average_years_webtag_certainty(
         data: dict[str, pd.DataFrame],
         webtag_lookup: pd.DataFrame,
-        ) -> dict[int, list[int]]:
+) -> dict[int, list[int]]:
     """calculates the mode start and end year for each catergory of webtag certainty
 
     ignores "not specified", uses the webtag certainty id as the key 
@@ -253,7 +254,11 @@ def calc_average_years_webtag_certainty(
 def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     infilled_data = {}
     infill_lookup = {"permissioned": 2,
-                     "not_permissioned_no_years": 4, "not_permissioned_with_years": 3}
+                     "not_permissioned_no_years": 4,
+                     "not_permissioned_with_years": 3,
+                     "not_specified_in_construction": 1,
+                     "not_specified_not_started_specified": 4,
+                     }
 
     for key, value in data.items():
 
@@ -264,7 +269,7 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
         missing_tag_permissioned = missing_tag.loc[missing_tag["planning_status_id"] == 2, :]
 
         missing_tag_permissioned.loc[:,
-                                     "webtag_certainty_id"] = infill_lookup["permissioned"]
+                                     "web_tag_certainty_id"] = infill_lookup["permissioned"]
 
         #not permissioned
         missing_tag_not_permissioned = missing_tag[missing_tag["planning_status_id"] == 1]
@@ -277,11 +282,28 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
         missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
                                          False, "web_tag_certainty_id"] = infill_lookup["not_permissioned_with_years"]
 
+        #not specified
+        missing_tag_not_spec = missing_tag.loc[missing_tag["planning_status_id"] == 0, :]
+
+        # completed or undergoing constructiom
+        completed_undergoing_constr = pd.DataFrame(
+            [missing_tag_not_spec["construction_status_id"] == 2,
+                missing_tag_not_spec["construction_status_id"] == 3]).transpose().any(axis=1)
+
+        missing_tag_not_spec.loc[completed_undergoing_constr, "web_tag_certainty_id"] = infill_lookup[
+            "not_specified_in_construction"]
+
+        # not started/not specified
+        missing_tag_not_spec.loc[~completed_undergoing_constr, "web_tag_certainty_id"] = infill_lookup[
+            "not_specified_not_started_specified"]
+
         # infill
         to_be_infilled.loc[missing_tag_permissioned.index,
                            :] = missing_tag_permissioned
         to_be_infilled.loc[missing_tag_not_permissioned.index,
                            :] = missing_tag_not_permissioned
+        to_be_infilled.loc[missing_tag_not_spec.index,
+                           :] = missing_tag_not_spec
 
         infilled_data[key] = to_be_infilled
 
@@ -292,6 +314,24 @@ def infill_one_missing_year(
     data: dict[str, pd.DataFrame],
     average_years: dict[int, list[int]]
 ) -> dict[str, pd.DataFrame]:
+    """infills start/end year when end/start year is present
+
+    takes the average periods for each tag status and uses that to
+    infill. if this will result in an invalid year, the missing year
+    will be infilled with the existing year.
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to infill
+    average_years : dict[int, list[int]]
+        average year for each tag status
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        infilled years
+    """
 
     missing_start_id = analyse.find_multiple_missing_values(data,
                                                             dict((k, ["start_year_id"])
@@ -306,8 +346,9 @@ def infill_one_missing_year(
     fixed = {}
 
     for key, value in data.items():
+        fixed_data = value.copy()
         for id_, average_year in average_years.items():
-            to_be_fixed = value[value["web_tag_certainty_id"] == id_].copy()
+            to_be_fixed = fixed_data[fixed_data["web_tag_certainty_id"] == id_].copy()
             period = average_year[1]-average_year[0]
             no_start_index = missing_start_id[key][
                 missing_start_id[key]["web_tag_certainty_id"] == id_].index
@@ -330,19 +371,22 @@ def infill_one_missing_year(
             start_no_end_values.loc[start_no_end_values["start_year_id"] + period >= 14,
                                     "end_year_id"] = start_no_end_values.loc[start_no_end_values[
                                         "start_year_id"] <= period, "start_year_id"]
-                                        
+
             start_no_end_values.loc[start_no_end_values["start_year_id"] + period < 14,
                                     "end_year_id"] = start_no_end_values.loc[start_no_end_values[
                                         "start_year_id"] <= period, "start_year_id"] + period
 
-            to_be_fixed.loc[end_no_start, "start_year_id"] = end_no_start_values["end_year_id"]
-            to_be_fixed.loc[start_no_end, "end_year_id"] = start_no_end_values["start_year_id"]
+            to_be_fixed.loc[end_no_start,
+                            "start_year_id"] = end_no_start_values["end_year_id"]
+            to_be_fixed.loc[start_no_end,
+                            "end_year_id"] = start_no_end_values["start_year_id"]
 
-            fixed[key] = to_be_fixed
+            fixed_data.loc[to_be_fixed.index] = to_be_fixed
+        fixed[key]=fixed_data
     return fixed
 
 
-def infill_missing_years(data: dict[str, pd.DataFrame], tag_lookup:pd.DataFrame) -> dict[str, pd.DataFrame]:
+def infill_missing_years(data: dict[str, pd.DataFrame], tag_lookup: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """infills missing years
 
     infills using the modal start and end year for the tag certainty of the entry
