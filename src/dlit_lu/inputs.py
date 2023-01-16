@@ -113,21 +113,21 @@ class DLitConfig(BaseConfig):
         path to a CSV containing the column names for the combined sheet in the DLog
         excel spreadsheet
     residential_column_names_path: pathlib.Path
-        path to a CSV containing the column names for the residential sheet in the 
+        path to a CSV containing the column names for the residential sheet in the
         DLog excel spreadsheet
     employment_column_names_path: pathlib.Path
-        path to a CSV containing the column names for the employment sheet in the 
+        path to a CSV containing the column names for the employment sheet in the
         DLog excel spreadsheet
     mixed_column_names_path: pathlib.Path
-        path to a CSV containing the column names for the mixed sheet in the 
+        path to a CSV containing the column names for the mixed sheet in the
         DLog excel spreadsheet
     ignore_columns_path: pathlib.Path
         path to a csv containing the columns in the dlog to ignore when reading
         in
     valid_luc_path: pathlib.Path
-        path to a CSV containing valid land use codes 
+        path to a CSV containing valid land use codes
     out_of_date_luc_path: pathlib.Path
-        path to a CSV containing out of date land use codes 
+        path to a CSV containing out of date land use codes
     incomplete_luc_path: pathlib.Path
         path to a CSV containing incomplete land use codes 
     regions_shapefiles_path: pathlib.Path

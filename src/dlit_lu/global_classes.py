@@ -31,7 +31,7 @@ class Lookup(NamedTuple):
         distribution profile look up table
     land_use_codes: pd.Series
         a list of allowed land use codes, though to incomplete for the
-        2021 set, so a complete list is read in in auxiliary data  
+        2021 set, so a complete list is read in in auxiliary data
     adoption_status: pd.DataFrame
         adoption status look up table
     local_authority: pd.DataFrame
@@ -65,7 +65,7 @@ class DLogData(NamedTuple):
         sites which have residential and employment developments
     lookup: Lookup
         a look up table for the IDs used in the data
-    """    
+    """
     combined_data: Optional[pd.DataFrame]
     residential_data: pd.DataFrame
     employment_data: pd.DataFrame
@@ -75,7 +75,7 @@ class DLogData(NamedTuple):
 class AuxiliaryData(NamedTuple):
     """stores data not contained in the DLog required for processing
 
-    contains allowed and not allowed land use codes and lpa region 
+    contains allowed and not allowed land use codes and lpa region
     shape data
 
     Parameters
@@ -90,7 +90,7 @@ class AuxiliaryData(NamedTuple):
         incomplete land use codes lookup
     regions: gpd.GeoDataFrame
         regions shape file
-    """    
+    """
     allowed_codes:pd.DataFrame
     known_invalid_luc: pd.DataFrame
     out_of_date_luc: pd.DataFrame
@@ -105,14 +105,14 @@ class ResultsReport(NamedTuple):
     data_filter: dict[str, pd.DataFrame]
         data with the filter column added
     analysis_summary: list[dict[str, int]]
-        the number of invalid values in each filter column 
+        the number of invalid values in each filter column
     analysis_summary_index_labels: list[str]
         labels each of the indexs in the summary
     analysis_summary_notes: list[str]
         notes for each of the filter column displayed in the summary sheet
     filter_columns:list[str]
         list of the filter column names
-    """    
+    """
     data_filter: dict[str, pd.DataFrame]
     analysis_summary: list[dict[str, int]]
     analysis_summary_index_labels: list[str]

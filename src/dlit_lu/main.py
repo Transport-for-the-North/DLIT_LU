@@ -5,9 +5,9 @@
     spradsheet. Any fixes that can be perfomed automatically will be
     performed. Any issues that require user intervention will be
     outputted to the user, to be infilled manually, read back in and
-    intergrated with the DLog 
+    intergrated with the DLog
 
-    Kieran Fishwick: kieran.fishwick@wsp.com 
+    Kieran Fishwick: kieran.fishwick@wsp.com
 """
 # standard imports
 import pathlib
@@ -26,7 +26,7 @@ PLOT_GRAPHS = False
 
 def run() -> None:
     """initilises Logging and calls main
-    """    
+    """
     with utilities.DLitLog() as dlit_log:
         with tqdm_log.logging_redirect_tqdm([dlit_log.logger]):
             main(dlit_log)
@@ -89,7 +89,7 @@ def main(log: utilities.DLitLog) -> None:
 
         if user_fixed_data is None:
             return
-            
+
         report_path = config.output_folder / "post_user_fix_data_report.xlsx"
 
         user_fixed_data = analyse.data_report(

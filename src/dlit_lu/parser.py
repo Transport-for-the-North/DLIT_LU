@@ -1,4 +1,4 @@
-"""parses the DLog data and auxiliary data 
+"""parses the DLog data and auxiliary data
 """
 # standard imports
 import pathlib
@@ -41,7 +41,7 @@ def parse_dlog(
     mix_column_names = pd.read_csv(
         config.mixed_column_names_path).iloc[:, 0].tolist()
 
-    #read in column to remove from data 
+    #read in column to remove from data
     ignore_columns = pd.read_csv(
         config.ignore_columns_path).iloc[:, 0].str.lower().tolist()
 
@@ -241,12 +241,12 @@ def read_auxiliary_data(
         path to csv file containing allowed land use codes
     known_invalid_luc_path : pathlib.Path
         path to csv file that contains a lookup for known errors
-        that cannot be fixed automatically. 
+        that cannot be fixed automatically.
     out_of_date_luc_path : pathlib.Path
         path to csv file that contains a lookup for out of date codes
         and their indate replacements
     incomplete_luc_path : pathlib.Path
-        path to csv file that contains a lookup incomplete codes and 
+        path to csv file that contains a lookup incomplete codes and
         their possible replacements
     lpa_shapefile_path : pathlib.Path
         path to the LPA shape file, used for analysis results graph
@@ -254,7 +254,7 @@ def read_auxiliary_data(
     Returns
     -------
     global_classes.AuxiliaryData
-        auxiliary data parsed into pd.Dataframes contained within the 
+        auxiliary data parsed into pd.Dataframes contained within the
         object
     """
     LOG.info("Parsing auxiliary files")
@@ -290,7 +290,7 @@ def read_auxiliary_data(
     known_invalid_luc.loc[:, "corrected_code"] = parse_landuse_codes(known_invalid_luc[
         "corrected_code"
     ])
-    
+
     # parse local planning regions
     # TODO add column names to config file
     regions = gpd.read_file(lpa_shapefile_path)

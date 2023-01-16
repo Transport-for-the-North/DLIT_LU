@@ -1,7 +1,7 @@
-"""Analyses a DLog data object for invalid/missing/contradictory data 
+"""Analyses a DLog data object for invalid/missing/contradictory data
 when data report is called, returns inputted object with additional/
-ammended filter columns, which contain bool values corresponding to 
-the type of invalid data found in each row. data_report also has the 
+ammended filter columns, which contain bool values corresponding to
+the type of invalid data found in each row. data_report also has the
 out to write a data report and plot graphs displaying the findings.
 
 
@@ -69,10 +69,10 @@ def data_report(
         location of the output folder
     auxiliary_data : global_classes.AuxiliaryData
         data required for the analysis that is not in DLog
-    plot_maps: bool 
+    plot_maps: bool
         whether the function should create visual outputs,
         this takes some time
-    write_report: bool 
+    write_report: bool
         whether the function create visual outputs, this takes some time
     """
     res_data = dlog_data.residential_data
@@ -205,7 +205,8 @@ def data_report(
         missing_area,
         results_report,
         "missing_area",
-        "NON FATAL: Entries where site area have not been provided. Only becomes critical error if dwellings/floorspace have not been provided.",
+        "NON FATAL: Entries where site area have not been provided."
+        " Only becomes critical error if dwellings/floorspace have not been provided.",
     )
 
     # ------------------- find missing areas_dwellings------------------------------
@@ -315,14 +316,15 @@ def data_report(
         "inactive_entries",
         "NON FATAL: entries where active has not been specified as \"t\""
     )
-    #---------------------------contra constr, planning, tag------------------
+    # ---------------------------contra constr, planning, tag------------------
     contra_constr_planning_tag = find_contradictory_tag_const_plan(data)
 
     results_report = parse_analysis_results(
         contra_constr_planning_tag,
         results_report,
         "contra_construction_planning_tag",
-        "NON FATAL: entries with contradictor construction_status, planning_status and or web_tag_certainty"
+        "NON FATAL: entries with contradictor construction_status,"
+        " planning_status and or web_tag_certainty"
     )
     # used to calculate the number of entries with user intervention required
     user_intervention_required = [
@@ -369,7 +371,8 @@ def data_report(
     )
     analysis_summary_index_labels.append("total_contradictory_entries")
     analysis_summary_notes.append(
-        "total number of entries with non-fatal values, these entries do not require modification to be included"
+        "total number of entries with non-fatal values,"
+        " these entries do not require modification to be included"
     )
 
     analysis_summary.append(
@@ -504,7 +507,13 @@ def data_report(
                 "Mixed": classified_data["invalid"]["mixed"],
             },
         )
-    return global_classes.DLogData(None, results_report.data_filter["residential"], results_report.data_filter["employment"], results_report.data_filter["mixed"], dlog_data.lookup)
+    return global_classes.DLogData(
+        None,
+        results_report.data_filter["residential"],
+        results_report.data_filter["employment"],
+        results_report.data_filter["mixed"],
+        dlog_data.lookup
+        )
 
 
 def classify_data(
@@ -526,8 +535,8 @@ def classify_data(
     intervention_required_columns : list[str]
         a list of filter columns in the results report that cannot be
         fixed automatically
-    contra_columns : list[str]
-        a list of filter columns that have contradictory information
+    non_fatal_columns : list[str]
+        a list of filter columns that have contradictory/non-fatal information
 
     Returns
     -------
@@ -1193,8 +1202,9 @@ def geo_plotter(
     ax.set_yticks([])
     plt.title(title)
     ax.text(0.01, 0.01,
-            s="Source: Office for National Statistics licensed under the Open Government Licence v.3.0\n"
-            "Contains OS data © Crown copyright and database right [2021]",
+            s="Source: Office for National Statistics licensed under"
+            " the Open Government Licence v.3.0\n Contains OS data ©"
+            " Crown copyright and database right [2021]",
             transform=fig.transFigure,
             )
     if limits is not None:  # set limits
@@ -1670,25 +1680,46 @@ def find_invalid_land_use_codes(
             .sort_values("site_reference_id")
         )
 
-def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame]):
+
+def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str, pd.DataFrame]:
+    """returns contradictory tag certainty, construction and planning status
+
+    checks for combinations that do not make sense e.g. work completed but
+    plannong permission not granted 
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to analyse
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        contradictory rows
+    """    
     contra = {}
     for key, value in data.items():
 
         construction_started_completed = pd.DataFrame(
-            [value["construction_status_id"]==2, value[
-                "construction_status_id"]==3]).transpose().any(axis=1)
-        not_permissioned = value["planning_status_id"]==1
-        near_certain =  value["web_tag_certainty_id"]==1
-        more_than_likely = value["web_tag_certainty_id"]==2
+            [value["construction_status_id"] == 2, value[
+                "construction_status_id"] == 3]).transpose().any(axis=1)
+        not_permissioned = value["planning_status_id"] == 1
+        near_certain = value["web_tag_certainty_id"] == 1
+        more_than_likely = value["web_tag_certainty_id"] == 2
         greater_than_mtl = pd.DataFrame(
             [near_certain, more_than_likely]).transpose().any(axis=1)
 
-        contra_constr_perm = construction_started_completed[construction_started_completed.isin(not_permissioned)]
-        contra_plan_perm = not_permissioned[not_permissioned.isin(near_certain)]
-        contra_constr_tag = construction_started_completed[~construction_started_completed.isin(greater_than_mtl)]
+        contra_constr_perm = construction_started_completed[construction_started_completed.isin(
+            not_permissioned)]
+        contra_plan_perm = not_permissioned[not_permissioned.isin(
+            near_certain)]
+        contra_constr_tag = construction_started_completed[~construction_started_completed.isin(
+            greater_than_mtl)]
 
-        contra[key] = pd.concat([contra_constr_perm, contra_plan_perm, contra_constr_tag]).drop_duplicates()
+        contra[key] = pd.concat(
+            [contra_constr_perm, contra_plan_perm, contra_constr_tag]).drop_duplicates()
     return contra
+
 
 def analyse_invalid_luc(
     invalid_luc: dict[str, pd.DataFrame],

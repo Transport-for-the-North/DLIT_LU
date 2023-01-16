@@ -91,11 +91,15 @@ def infill_data(data: global_classes.DLogData,
     area_columns = {"residential": "total_site_area_size_hectares",
                     "employment": "site_area_ha", "mixed": "total_area_ha"}
 
-    land_use_columns = {"residential": ["existing_land_use"], "employment": [
-        "existing_land_use", "proposed_land_use"], "mixed": ["existing_land_use", "proposed_land_use"]}
+    land_use_columns = {
+        "residential": ["existing_land_use"], "employment": [
+            "existing_land_use", "proposed_land_use"],
+        "mixed": ["existing_land_use", "proposed_land_use"]}
 
-    units_columnns = {"residential": ["units_(dwellings)", "total_units"], "employment": [
-        "total_area_sqm", "units_(floorspace)"], "mixed": ["floorspace_sqm", "units_(floorspace)"]}
+    units_columnns = {
+        "residential": ["units_(dwellings)", "total_units"],
+        "employment": ["total_area_sqm", "units_(floorspace)"],
+        "mixed": ["floorspace_sqm", "units_(floorspace)"]}
 
     # calculate ratios
 
@@ -113,15 +117,15 @@ def infill_data(data: global_classes.DLogData,
 
     # infill values
     corrected_format = infill_missing_site_area(data_dict, area_columns_list,
-                                                [0, "-"], dict((k, int(average_area)) for k in (data_dict)))
+        [0, "-"], dict((k, int(average_area)) for k in (data_dict)))
     corrected_format = infill_units(corrected_format, units_columnns,
-                                    area_columns, ["-", 0],
-                                    {"residential": dwelling_area_ratio,
-                                        "employment": floorspace_area_ratio,
-                                        "mixed": floorspace_area_ratio})
+        area_columns, ["-", 0],
+        {"residential": dwelling_area_ratio,
+            "employment": floorspace_area_ratio,
+            "mixed": floorspace_area_ratio})
 
     corrected_format["mixed"] = infill_units({"mixed": corrected_format["mixed"]},
-                                             {"mixed": ["dwellings", "units_(dwellings)"]}, {
+        {"mixed": ["dwellings", "units_(dwellings)"]}, {
         "mixed": "total_area_ha"}, ["-", 0],
         {"mixed": dwelling_area_ratio})["mixed"]
 
@@ -132,11 +136,11 @@ def infill_data(data: global_classes.DLogData,
         "unknown", "mixed"], auxiliary_data.allowed_codes["land_use_codes"].to_list())
 
     corrected_format = fix_undefined_invalid_luc(corrected_format, land_use_columns,
-                                                 auxiliary_data.allowed_codes["land_use_codes"].to_list(
-                                                 ),
-                                                 auxiliary_data,
-                                                 {"existing_land_use": "other_issues_existing_land_use_code",
-                                                     "proposed_land_use": "other_issues_proposed_land_use_code"})
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+        auxiliary_data,
+        {"existing_land_use": "other_issues_existing_land_use_code",
+            "proposed_land_use": "other_issues_proposed_land_use_code"})
+
     corrected_format = infill_missing_tag(corrected_format)
 
     corrected_format = infill_missing_years(
@@ -207,8 +211,8 @@ def calc_average_years_webtag_certainty(
 ) -> dict[int, list[int]]:
     """calculates the mode start and end year for each catergory of webtag certainty
 
-    ignores "not specified", uses the webtag certainty id as the key 
-    in the output 
+    ignores "not specified", uses the webtag certainty id as the key
+    in the output
 
     Parameters
     ----------
@@ -226,15 +230,15 @@ def calc_average_years_webtag_certainty(
     """
     average_years = {}
 
-    for id in webtag_lookup.index:
-        if id == 0:
+    for id_ in webtag_lookup.index:
+        if id_ == 0:
             continue
         all_start_years = pd.Series([])
         all_end_years = pd.Series([])
         for _, value in data.items():
             # filter df for each webtag status without missing years
             filtered_value = value[value["missing_years"] == False]
-            filtered_value = filtered_value[value["web_tag_certainty_id"] == id]
+            filtered_value = filtered_value[value["web_tag_certainty_id"] == id_]
 
             all_start_years = all_start_years.append(filtered_value["start_year_id"],
                                                      ignore_index=True)
@@ -242,16 +246,33 @@ def calc_average_years_webtag_certainty(
                                                  ignore_index=True)
         mode_start_year = all_start_years.mode().values[0]
         mode_end_year = all_end_years.mode().values[0]
+
         if mode_start_year > mode_end_year:
-            LOG.warning(f"infilled years for TAG status {webtag_lookup[id]} have end years"
-                        f" that are before start years, setting end year equal to start year ({mode_start_year})")
+            LOG.warning(f"infilled years for TAG status {webtag_lookup[id_]} have end years"
+                        " that are before start years, setting end"
+                        " year equal to start year ({mode_start_year})")
+
             mode_end_year = mode_start_year
-        average_years[id] = [mode_start_year, mode_end_year]
+        average_years[id_] = [mode_start_year, mode_end_year]
 
     return average_years
 
 
 def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """infills TAG certainty where it is not specified
+
+    the infill value is determined from the planning and/or construction status
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to infill
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        infilled data
+    """
     infilled_data = {}
     infill_lookup = {"permissioned": 2,
                      "not_permissioned_no_years": 4,
@@ -276,11 +297,11 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
 
         # without_years
         missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
-                                         True, "web_tag_certainty_id"] = infill_lookup["not_permissioned_no_years"]
+            True, "web_tag_certainty_id"] = infill_lookup["not_permissioned_no_years"]
 
         # with_years
         missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
-                                         False, "web_tag_certainty_id"] = infill_lookup["not_permissioned_with_years"]
+            False, "web_tag_certainty_id"] = infill_lookup["not_permissioned_with_years"]
 
         #not specified
         missing_tag_not_spec = missing_tag.loc[missing_tag["planning_status_id"] == 0, :]
@@ -290,12 +311,12 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
             [missing_tag_not_spec["construction_status_id"] == 2,
                 missing_tag_not_spec["construction_status_id"] == 3]).transpose().any(axis=1)
 
-        missing_tag_not_spec.loc[completed_undergoing_constr, "web_tag_certainty_id"] = infill_lookup[
-            "not_specified_in_construction"]
+        missing_tag_not_spec.loc[completed_undergoing_constr,
+            "web_tag_certainty_id"] = infill_lookup["not_specified_in_construction"]
 
         # not started/not specified
-        missing_tag_not_spec.loc[~completed_undergoing_constr, "web_tag_certainty_id"] = infill_lookup[
-            "not_specified_not_started_specified"]
+        missing_tag_not_spec.loc[~completed_undergoing_constr,
+            "web_tag_certainty_id"] = infill_lookup["not_specified_not_started_specified"]
 
         # infill
         to_be_infilled.loc[missing_tag_permissioned.index,
@@ -334,21 +355,20 @@ def infill_one_missing_year(
     """
 
     missing_start_id = analyse.find_multiple_missing_values(data,
-                                                            dict((k, ["start_year_id"])
-                                                                 for k in data.keys()),
-                                                            dict((k, [14, ""]) for k in data.keys()))
+        dict((k, ["start_year_id"]) for k in data.keys()),
+        dict((k, [14, ""]) for k in data.keys()))
 
     missing_end_id = analyse.find_multiple_missing_values(data,
-                                                          dict((k, ["end_year_id"])
-                                                               for k in data.keys()),
-                                                          dict((k, [14, ""]) for k in data.keys()))
+        dict((k, ["end_year_id"]) for k in data.keys()),
+        dict((k, [14, ""]) for k in data.keys()))
 
     fixed = {}
 
     for key, value in data.items():
         fixed_data = value.copy()
         for id_, average_year in average_years.items():
-            to_be_fixed = fixed_data[fixed_data["web_tag_certainty_id"] == id_].copy()
+            to_be_fixed = fixed_data[fixed_data["web_tag_certainty_id"] == id_].copy(
+            )
             period = average_year[1]-average_year[0]
             no_start_index = missing_start_id[key][
                 missing_start_id[key]["web_tag_certainty_id"] == id_].index
@@ -361,32 +381,35 @@ def infill_one_missing_year(
             start_no_end_values = to_be_fixed.loc[start_no_end]
 
             end_no_start_values.loc[end_no_start_values["end_year_id"] <= period,
-                                    "start_year_id"] = end_no_start_values.loc[end_no_start_values[
-                                        "end_year_id"] <= period, "end_year_id"]
+                "start_year_id"] = end_no_start_values.loc[end_no_start_values[
+                    "end_year_id"] <= period, "end_year_id"]
 
             end_no_start_values.loc[end_no_start_values["end_year_id"] > period,
-                                    "start_year_id"] = end_no_start_values.loc[end_no_start_values[
-                                        "end_year_id"] <= period, "end_year_id"] - period
+                "start_year_id"] = end_no_start_values.loc[end_no_start_values[
+                    "end_year_id"] <= period, "end_year_id"] - period
 
             start_no_end_values.loc[start_no_end_values["start_year_id"] + period >= 14,
-                                    "end_year_id"] = start_no_end_values.loc[start_no_end_values[
-                                        "start_year_id"] <= period, "start_year_id"]
+                "end_year_id"] = start_no_end_values.loc[start_no_end_values[
+                    "start_year_id"] <= period, "start_year_id"]
 
             start_no_end_values.loc[start_no_end_values["start_year_id"] + period < 14,
-                                    "end_year_id"] = start_no_end_values.loc[start_no_end_values[
-                                        "start_year_id"] <= period, "start_year_id"] + period
+                "end_year_id"] = start_no_end_values.loc[start_no_end_values[
+                    "start_year_id"] <= period, "start_year_id"] + period
 
             to_be_fixed.loc[end_no_start,
-                            "start_year_id"] = end_no_start_values["end_year_id"]
+                "start_year_id"] = end_no_start_values["end_year_id"]
             to_be_fixed.loc[start_no_end,
-                            "end_year_id"] = start_no_end_values["start_year_id"]
+                "end_year_id"] = start_no_end_values["start_year_id"]
 
             fixed_data.loc[to_be_fixed.index] = to_be_fixed
-        fixed[key]=fixed_data
+        fixed[key] = fixed_data
     return fixed
 
 
-def infill_missing_years(data: dict[str, pd.DataFrame], tag_lookup: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def infill_missing_years(
+    data: dict[str, pd.DataFrame],
+    tag_lookup: pd.DataFrame
+    ) -> dict[str, pd.DataFrame]:
     """infills missing years
 
     infills using the modal start and end year for the tag certainty of the entry
@@ -419,9 +442,9 @@ def infill_missing_years(data: dict[str, pd.DataFrame], tag_lookup: pd.DataFrame
         for id_, value in average_years.items():
             id_ = int(id_)
             filtered_data.loc[filtered_data["web_tag_certainty_id"]
-                              == id_, "start_year_id"] = average_years[id_][0]
+                            == id_, "start_year_id"] = average_years[id_][0]
             filtered_data.loc[filtered_data["web_tag_certainty_id"]
-                              == id_, "end_year_id"] = average_years[id_][1]
+                            == id_, "end_year_id"] = average_years[id_][1]
         fixed_data[key].loc[filtered_data.index, :] = filtered_data
     return fixed_data
 
@@ -433,7 +456,7 @@ def infill_units(
     missing_values: list[str | int],
     unit_area_ratio: dict[str, float]
 ) -> dict[str, pd.DataFrame]:
-    """infills missing units 
+    """infills missing units
 
     infills missing units based on the site area and average unit area
     ratio. All dicts should have the same keys
@@ -476,7 +499,9 @@ def infill_units(
             index=filtered_data_missing_area[key].index)
 
         fixed_data[key].loc[filtered_data_with_area.index, unit_columns[key]
-                            ] = fixed_data[key].loc[filtered_data_with_area.index, area_columns[key]]*unit_area_ratio[key]
+            ] = fixed_data[key].loc[
+                    filtered_data_with_area.index, area_columns[key]
+                ]*unit_area_ratio[key]
 
     return fixed_data
 
@@ -521,7 +546,7 @@ def infill_missing_site_area(
 
 
 def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str]]) -> float:
-    """calculate the mean value 
+    """calculate the mean value
 
     will calculate the total average across all the columns
 
@@ -704,17 +729,21 @@ def fix_undefined_invalid_luc(
         fixed_codes[key] = value.copy()
         for column in columns[key]:
             # finds values that have not been defined as empty, infills and gives a warning
-            existing_entries_other_issues = fixed_codes[key][fixed_codes[key]
-                                                             [filter_column_lookup[column]] == True]
-            not_fixed = existing_entries_other_issues.loc[existing_entries_other_issues[column].apply(
-                lambda x: x != fill_value), :]
+            existing_entries_other_issues = fixed_codes[key][fixed_codes[key
+                ][filter_column_lookup[column]] == True]
+            not_fixed = existing_entries_other_issues.loc[
+                existing_entries_other_issues[column].apply(
+                    lambda x: x != fill_value), :]
+
             if len(not_fixed) != 0:
                 not_fixed = analyse.find_invalid_land_use_codes(
                     not_fixed, valid_codes, [column])
                 if len(not_fixed) == 0:
                     continue
-                LOG.warning(f"{len(not_fixed)} undefined invalid land use codes found in {key}, {column}:\n"
-                            f"{not_fixed[column].to_list()}\nInfilling with average land use split.")
+
+                LOG.warning(f"{len(not_fixed)} undefined invalid land use codes"
+                    f" found in {key}, {column}:\n{not_fixed[column].to_list()}\n"
+                    "Infilling with average land use split.")
                 replacement = pd.Series([fill_value]).repeat(len(not_fixed))
                 replacement.index = not_fixed.index
                 fixed_codes[key].loc[not_fixed.index, column] = replacement
@@ -728,7 +757,7 @@ def luc_ratio(
 ) -> pd.DataFrame:
     """calculates the average floorspace taken by each  luc
 
-    assumes the floorspace is evenly distributed between the 
+    assumes the floorspace is evenly distributed between the
     luc defined in each entry
 
     Parameters
@@ -759,18 +788,25 @@ def luc_ratio(
                 if code_in_entry is None:
                     continue
 
-                have_floorspace = pd.DataFrame([code_in_entry["missing_gfa_or_dwellings_no_site_area"],
-                                                code_in_entry["missing_gfa_or_dwellings_with_site_area"]]).transpose()
-                have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
-                have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace["units_(floorspace)"] / \
-                    have_floorspace[column].apply(lambda x: len(x))
-                total_floorspace = have_floorspace["units_(floorspace)"].sum(
-                )
+                have_floorspace = pd.DataFrame([code_in_entry[
+                    "missing_gfa_or_dwellings_no_site_area"],
+                        code_in_entry["missing_gfa_or_dwellings_with_site_area"]]).transpose()
 
-                land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"] + len(
-                    have_floorspace)
-                land_use_codes_count.loc[land_use_codes_count["land_use_codes"]
-                                         == code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "total_floorspace"] + total_floorspace
+                have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
+
+                have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
+                    "units_(floorspace)"] /have_floorspace[column].apply(lambda x: len(x))
+                    
+                total_floorspace = have_floorspace["units_(floorspace)"].sum()
+
+                land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
+                    ] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                        ] == code, "count"] + len(have_floorspace)
+
+                land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                    ]== code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
+                        "land_use_codes"] == code, "total_floorspace"] + total_floorspace
+
     land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / \
         land_use_codes_count["count"]
     return land_use_codes_count
@@ -799,7 +835,8 @@ def unit_area_ratio(data: dict[str, pd.DataFrame], unit_columns: dict[str, str],
     all_ratios = np.array([])
     for key, value in data.items():
         data_subset = value.loc[value["missing_area"] == False, :]
-        data_subset = data_subset.loc[data_subset["missing_gfa_or_dwellings_with_site_area"] == False, :]
+        data_subset = data_subset.loc[data_subset[
+            "missing_gfa_or_dwellings_with_site_area"] == False, :]
         # data subset only contains entries with site area and dwelling/floorspace
         all_ratios = np.append(all_ratios, (data_subset[unit_columns[key]] /
                                             data_subset[area_columns[key]]))
@@ -843,7 +880,8 @@ def find_and_replace_luc(
                     return fill_empty_value
                 else:
                     LOG.warning(
-                        f"fill_empty_value is a {type(fill_empty_value)}, that is neither a str or list[str]")
+                        f"fill_empty_value is a {type(fill_empty_value)},"
+                        " that is neither a str or list[str]")
             else:
                 return []
     except TypeError:
@@ -864,7 +902,8 @@ def find_and_replace_luc(
                 luc_entry = luc_entry + replacement_code
             else:
                 LOG.warning(
-                    f"{replace_column_name} contians {type(replacement_code)}, that is neither a str or list[str]")
+                    f"{replace_column_name} contians {type(replacement_code)},"
+                    " that is neither a str or list[str]")
     return luc_entry
 
 

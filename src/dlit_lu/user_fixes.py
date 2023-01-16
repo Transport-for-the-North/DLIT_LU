@@ -1,3 +1,8 @@
+"""handles the user inputted fixes 
+
+takes user preference, generates file for user to input fixes and
+integrates fixes with the existing data
+"""
 # standard imports
 import pathlib
 import os
@@ -13,7 +18,7 @@ from dlit_lu import global_classes, utilities, parser, analyse, inputs
 LOG = logging.getLogger(__name__)
 
 
-def user_input_file_builder(path: pathlib.Path, data: global_classes.DLogData) -> None:
+def user_input_file_builder(path: pathlib.Path, input_data: global_classes.DLogData) -> None:
     """builds file for user to edit 
 
     file can then be read and edits integrated into data
@@ -22,10 +27,10 @@ def user_input_file_builder(path: pathlib.Path, data: global_classes.DLogData) -
     ----------
     path : pathlib.Path
         location to save file
-    data : global_classes.DLogData
+    input_data : global_classes.DLogData
         data to save
     """
-    data = utilities.to_dict(data)
+    data = utilities.to_dict(input_data)
     utilities.write_to_excel(path, data)
 
 
@@ -181,8 +186,8 @@ def implement_user_fixes(
             dict((k, utilities.to_dict(dlog_data)[k]) for k in (
                 ["residential", "employment", "mixed"])),
             config.user_input_path)
-        infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
-        return infilled_data
+        converted_infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
+        return converted_infilled_data
     return dlog_data
 
 
