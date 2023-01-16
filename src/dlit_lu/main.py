@@ -25,7 +25,7 @@ LOG_FILE = "DLIT.log"
 #whether to plot graphs during data quality assessments
 PLOT_GRAPHS = False
 #whether to write an initial data qualtity report
-INITIAL_ASSESSMENT = False
+INITIAL_ASSESSMENT = True
 
 
 def run() -> None:

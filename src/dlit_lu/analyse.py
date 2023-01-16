@@ -295,18 +295,6 @@ def data_report(
         "missing_dist",
         "Entries where a distribution (build up profile) has not been provided",
     )
-    # ------------------------find contradictory webtag-planning status
-    contra_webtag_planning = contradictory_webtag_planning_status(data)
-
-    results_report = parse_analysis_results(
-        contra_webtag_planning,
-        results_report,
-        "contradictory_webtag_and_planning_status",
-        "NON FATAL: Entries have webtag = near certain,"
-        " yet planning_status = not permissioned or not specified (fixes are"
-        " not required on these entries for them to be included in the analysis)",
-    )
-
     # --------------------------find inactive entries------------------------
     inactive_entries = find_inactivate_entries(data)
 
@@ -322,7 +310,7 @@ def data_report(
     results_report = parse_analysis_results(
         contra_constr_planning_tag,
         results_report,
-        "contra_construction_planning_tag",
+        "contradictory_construction_planning_tag",
         "NON FATAL: entries with contradictor construction_status,"
         " planning_status and or web_tag_certainty"
     )
@@ -332,10 +320,9 @@ def data_report(
     ]
 
     non_fatal_columns = [
-        "contradictory_webtag_and_planning_status",
         "inactive_entries",
         "missing_area",
-        "contra_construction_planning_tag",
+        "contradictory_construction_planning_tag",
     ]
 
     autofix_columns = [
