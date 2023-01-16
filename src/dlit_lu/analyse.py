@@ -1700,24 +1700,28 @@ def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str,
     contra = {}
     for key, value in data.items():
 
-        construction_started_completed = pd.DataFrame(
+        construction_started_completed = value[pd.DataFrame(
             [value["construction_status_id"] == 2, value[
                 "construction_status_id"] == 3]).transpose().any(axis=1)
-        not_permissioned = value["planning_status_id"] == 1
-        near_certain = value["web_tag_certainty_id"] == 1
-        more_than_likely = value["web_tag_certainty_id"] == 2
-        greater_than_mtl = pd.DataFrame(
-            [near_certain, more_than_likely]).transpose().any(axis=1)
+        ]
 
-        contra_constr_perm = construction_started_completed[construction_started_completed.isin(
-            not_permissioned)]
-        contra_plan_perm = not_permissioned[not_permissioned.isin(
-            near_certain)]
-        contra_constr_tag = construction_started_completed[~construction_started_completed.isin(
-            greater_than_mtl)]
+        not_permissioned = value[value["planning_status_id"] == 1]
+        near_certain = value[value["web_tag_certainty_id"] == 1]
+        less_than_mtl = value[value["planning_status_id"] > 2]
 
-        contra[key] = pd.concat(
-            [contra_constr_perm, contra_plan_perm, contra_constr_tag]).drop_duplicates()
+        contra_constr_perm = construction_started_completed[construction_started_completed.index.isin(
+            not_permissioned.index)]
+        contra_plan_perm = not_permissioned[not_permissioned.index.isin(
+            near_certain.index)]
+        contra_constr_tag = construction_started_completed[construction_started_completed.index.isin(
+            less_than_mtl.index)]
+
+        #can't drop duplicates of all column values as some columns are lists
+        all_contra = pd.concat(
+            [contra_constr_perm, contra_plan_perm, contra_constr_tag])
+        contra_values = all_contra.loc[all_contra.index.drop_duplicates()]
+
+        contra[key] = contra_values
     return contra
 
 
