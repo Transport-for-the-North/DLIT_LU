@@ -105,6 +105,7 @@ def implement_user_fixes(
     config: inputs.DLitConfig,
     dlog_data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
+    plot_graphs: bool, 
 ) -> Optional[global_classes.DLogData]:
     """intergrates user fixes into data
 
@@ -120,6 +121,8 @@ def implement_user_fixes(
         data to infill
     auxiliary_data : global_classes.AuxiliaryData
         auxiliary data from parser
+    plot_graphs : bool
+        whether to plot graphs during the data quality assessment
 
     Returns
     -------
@@ -142,17 +145,20 @@ def implement_user_fixes(
         LOG.info(
             f"Existing file {config.user_input_path} set as user infill input.")
     else:
-        report_path = config.output_folder / "initial_data_quality_report.xlsx"
+        
+        pre_user_fix_path = config.output_folder / "pre_user_fix"
+        pre_user_fix_path.mkdir(exist_ok=True)
+
         analyse.data_report(
             dlog_data,
-            report_path,
+            pre_user_fix_path/"initial_data_quality_report.xlsx",
             config.output_folder,
             auxiliary_data,
-            False,
+            plot_graphs,
             True,
         )
 
-        LOG.info(f"Intial data quality report saved as {report_path}")
+        LOG.info(f"Intial data quality report saved as {pre_user_fix_path}")
 
         # checks if user wishes to infill data
         user_changes = utilities.y_n_user_input("Do you wish to "

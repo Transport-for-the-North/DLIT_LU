@@ -203,6 +203,21 @@ def y_n_user_input(message: str)->bool:
             LOG.warning(f"{answer_lower} does not look like \"y\" or \"n\" to me...")
 
 def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
+    """disaggregates the mixed data set into residential and employment
+
+    assumes the columns in mixed relevent to each sheet will have identical
+    column names to the those in the sheet
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data set to disagg mixed
+
+    Returns
+    -------
+    dict[str, pd.DataFrame]
+        data set with just residential and employment
+    """    
     
     mix = data["mixed"]
     res = data["residential"].reset_index(drop=True)

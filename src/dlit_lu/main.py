@@ -21,7 +21,11 @@ from dlit_lu import data_repair, inputs, parser, utilities, analyse, user_fixes
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
 LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
+
+#whether to plot graphs during data quality assessments
 PLOT_GRAPHS = False
+#whether to write an initial data qualtity report
+INITIAL_ASSESSMENT = False
 
 
 def run() -> None:
@@ -58,13 +62,17 @@ def main(log: utilities.DLitLog) -> None:
         config.regions_shapefiles_path,
     )
     # implement syntax fixes
+    initial_assessment_folder = config.output_folder/"initial_assessment"
+    if INITIAL_ASSESSMENT:
+        initial_assessment_folder.mkdir(exist_ok=True)
+
     data_filter_columns = analyse.data_report(
         dlog_data,
-        config.output_folder/"DLOG_data_quality_assessment.xlsx",
+        initial_assessment_folder/"DLOG_data_quality_assessment.xlsx",
         config.output_folder,
         auxiliary_data,
         PLOT_GRAPHS,
-        False,
+        INITIAL_ASSESSMENT,
     )
 
     syntax_fixed_data = data_repair.fix_inavlid_syntax(
@@ -85,22 +93,24 @@ def main(log: utilities.DLitLog) -> None:
 
     while True:
         user_fixed_data = user_fixes.implement_user_fixes(
-            config, data_to_fix, auxiliary_data)
+            config, data_to_fix, auxiliary_data, PLOT_GRAPHS)
 
         if user_fixed_data is None:
             return
 
-        report_path = config.output_folder / "post_user_fix_data_report.xlsx"
+        post_user_fix_path = config.output_folder / "post_user_fix"
+        post_user_fix_path.mkdir(exist_ok=True)
+        post_user_fix_report_path =post_user_fix_path/ "data_report.xlsx"
 
         user_fixed_data = analyse.data_report(
             user_fixed_data,
-            report_path,
+            post_user_fix_report_path,
             config.output_folder,
             auxiliary_data,
             PLOT_GRAPHS,
             True,
         )
-        LOG.info(f"post user fix report outputted to {report_path}")
+        LOG.info(f"post user fix report outputted to {post_user_fix_report_path}")
 
         continue_analysis = utilities.y_n_user_input("A data report has been outputted"
             ", please review this. Would you like to continue (or add further changes)? (Y/N)\n")
@@ -118,14 +128,14 @@ def main(log: utilities.DLitLog) -> None:
         user_fixed_data, auxiliary_data)
 
     #post fixes data report and write post fix data
-    post_fix_output_path = config.output_folder / "post_auto_fix"
+    post_fix_output_path = config.output_folder / "post_fixes"
     post_fix_output_path.mkdir(exist_ok=True)
 
     post_fix_data_filter_columns = analyse.data_report(
         infilled_fixed_data, post_fix_output_path / "post_fix_data_report.xlsx",
         post_fix_output_path, auxiliary_data, PLOT_GRAPHS, True)
 
-    utilities.write_to_excel(config.output_folder / "post_fix_data.xlsx",
+    utilities.write_to_excel(post_fix_output_path / "post_fix_data.xlsx",
                              utilities.to_dict(post_fix_data_filter_columns))
 
     # TODO finalise disagg mixed pipeline
