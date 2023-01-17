@@ -244,4 +244,5 @@ def disagg_land_use(data: dict[str, pd.DataFrame],  luc_column: str, unit_coloum
         for site in disagg["site_reference_id"].unique():
             site_disagg = disagg.loc[disagg["site_reference_id"]==site,unit_coloumn[key]]
             site_luc = site_disagg[luc_column]
-            site_luc = site_disagg.merge()
+            site_luc = site_luc.merge(land_use_split, how = "left", left_on=luc_column, right_on="land_use_codes")
+            

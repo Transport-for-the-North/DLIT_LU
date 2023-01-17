@@ -546,7 +546,7 @@ def luc_ratio(
                 have_floorspace = pd.DataFrame([code_in_entry[
                     "missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
                         code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(drop=True)]).transpose()
-
+                have_floorspace.index = code_in_entry.index
                 have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
 
                 have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[

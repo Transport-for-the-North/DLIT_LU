@@ -86,6 +86,10 @@ def main(log: utilities.DLitLog) -> None:
         False,
         False,
     )
+    proposed_luc_split = analyse.luc_ratio(
+        utilities.to_dict(syntax_fixed_data),
+        auxiliary_data,
+        ["proposed_land_use"])
 
     # user fixes
     #TODO streamline user fixes pipeline
@@ -142,7 +146,8 @@ def main(log: utilities.DLitLog) -> None:
     
     disagg_fixed_data = utilities.disagg_mixed(
         utilities.to_dict(post_fix_data_filter_columns))
-    proposed_luc_split = analyse.luc_ratio(disagg_fixed_data,auxiliary_data, ["proposed_land_use"])
+
     utilities.disagg_land_use(disagg_fixed_data, "proposed_land_use",
         {"residential":"units_(dwellings)", "employment":"units_(floorspace"},
         proposed_luc_split)
+    
