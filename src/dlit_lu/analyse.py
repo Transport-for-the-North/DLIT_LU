@@ -295,18 +295,6 @@ def data_report(
         "missing_dist",
         "Entries where a distribution (build up profile) has not been provided",
     )
-    # ------------------------find contradictory webtag-planning status
-    contra_webtag_planning = contradictory_webtag_planning_status(data)
-
-    results_report = parse_analysis_results(
-        contra_webtag_planning,
-        results_report,
-        "contradictory_webtag_and_planning_status",
-        "NON FATAL: Entries have webtag = near certain,"
-        " yet planning_status = not permissioned or not specified (fixes are"
-        " not required on these entries for them to be included in the analysis)",
-    )
-
     # --------------------------find inactive entries------------------------
     inactive_entries = find_inactivate_entries(data)
 
@@ -332,7 +320,6 @@ def data_report(
     ]
 
     non_fatal_columns = [
-        "contradictory_webtag_and_planning_status",
         "inactive_entries",
         "missing_area",
         "contra_construction_planning_tag",
@@ -514,6 +501,96 @@ def data_report(
         results_report.data_filter["mixed"],
         dlog_data.lookup
         )
+
+def luc_ratio(
+    data: dict[str, pd.DataFrame],
+    auxiliary_data: global_classes.AuxiliaryData,
+    columns: list[str] = ["proposed_land_use"]
+) -> pd.DataFrame:
+    """calculates the average floorspace taken by each  luc
+
+    assumes the floorspace is evenly distributed between the
+    luc defined in each entry
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to be analysed
+    auxiliary_data : global_classes.AuxiliaryData
+        auxiliary data read in from parser
+    columns : list[str], optional
+        columns to analyse, by default ["proposed_land_use"]
+
+    Returns
+    -------
+    pd.DataFrame
+        the total count, total floorspace and average floorspace for
+        each luc
+    """
+    land_use_codes = auxiliary_data.allowed_codes
+    land_use_codes_count = land_use_codes.copy()
+    land_use_codes_count["count"] = 0
+    land_use_codes_count["total_floorspace"] = 0
+    for code in land_use_codes["land_use_codes"]:
+        for key, value in data.items():
+            #do not use residential since they do not contain floorspace
+            if key == "residential":
+                continue
+            for column in columns:
+
+                code_in_entry = find_lucs(value, column, code)
+
+                if code_in_entry is None:
+                    continue
+
+                have_floorspace = pd.DataFrame([code_in_entry[
+                    "missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
+                        code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(drop=True)]).transpose()
+
+                have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
+
+                have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
+                    "units_(floorspace)"] / have_floorspace[column].apply(lambda x: len(x))
+                    
+                total_floorspace = have_floorspace["units_(floorspace)"].sum()
+
+                land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
+                    ] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                        ] == code, "count"] + len(have_floorspace)
+
+                land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                    ]== code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
+                        "land_use_codes"] == code, "total_floorspace"] + total_floorspace
+
+    land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / \
+        land_use_codes_count["count"]
+    return land_use_codes_count
+
+def find_lucs(data: pd.DataFrame, column: str, code: str) -> Optional[pd.DataFrame]:
+    """returns all entries with a given land use code
+
+    if no entrues have the land use code, None is returned
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        data to be filtered
+    column : str
+        column to be filtered
+    code : str
+        code to filter by
+
+    Returns
+    -------
+    Optional[pd.DataFrame]
+        filtered data, if no entries are found returns None
+    """
+    exploded_luc = data[column].explode()
+    matching_lucs = exploded_luc[exploded_luc == code]
+    if len(matching_lucs) == 0:
+        return None
+    matching_data = data.loc[matching_lucs.index, :]
+    return matching_data
 
 
 def classify_data(
@@ -1719,7 +1796,7 @@ def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str,
         #can't drop duplicates of all column values as some columns are lists
         all_contra = pd.concat(
             [contra_constr_perm, contra_plan_perm, contra_constr_tag])
-        contra_values = all_contra.loc[all_contra.index.drop_duplicates()]
+        contra_values = all_contra.drop_duplicates(subset=["site_reference_id"])
 
         contra[key] = contra_values
     return contra

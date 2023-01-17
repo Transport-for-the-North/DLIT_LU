@@ -7,7 +7,8 @@ import os
 
 # third party imports
 import pandas as pd
-import openpyxl
+import geopandas as gpd
+
 
 # local imports
 from dlit_lu import global_classes
@@ -231,3 +232,16 @@ def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
     emp_new = pd.concat([emp, mix_emp], ignore_index= True)
 
     return {"residential":res_new, "employment":emp_new}
+
+def msoa_site_geospacial_lookup(data: dict[str, pd.DataFrame])->gpd.GeoDataFrame:
+    print("hello fire ball")
+
+def disagg_land_use(data: dict[str, pd.DataFrame],  luc_column: str, unit_coloumn: dict[str, str], land_use_split:pd.DataFrame)->pd.DataFrame:
+    disagg_data = {}
+    for key, value in data.items():
+        disagg = value.copy()
+        disagg = disagg.explode(luc_column)
+        for site in disagg["site_reference_id"].unique():
+            site_disagg = disagg.loc[disagg["site_reference_id"]==site,unit_coloumn[key]]
+            site_luc = site_disagg[luc_column]
+            site_luc = site_disagg.merge()

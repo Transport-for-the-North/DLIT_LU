@@ -132,6 +132,10 @@ class DLitConfig(BaseConfig):
         path to a CSV containing incomplete land use codes 
     regions_shapefiles_path: pathlib.Path
         file path for the regions shape file
+    user_inputs_path: pathlib.Path
+        file path for the user input excel spreadsheet
+    msoa_shapefile_path: pathlib.Path
+        file path for the msoa shapefile
 
     Raises
     ------
@@ -156,6 +160,7 @@ class DLitConfig(BaseConfig):
     incomplete_luc_path: pathlib.Path
     regions_shapefiles_path: pathlib.Path
     user_input_path: pathlib.Path
+    msoa_shapefile_path: pathlib.Path
 
     @pydantic.validator(
         "dlog_input_file",

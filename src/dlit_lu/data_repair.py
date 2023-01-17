@@ -623,33 +623,6 @@ def old_incomplete_known_luc(
     return fixed_format
 
 
-def find_lucs(data: pd.DataFrame, column: str, code: str) -> Optional[pd.DataFrame]:
-    """returns all entries with a given land use code
-
-    if no entrues have the land use code, None is returned
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        data to be filtered
-    column : str
-        column to be filtered
-    code : str
-        code to filter by
-
-    Returns
-    -------
-    Optional[pd.DataFrame]
-        filtered data, if no entries are found returns None
-    """
-    exploded_luc = data[column].explode()
-    matching_lucs = exploded_luc[exploded_luc == code]
-    if len(matching_lucs) == 0:
-        return None
-    matching_data = data.loc[matching_lucs.index, :]
-    return matching_data
-
-
 def fix_missing_lucs(
     data: dict[str, pd.DataFrame],
     columns: dict[str, list[str]],
@@ -750,66 +723,6 @@ def fix_undefined_invalid_luc(
     return fixed_codes
 
 
-def luc_ratio(
-    data: dict[str, pd.DataFrame],
-    auxiliary_data: global_classes.AuxiliaryData,
-    columns: list[str] = ["proposed_land_use"]
-) -> pd.DataFrame:
-    """calculates the average floorspace taken by each  luc
-
-    assumes the floorspace is evenly distributed between the
-    luc defined in each entry
-
-    Parameters
-    ----------
-    data : dict[str, pd.DataFrame]
-        data to be analysed
-    auxiliary_data : global_classes.AuxiliaryData
-        auxiliary data read in from parser
-    columns : list[str], optional
-        columns to analyse, by default ["proposed_land_use"]
-
-    Returns
-    -------
-    pd.DataFrame
-        the total count, total floorspace and average floorspace for
-        each luc
-    """
-    land_use_codes = auxiliary_data.allowed_codes
-    land_use_codes_count = land_use_codes.copy()
-    land_use_codes_count["count"] = 0
-    land_use_codes_count["total_floorspace"] = 0
-    for code in land_use_codes["land_use_codes"]:
-        for _, value in data.items():
-            for column in columns:
-
-                code_in_entry = find_lucs(value, column, code)
-
-                if code_in_entry is None:
-                    continue
-
-                have_floorspace = pd.DataFrame([code_in_entry[
-                    "missing_gfa_or_dwellings_no_site_area"],
-                        code_in_entry["missing_gfa_or_dwellings_with_site_area"]]).transpose()
-
-                have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
-
-                have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
-                    "units_(floorspace)"] /have_floorspace[column].apply(lambda x: len(x))
-                    
-                total_floorspace = have_floorspace["units_(floorspace)"].sum()
-
-                land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
-                    ] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"
-                        ] == code, "count"] + len(have_floorspace)
-
-                land_use_codes_count.loc[land_use_codes_count["land_use_codes"
-                    ]== code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
-                        "land_use_codes"] == code, "total_floorspace"] + total_floorspace
-
-    land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / \
-        land_use_codes_count["count"]
-    return land_use_codes_count
 
 
 def unit_area_ratio(data: dict[str, pd.DataFrame], unit_columns: dict[str, str], area_columns: dict[str, str]) -> float:
