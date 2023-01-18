@@ -1706,7 +1706,7 @@ def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str,
         #can't drop duplicates of all column values as some columns are lists
         all_contra = pd.concat(
             [contra_constr_perm, contra_plan_perm, contra_constr_tag])
-        contra_values = all_contra.loc[all_contra.index.drop_duplicates()]
+        contra_values = all_contra.drop_duplicates(subset=["site_reference_id"])
 
         contra[key] = contra_values
     return contra
