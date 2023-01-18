@@ -856,3 +856,76 @@ def fix_site_ref_id(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         fixed_ids[key].loc[value["missing_site_ref"]
                            == True, "site_reference_id"] = new_ids
     return fixed_ids
+
+def infill_year_units(data: dict[str, pd.DataFrame], distribution_columns:dict[str,str], unit_column:dict[str, str], unit_year_column:dict[str, list[str]])->dict[str, pd.DataFrame]:
+    infilled_data = {}
+    for key, value in data.items():
+
+        not_specified = value[distribution_columns[key]==0]
+        years_defined= value[distribution_columns[key]==1]
+
+        if len(not_specified)!=0 or len(years_defined)!=0:
+            raise ValueError("distrubtion contains not specified or defined years values")
+
+        flat = value[distribution_columns[key]==2]
+        early = value[distribution_columns[key]==3]
+        late = value[distribution_columns[key]==4]
+        mid = value[distribution_columns[key]==5]
+
+        #TODO get int start and end years
+
+        for column in unit_year_column[key]:
+
+            #flat.loc[:,column] = flat_distribution(flat[unit_column[key]],)
+    
+
+def flat_distribution(
+    unit: pd.Series,
+    start_year: pd.Series,
+    end_year: pd.Series,
+    )-> pd.Series:
+    return unit/(end_year - start_year) 
+
+def early_distribution(
+    unit: pd.Series,
+    start_year: pd.Series,
+    end_year: pd.Series,
+    year: int
+    )-> pd.Series:
+    periods = (end_year - start_year+1)/5
+    return unit*2^(periods-(((year-start_year)/5)+1))/((2^periods)-1)
+
+
+def late_distribution(
+    unit: pd.Series,
+    start_year: pd.Series,
+    end_year: pd.Series,
+    year: int
+    )-> pd.Series:
+    periods = (end_year - start_year+1)/5
+    return unit*2^(periods-(((end_year-(year+4))/5)+1))/((2^periods)-1)
+
+
+def mid_distribution(
+    unit: pd.Series,
+    start_year: pd.Series,
+    end_year: pd.Series,
+    year: int
+    )-> pd.Series:
+    periods = (end_year - start_year+1)/5
+
+    determinator = 1 + (year - start_year)/5
+    less_than_bool = determinator<=periods+1
+    more_than_bool = ~less_than_bool
+
+    unit_modified = unit.copy()
+
+    unit_modified[less_than_bool] = unit_modified[
+        less_than_bool]*2^((year-start_year[less_than_bool])/5)
+
+    unit_modified[more_than_bool] = (2^(((periods)/2).apply(
+        np.floor))-1) + unit_modified[
+            more_than_bool]*2^(periods-(year+1-start_year[
+                    less_than_bool])/5)/(2^(((periods+1)/2).apply(np.floor))-1)
+    
+    return unit_modified
