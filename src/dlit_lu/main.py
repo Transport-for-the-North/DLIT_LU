@@ -147,7 +147,8 @@ def main(log: utilities.DLitLog) -> None:
     disagg_fixed_data = utilities.disagg_mixed(
         utilities.to_dict(post_fix_data_filter_columns))
 
-    utilities.disagg_land_use(disagg_fixed_data, "proposed_land_use",
-        {"residential":"units_(dwellings)", "employment":"units_(floorspace"},
+    disagg_fixed_data = utilities.disagg_land_use(disagg_fixed_data, "proposed_land_use",
+        {"residential": "units_(dwellings)", "employment":"units_(floorspace)"},
         proposed_luc_split)
+    print("sandwich")
     

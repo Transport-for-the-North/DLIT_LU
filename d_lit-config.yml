@@ -20,7 +20,7 @@ incomplete_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\incomplete_
 known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_invalid_luc.csv
 
 regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
-msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
+msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
 
 
 

@@ -236,13 +236,50 @@ def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
 def msoa_site_geospacial_lookup(data: dict[str, pd.DataFrame])->gpd.GeoDataFrame:
     print("hello fire ball")
 
-def disagg_land_use(data: dict[str, pd.DataFrame],  luc_column: str, unit_coloumn: dict[str, str], land_use_split:pd.DataFrame)->pd.DataFrame:
+def disagg_land_use(
+    data: dict[str, pd.DataFrame],
+    luc_column: str,
+    unit_columns: dict[str, str],
+    land_use_split:pd.DataFrame
+    )->pd.DataFrame:
+    """disaggregates land use into seperate rows
+
+    calculates the split of the GFA using total GFA for each land use as a input
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to disaggregate
+    luc_column : str
+        columns to disaggregate
+    unit_columns : dict[str, str]
+        unit column to disagregate
+    land_use_split : pd.DataFrame
+        contains each land use and the total GFA the take up in the Dlog
+
+    Returns
+    -------
+    pd.DataFrame
+        disaggregated land use
+    """    
     disagg_data = {}
     for key, value in data.items():
         disagg = value.copy()
-        disagg = disagg.explode(luc_column)
+        disagg = disagg.explode(luc_column).reset_index(drop= True)
+
         for site in disagg["site_reference_id"].unique():
-            site_disagg = disagg.loc[disagg["site_reference_id"]==site,unit_coloumn[key]]
+
+            site_disagg = disagg.loc[disagg["site_reference_id"]==site]
             site_luc = site_disagg[luc_column]
-            site_luc = site_luc.merge(land_use_split, how = "left", left_on=luc_column, right_on="land_use_codes")
-            
+            site_luc = site_luc.to_frame().merge(
+                land_use_split,
+                how = "left",
+                left_on=luc_column,
+                right_on="land_use_codes",
+                )
+            ratio = site_luc["total_floorspace"]/site_luc["total_floorspace"].sum()
+            site_disagg.loc[:,unit_columns[key]] = site_disagg.loc[
+                :,unit_columns[key]]*ratio
+            disagg.loc[site_disagg.index] = site_disagg
+        disagg_data[key] = disagg
+    return disagg_data
