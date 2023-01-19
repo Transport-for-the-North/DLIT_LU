@@ -14,6 +14,7 @@ import pathlib
 import logging
 # third party imports
 from tqdm.contrib import logging as tqdm_log
+import pandas as pd
 # local imports
 from dlit_lu import data_repair, inputs, parser, utilities, analyse, user_fixes
 
@@ -144,11 +145,25 @@ def main(log: utilities.DLitLog) -> None:
 
     # TODO finalise disagg mixed pipeline
     
+    LOG.info("Disaggregating mixed into residential and employment")
     disagg_fixed_data = utilities.disagg_mixed(
         utilities.to_dict(post_fix_data_filter_columns))
 
-    disagg_fixed_data = utilities.disagg_land_use(disagg_fixed_data, "proposed_land_use",
+    LOG.info("Disaggregating proposed LUCs")
+    disagg_fixed_data["employment"] = utilities.disagg_land_use({"employment": disagg_fixed_data["employment"]}, "proposed_land_use",
         {"residential": "units_(dwellings)", "employment":"units_(floorspace)"},
-        proposed_luc_split)
+        proposed_luc_split)["employment"]
+    
+    LOG.info("Calculating and infilling build out profile")
+    res_columns = pd.read_csv(config.residential_column_names_path).iloc[:,0].to_list()
+    emp_columns = pd.read_csv(config.employment_column_names_path).iloc[:,0].to_list()
+
+    res_unit_year_columns = list(filter(lambda x: x.startswith("res_year_"), res_columns))
+    emp_unit_year_columns = list(filter(lambda x: x.startswith("emp_year_"), emp_columns))
+
+    disagg_fixed_data = data_repair.infill_year_units(disagg_fixed_data, {"residential":"res_distribution", "employment":"emp_distribution"},
+    {"residential":"units_(dwellings)", "employment":"units_(floorspace)"},
+    {"residential":res_unit_year_columns ,"employment": emp_unit_year_columns}, dlog_data.lookup.years)
+
     print("sandwich")
     

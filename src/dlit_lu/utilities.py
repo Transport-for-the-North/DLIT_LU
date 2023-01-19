@@ -278,6 +278,7 @@ def disagg_land_use(
                 right_on="land_use_codes",
                 )
             ratio = site_luc["total_floorspace"]/site_luc["total_floorspace"].sum()
+            ratio.index = site_disagg.index
             site_disagg.loc[:,unit_columns[key]] = site_disagg.loc[
                 :,unit_columns[key]]*ratio
             disagg.loc[site_disagg.index] = site_disagg

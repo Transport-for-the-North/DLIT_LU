@@ -857,34 +857,88 @@ def fix_site_ref_id(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
                            == True, "site_reference_id"] = new_ids
     return fixed_ids
 
-def infill_year_units(data: dict[str, pd.DataFrame], distribution_columns:dict[str,str], unit_column:dict[str, str], unit_year_column:dict[str, list[str]])->dict[str, pd.DataFrame]:
+def infill_year_units(
+    data: dict[str, pd.DataFrame],
+    distribution_columns:dict[str,str],
+    unit_column:dict[str, str],
+    unit_year_column:dict[str, list[str]],
+    years_lookup: pd.DataFrame,
+    )->dict[str, pd.DataFrame]:
+
     infilled_data = {}
     for key, value in data.items():
+        to_infill = value.copy()
 
-        not_specified = value[distribution_columns[key]==0]
-        years_defined= value[distribution_columns[key]==1]
+        not_specified = value[value[distribution_columns[key]]==0]
+        years_defined= value[value[distribution_columns[key]]==1]
 
         if len(not_specified)!=0 or len(years_defined)!=0:
             raise ValueError("distrubtion contains not specified or defined years values")
 
-        flat = value[distribution_columns[key]==2]
-        early = value[distribution_columns[key]==3]
-        late = value[distribution_columns[key]==4]
-        mid = value[distribution_columns[key]==5]
-
-        #TODO get int start and end years
+        flat = value[value[distribution_columns[key]]==2]
+        flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], years_lookup)
+        early = value[value[distribution_columns[key]]==3]
+        early_years = strip_year(early["start_year_id"], early["end_year_id"], years_lookup)
+        late = value[value[distribution_columns[key]]==4]
+        late_years = strip_year(late["start_year_id"], late["end_year_id"], years_lookup)
+        mid = value[value[distribution_columns[key]]==5]
+        mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], years_lookup)
 
         for column in unit_year_column[key]:
+            year = int(column.split("_")[2])
 
-            #flat.loc[:,column] = flat_distribution(flat[unit_column[key]],)
-    
+            flat.loc[:,column] = flat_distribution(flat[unit_column[key]], flat_years["start_year"],flat_years["end_year"],year )
+            early.loc[:,column] = early_distribution(early[unit_column[key]], early_years["start_year"],early_years["end_year"],year)
+            late.loc[:,column] = late_distribution(late[unit_column[key]], late_years["start_year"],late_years["end_year"],year)
+            mid.loc[:,column] = mid_distribution(mid[unit_column[key]], mid_years["start_year"],mid_years["end_year"],year)
+
+        to_infill.update(flat)
+        to_infill.update(early)
+        to_infill.update(late)
+        to_infill.update(mid)
+        infilled_data[key] = to_infill
+    return infilled_data
+
+def strip_year(start_year_id: pd.Series, end_year_id:pd.Series, years_lookup:pd.DataFrame)->pd.DataFrame:
+    """strips the integer years from the string
+
+    returns a data frame returning either the start or end year
+
+    Parameters
+    ----------
+    str_year : pd.Series
+        years in start_year-end_year format
+
+    start: bool
+        True if start years have been inputted
+        False if end years have been inputted
+
+    Returns
+    -------
+    pd.DataFrame
+        start and end years as integers
+    """    
+    years_lookup = years_lookup["years"].str.split("-", expand=True)
+    years_lookup.columns = ["start_year", "end_year"]
+    start_year = start_year_id.to_frame().merge(years_lookup, how="left", left_on= "start_year_id", right_index = True, suffixes = ["", "_"]).drop(columns=["end_year"])
+    end_year = end_year_id.to_frame().merge(years_lookup, how="left", left_on= "end_year_id", right_index = True,suffixes = ["", "_"]).drop(columns=["start_year"])
+    years = pd.DataFrame([start_year["start_year"].astype(int), end_year["end_year"].astype(int)]).transpose()
+    years.columns=["start_year", "end_year"]
+    return years
 
 def flat_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
+    year:pd.Series
     )-> pd.Series:
-    return unit/(end_year - start_year) 
+    after_start = year>=start_year
+    before_end = year<=end_year
+    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
+    periods = (end_year - start_year+1)/5
+    unit_years[within_years] = unit[within_years]/periods[within_years]
+    return unit_years
 
 def early_distribution(
     unit: pd.Series,
@@ -892,9 +946,16 @@ def early_distribution(
     end_year: pd.Series,
     year: int
     )-> pd.Series:
-    periods = (end_year - start_year+1)/5
-    return unit*2^(periods-(((year-start_year)/5)+1))/((2^periods)-1)
+    
+    after_start = year>=start_year
+    before_end = year<=end_year
+    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
 
+    periods = (end_year - start_year+1)/5
+
+    unit_years[within_years]  = unit[within_years]*((periods[within_years]-(((year-start_year[within_years])/5)+1)).apply(two_pow)/(periods[within_years].apply(two_pow)-1))
+    return unit_years
 
 def late_distribution(
     unit: pd.Series,
@@ -902,9 +963,16 @@ def late_distribution(
     end_year: pd.Series,
     year: int
     )-> pd.Series:
-    periods = (end_year - start_year+1)/5
-    return unit*2^(periods-(((end_year-(year+4))/5)+1))/((2^periods)-1)
+    
+    after_start = year>=start_year
+    before_end = year<=end_year
+    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
 
+    periods = (end_year - start_year+1)/5
+
+    unit_years[within_years] = unit[within_years]*((periods[within_years]-(((end_year[within_years]-(year+4))/5)+1))).apply(two_pow)/(periods[within_years].apply(two_pow)-1)
+    return unit_years
 
 def mid_distribution(
     unit: pd.Series,
@@ -912,20 +980,33 @@ def mid_distribution(
     end_year: pd.Series,
     year: int
     )-> pd.Series:
+    
+    after_start = year>=start_year
+    before_end = year<=end_year
+    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
+
     periods = (end_year - start_year+1)/5
 
     determinator = 1 + (year - start_year)/5
     less_than_bool = determinator<=periods+1
     more_than_bool = ~less_than_bool
-
-    unit_modified = unit.copy()
-
-    unit_modified[less_than_bool] = unit_modified[
-        less_than_bool]*2^((year-start_year[less_than_bool])/5)
-
-    unit_modified[more_than_bool] = (2^(((periods)/2).apply(
-        np.floor))-1) + unit_modified[
-            more_than_bool]*2^(periods-(year+1-start_year[
-                    less_than_bool])/5)/(2^(((periods+1)/2).apply(np.floor))-1)
     
-    return unit_modified
+    less_than_bool = pd.DataFrame([less_than_bool.reset_index(
+        drop=True),within_years.reset_index(drop=True)]).transpose().all(axis=1)
+    more_than_bool = pd.DataFrame([more_than_bool.reset_index(
+        drop=True),within_years.reset_index(drop=True)]).transpose().all(axis=1)
+    less_than_bool.index = unit.index
+    more_than_bool.index = unit.index
+
+    unit_years[less_than_bool] = unit[
+        less_than_bool]*((year-start_year[less_than_bool])/5).apply(two_pow)
+
+    unit_years[more_than_bool] = ((((periods[more_than_bool])/2).apply(
+        np.floor)).apply(two_pow)-1) + unit[
+            more_than_bool]*(periods[more_than_bool]-(year+1-start_year[
+                    more_than_bool])/5).apply(two_pow)/((((periods[more_than_bool]+1)/2).apply(np.floor)).apply(two_pow)-1)
+    return unit_years
+
+def two_pow(x:float):
+    return 2**x
