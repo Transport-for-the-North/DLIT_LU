@@ -75,6 +75,7 @@ def main(log: utilities.DLitLog) -> None:
         PLOT_GRAPHS,
         INITIAL_ASSESSMENT,
     )
+    msoa = parser.parse_msoa(config.msoa_shapefile_path)
 
     syntax_fixed_data = data_repair.fix_inavlid_syntax(
         data_filter_columns, auxiliary_data)

@@ -233,8 +233,17 @@ def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
 
     return {"residential":res_new, "employment":emp_new}
 
-def msoa_site_geospacial_lookup(data: dict[str, pd.DataFrame])->gpd.GeoDataFrame:
-    print("hello fire ball")
+def msoa_site_geospacial_lookup(data: dict[str, pd.DataFrame], msoa)->gpd.GeoDataFrame:
+    print("inprogress")
+    joined = {}
+    for key, value in data.items():
+        #create value geodataframe 
+        #join msoa to geodataframe
+        # drop unwanted columns
+    # aggregate by common luc
+    # disagg by dwelling type
+    # aggregate common dwelling type
+        
 
 def disagg_land_use(
     data: dict[str, pd.DataFrame],

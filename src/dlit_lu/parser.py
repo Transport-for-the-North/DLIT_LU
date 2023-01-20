@@ -297,3 +297,8 @@ def read_auxiliary_data(
     return global_classes.AuxiliaryData(
         allowed_land_use_codes, known_invalid_luc, out_of_date_luc, incomplete_luc, regions
     )
+
+def parse_msoa(file_path:pathlib.Path)->gpd.GeoDataFrame:
+    msoa = gpd.read_file(file_path)
+    north_msoa = msoa[~msoa["north_msoa"].isna()]
+    return north_msoa
