@@ -117,15 +117,15 @@ def infill_data(data: global_classes.DLogData,
 
     # infill values
     corrected_format = infill_missing_site_area(data_dict, area_columns_list,
-        [0, "-"], dict((k, float(average_area)) for k in (data_dict)))
+                                                [0, "-"], dict((k, float(average_area)) for k in (data_dict)))
     corrected_format = infill_units(corrected_format, units_columnns,
-        area_columns, ["-", 0],
-        {"residential": dwelling_area_ratio,
-            "employment": floorspace_area_ratio,
-            "mixed": floorspace_area_ratio})
+                                    area_columns, ["-", 0],
+                                    {"residential": dwelling_area_ratio,
+                                     "employment": floorspace_area_ratio,
+                                     "mixed": floorspace_area_ratio})
 
     corrected_format["mixed"] = infill_units({"mixed": corrected_format["mixed"]},
-        {"mixed": ["dwellings", "units_(dwellings)"]}, {
+                                             {"mixed": ["dwellings", "units_(dwellings)"]}, {
         "mixed": "total_area_ha"}, ["-", 0],
         {"mixed": dwelling_area_ratio})["mixed"]
 
@@ -136,10 +136,11 @@ def infill_data(data: global_classes.DLogData,
         "unknown", "mixed"], auxiliary_data.allowed_codes["land_use_codes"].to_list())
 
     corrected_format = fix_undefined_invalid_luc(corrected_format, land_use_columns,
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
-        auxiliary_data,
-        {"existing_land_use": "other_issues_existing_land_use_code",
-            "proposed_land_use": "other_issues_proposed_land_use_code"})
+                                                 auxiliary_data.allowed_codes["land_use_codes"].to_list(
+                                                 ),
+                                                 auxiliary_data,
+                                                 {"existing_land_use": "other_issues_existing_land_use_code",
+                                                  "proposed_land_use": "other_issues_proposed_land_use_code"})
 
     corrected_format = infill_missing_tag(corrected_format)
 
@@ -297,11 +298,11 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
 
         # without_years
         missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
-            True, "web_tag_certainty_id"] = infill_lookup["not_permissioned_no_years"]
+                                         True, "web_tag_certainty_id"] = infill_lookup["not_permissioned_no_years"]
 
         # with_years
         missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
-            False, "web_tag_certainty_id"] = infill_lookup["not_permissioned_with_years"]
+                                         False, "web_tag_certainty_id"] = infill_lookup["not_permissioned_with_years"]
 
         #not specified
         missing_tag_not_spec = missing_tag.loc[missing_tag["planning_status_id"] == 0, :]
@@ -312,11 +313,11 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
                 missing_tag_not_spec["construction_status_id"] == 3]).transpose().any(axis=1)
 
         missing_tag_not_spec.loc[completed_undergoing_constr,
-            "web_tag_certainty_id"] = infill_lookup["not_specified_in_construction"]
+                                 "web_tag_certainty_id"] = infill_lookup["not_specified_in_construction"]
 
         # not started/not specified
         missing_tag_not_spec.loc[~completed_undergoing_constr,
-            "web_tag_certainty_id"] = infill_lookup["not_specified_not_started_specified"]
+                                 "web_tag_certainty_id"] = infill_lookup["not_specified_not_started_specified"]
 
         # infill
         to_be_infilled.loc[missing_tag_permissioned.index,
@@ -355,12 +356,14 @@ def infill_one_missing_year(
     """
 
     missing_start_id = analyse.find_multiple_missing_values(data,
-        dict((k, ["start_year_id"]) for k in data.keys()),
-        dict((k, [14, ""]) for k in data.keys()))
+                                                            dict((k, ["start_year_id"])
+                                                                 for k in data.keys()),
+                                                            dict((k, [14, ""]) for k in data.keys()))
 
     missing_end_id = analyse.find_multiple_missing_values(data,
-        dict((k, ["end_year_id"]) for k in data.keys()),
-        dict((k, [14, ""]) for k in data.keys()))
+                                                          dict((k, ["end_year_id"])
+                                                               for k in data.keys()),
+                                                          dict((k, [14, ""]) for k in data.keys()))
 
     fixed = {}
 
@@ -381,25 +384,25 @@ def infill_one_missing_year(
             start_no_end_values = to_be_fixed.loc[start_no_end]
 
             end_no_start_values.loc[end_no_start_values["end_year_id"] <= period,
-                "start_year_id"] = end_no_start_values.loc[end_no_start_values[
-                    "end_year_id"] <= period, "end_year_id"]
+                                    "start_year_id"] = end_no_start_values.loc[end_no_start_values[
+                                        "end_year_id"] <= period, "end_year_id"]
 
             end_no_start_values.loc[end_no_start_values["end_year_id"] > period,
-                "start_year_id"] = end_no_start_values.loc[end_no_start_values[
-                    "end_year_id"] <= period, "end_year_id"] - period
+                                    "start_year_id"] = end_no_start_values.loc[end_no_start_values[
+                                        "end_year_id"] <= period, "end_year_id"] - period
 
             start_no_end_values.loc[start_no_end_values["start_year_id"] + period >= 14,
-                "end_year_id"] = start_no_end_values.loc[start_no_end_values[
-                    "start_year_id"] <= period, "start_year_id"]
+                                    "end_year_id"] = start_no_end_values.loc[start_no_end_values[
+                                        "start_year_id"] <= period, "start_year_id"]
 
             start_no_end_values.loc[start_no_end_values["start_year_id"] + period < 14,
-                "end_year_id"] = start_no_end_values.loc[start_no_end_values[
-                    "start_year_id"] <= period, "start_year_id"] + period
+                                    "end_year_id"] = start_no_end_values.loc[start_no_end_values[
+                                        "start_year_id"] <= period, "start_year_id"] + period
 
             to_be_fixed.loc[end_no_start,
-                "start_year_id"] = end_no_start_values["end_year_id"]
+                            "start_year_id"] = end_no_start_values["end_year_id"]
             to_be_fixed.loc[start_no_end,
-                "end_year_id"] = start_no_end_values["start_year_id"]
+                            "end_year_id"] = start_no_end_values["start_year_id"]
 
             fixed_data.loc[to_be_fixed.index] = to_be_fixed
         fixed[key] = fixed_data
@@ -409,7 +412,7 @@ def infill_one_missing_year(
 def infill_missing_years(
     data: dict[str, pd.DataFrame],
     tag_lookup: pd.DataFrame
-    ) -> dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     """infills missing years
 
     infills using the modal start and end year for the tag certainty of the entry
@@ -442,9 +445,9 @@ def infill_missing_years(
         for id_, value in average_years.items():
             id_ = int(id_)
             filtered_data.loc[filtered_data["web_tag_certainty_id"]
-                            == id_, "start_year_id"] = average_years[id_][0]
+                              == id_, "start_year_id"] = average_years[id_][0]
             filtered_data.loc[filtered_data["web_tag_certainty_id"]
-                            == id_, "end_year_id"] = average_years[id_][1]
+                              == id_, "end_year_id"] = average_years[id_][1]
         fixed_data[key].loc[filtered_data.index, :] = filtered_data
     return fixed_data
 
@@ -499,9 +502,9 @@ def infill_units(
             index=filtered_data_missing_area[key].index)
 
         fixed_data[key].loc[filtered_data_with_area.index, unit_columns[key]
-            ] = fixed_data[key].loc[
-                    filtered_data_with_area.index, area_columns[key]
-                ]*unit_area_ratio[key]
+                            ] = fixed_data[key].loc[
+            filtered_data_with_area.index, area_columns[key]
+        ]*unit_area_ratio[key]
 
     return fixed_data
 
@@ -703,7 +706,7 @@ def fix_undefined_invalid_luc(
         for column in columns[key]:
             # finds values that have not been defined as empty, infills and gives a warning
             existing_entries_other_issues = fixed_codes[key][fixed_codes[key
-                ][filter_column_lookup[column]] == True]
+                                                                         ][filter_column_lookup[column]] == True]
             not_fixed = existing_entries_other_issues.loc[
                 existing_entries_other_issues[column].apply(
                     lambda x: x != fill_value), :]
@@ -715,14 +718,12 @@ def fix_undefined_invalid_luc(
                     continue
 
                 LOG.warning(f"{len(not_fixed)} undefined invalid land use codes"
-                    f" found in {key}, {column}:\n{not_fixed[column].to_list()}\n"
-                    "Infilling with average land use split.")
+                            f" found in {key}, {column}:\n{not_fixed[column].to_list()}\n"
+                            "Infilling with average land use split.")
                 replacement = pd.Series([fill_value]).repeat(len(not_fixed))
                 replacement.index = not_fixed.index
                 fixed_codes[key].loc[not_fixed.index, column] = replacement
     return fixed_codes
-
-
 
 
 def unit_area_ratio(data: dict[str, pd.DataFrame], unit_columns: dict[str, str], area_columns: dict[str, str]) -> float:
@@ -857,40 +858,50 @@ def fix_site_ref_id(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
                            == True, "site_reference_id"] = new_ids
     return fixed_ids
 
+
 def infill_year_units(
     data: dict[str, pd.DataFrame],
-    distribution_columns:dict[str,str],
-    unit_column:dict[str, str],
-    unit_year_column:dict[str, list[str]],
+    distribution_columns: dict[str, str],
+    unit_column: dict[str, str],
+    unit_year_column: dict[str, list[str]],
     years_lookup: pd.DataFrame,
-    )->dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
 
     infilled_data = {}
     for key, value in data.items():
         to_infill = value.copy()
 
-        not_specified = value[value[distribution_columns[key]]==0]
-        years_defined= value[value[distribution_columns[key]]==1]
+        not_specified = value[value[distribution_columns[key]] == 0]
+        years_defined = value[value[distribution_columns[key]] == 1]
 
-        if len(not_specified)!=0 or len(years_defined)!=0:
-            raise ValueError("distrubtion contains not specified or defined years values")
+        if len(not_specified) != 0 or len(years_defined) != 0:
+            raise ValueError(
+                "distrubtion contains not specified or defined years values")
 
-        flat = value[value[distribution_columns[key]]==2]
-        flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], years_lookup)
-        early = value[value[distribution_columns[key]]==3]
-        early_years = strip_year(early["start_year_id"], early["end_year_id"], years_lookup)
-        late = value[value[distribution_columns[key]]==4]
-        late_years = strip_year(late["start_year_id"], late["end_year_id"], years_lookup)
-        mid = value[value[distribution_columns[key]]==5]
-        mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], years_lookup)
+        flat = value[value[distribution_columns[key]] == 2]
+        flat_years = strip_year(
+            flat["start_year_id"], flat["end_year_id"], years_lookup)
+        early = value[value[distribution_columns[key]] == 3]
+        early_years = strip_year(
+            early["start_year_id"], early["end_year_id"], years_lookup)
+        late = value[value[distribution_columns[key]] == 4]
+        late_years = strip_year(
+            late["start_year_id"], late["end_year_id"], years_lookup)
+        mid = value[value[distribution_columns[key]] == 5]
+        mid_years = strip_year(mid["start_year_id"],
+                               mid["end_year_id"], years_lookup)
 
         for column in unit_year_column[key]:
             year = int(column.split("_")[2])
 
-            flat.loc[:,column] = flat_distribution(flat[unit_column[key]], flat_years["start_year"],flat_years["end_year"],year )
-            early.loc[:,column] = early_distribution(early[unit_column[key]], early_years["start_year"],early_years["end_year"],year)
-            late.loc[:,column] = late_distribution(late[unit_column[key]], late_years["start_year"],late_years["end_year"],year)
-            mid.loc[:,column] = mid_distribution(mid[unit_column[key]], mid_years["start_year"],mid_years["end_year"],year)
+            flat.loc[:, column] = flat_distribution(
+                flat[unit_column[key]], flat_years["start_year"], flat_years["end_year"], year)
+            early.loc[:, column] = early_distribution(
+                early[unit_column[key]], early_years["start_year"], early_years["end_year"], year)
+            late.loc[:, column] = late_distribution(
+                late[unit_column[key]], late_years["start_year"], late_years["end_year"], year)
+            mid.loc[:, column] = mid_distribution(
+                mid[unit_column[key]], mid_years["start_year"], mid_years["end_year"], year)
 
         to_infill.update(flat)
         to_infill.update(early)
@@ -899,7 +910,8 @@ def infill_year_units(
         infilled_data[key] = to_infill
     return infilled_data
 
-def strip_year(start_year_id: pd.Series, end_year_id:pd.Series, years_lookup:pd.DataFrame)->pd.DataFrame:
+
+def strip_year(start_year_id: pd.Series, end_year_id: pd.Series, years_lookup: pd.DataFrame) -> pd.DataFrame:
     """strips the integer years from the string
 
     returns a data frame returning either the start or end year
@@ -917,93 +929,112 @@ def strip_year(start_year_id: pd.Series, end_year_id:pd.Series, years_lookup:pd.
     -------
     pd.DataFrame
         start and end years as integers
-    """    
+    """
     years_lookup = years_lookup["years"].str.split("-", expand=True)
     years_lookup.columns = ["start_year", "end_year"]
-    start_year = start_year_id.to_frame().merge(years_lookup, how="left", left_on= "start_year_id", right_index = True, suffixes = ["", "_"]).drop(columns=["end_year"])
-    end_year = end_year_id.to_frame().merge(years_lookup, how="left", left_on= "end_year_id", right_index = True,suffixes = ["", "_"]).drop(columns=["start_year"])
-    years = pd.DataFrame([start_year["start_year"].astype(int), end_year["end_year"].astype(int)]).transpose()
-    years.columns=["start_year", "end_year"]
+    start_year = start_year_id.to_frame().merge(years_lookup, how="left", left_on="start_year_id",
+                                                right_index=True, suffixes=["", "_"]).drop(columns=["end_year"])
+    end_year = end_year_id.to_frame().merge(years_lookup, how="left", left_on="end_year_id",
+                                            right_index=True, suffixes=["", "_"]).drop(columns=["start_year"])
+    years = pd.DataFrame([start_year["start_year"].astype(
+        int), end_year["end_year"].astype(int)]).transpose()
+    years.columns = ["start_year", "end_year"]
     return years
+
 
 def flat_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
-    year:pd.Series
-    )-> pd.Series:
-    after_start = year>=start_year
-    before_end = year<=end_year
-    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
-    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
+    year: pd.Series
+) -> pd.Series:
+    after_start = year >= start_year
+    before_end = year <= end_year
+    within_years = pd.DataFrame(
+        [after_start, before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
     periods = (end_year - start_year+1)/5
     unit_years[within_years] = unit[within_years]/periods[within_years]
     return unit_years
+
 
 def early_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
     year: int
-    )-> pd.Series:
-    
-    after_start = year>=start_year
-    before_end = year<=end_year
-    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
-    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
+) -> pd.Series:
+
+    after_start = year >= start_year
+    before_end = year <= end_year
+    within_years = pd.DataFrame(
+        [after_start, before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
     periods = (end_year - start_year+1)/5
 
-    unit_years[within_years]  = unit[within_years]*((periods[within_years]-(((year-start_year[within_years])/5)+1)).apply(two_pow)/(periods[within_years].apply(two_pow)-1))
+    unit_years[within_years] = unit[within_years]*((periods[within_years]-(
+        ((year-start_year[within_years])/5)+1)).apply(two_to_pow)/(periods[within_years].apply(two_to_pow)-1))
     return unit_years
+
 
 def late_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
     year: int
-    )-> pd.Series:
-    
-    after_start = year>=start_year
-    before_end = year<=end_year
-    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
-    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
+) -> pd.Series:
+
+    after_start = year >= start_year
+    before_end = year <= end_year
+    within_years = pd.DataFrame(
+        [after_start, before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
     periods = (end_year - start_year+1)/5
 
-    unit_years[within_years] = unit[within_years]*((periods[within_years]-(((end_year[within_years]-(year+4))/5)+1))).apply(two_pow)/(periods[within_years].apply(two_pow)-1)
+    unit_years[within_years] = unit[within_years]*((periods[within_years]-(
+        ((end_year[within_years]-(year+4))/5)+1))).apply(two_to_pow)/(periods[within_years].apply(two_to_pow)-1)
     return unit_years
+
 
 def mid_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
     year: int
-    )-> pd.Series:
-    
-    after_start = year>=start_year
-    before_end = year<=end_year
-    within_years = pd.DataFrame([after_start,before_end]).transpose().all(axis=1)
-    unit_years = pd.Series(np.zeros(len(unit)),index=unit.index)
+) -> pd.Series:
+
+    after_start = year >= start_year
+    before_end = year <= end_year
+    within_years = pd.DataFrame(
+        [after_start, before_end]).transpose().all(axis=1)
+    unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
     periods = (end_year - start_year+1)/5
 
     determinator = 1 + (year - start_year)/5
-    less_than_bool = determinator<=(periods+1)/2
+    less_than_bool = determinator <= (periods+1)/2
     more_than_bool = ~less_than_bool
-    
+
     less_than_bool = pd.DataFrame([less_than_bool.reset_index(
-        drop=True),within_years.reset_index(drop=True)]).transpose().all(axis=1)
+        drop=True), within_years.reset_index(drop=True)]).transpose().all(axis=1)
     more_than_bool = pd.DataFrame([more_than_bool.reset_index(
-        drop=True),within_years.reset_index(drop=True)]).transpose().all(axis=1)
+        drop=True), within_years.reset_index(drop=True)]).transpose().all(axis=1)
     less_than_bool.index = unit.index
     more_than_bool.index = unit.index
 
     unit_years[less_than_bool] = unit[
-        less_than_bool]*((year-start_year[less_than_bool])/5).apply(two_pow)/((((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_pow)-1)+(((periods[more_than_bool])/2).apply(np.floor).apply(two_pow)-1))
+        less_than_bool]*((year-start_year[less_than_bool])/5).apply(two_to_pow)/(
+            (((periods[less_than_bool]+1)/2).apply(np.floor).apply(two_to_pow)-1)+(
+                ((periods[less_than_bool])/2).apply(np.floor).apply(two_to_pow)-1))
 
-    unit_years[more_than_bool] = unit[more_than_bool]*((periods[more_than_bool]-((year-start_year[more_than_bool])/5+1)).apply(two_pow)/((((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_pow)-1)+(((periods[more_than_bool])/2).apply(np.floor).apply(two_pow)-1)))
+    unit_years[more_than_bool] = unit[more_than_bool]*((periods[more_than_bool]-(
+        (year-start_year[more_than_bool])/5+1)).apply(two_to_pow)/(
+            (((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_to_pow)-1)+(
+                ((periods[more_than_bool])/2).apply(np.floor).apply(two_to_pow)-1)))
     return unit_years
 
-def two_pow(x:float):
+
+def two_to_pow(x: float):
     return 2**x
