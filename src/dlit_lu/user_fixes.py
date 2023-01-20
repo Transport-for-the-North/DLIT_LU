@@ -146,12 +146,12 @@ def implement_user_fixes(
             f"Existing file {config.user_input_path} set as user infill input.")
     else:
         
-        pre_user_fix_path = config.output_folder / "pre_user_fix"
+        pre_user_fix_path = config.output_folder / "01_pre_user_fix"
         pre_user_fix_path.mkdir(exist_ok=True)
 
         analyse.data_report(
             dlog_data,
-            pre_user_fix_path/"initial_data_quality_report.xlsx",
+            pre_user_fix_path/"pre_user_fix_data_report.xlsx",
             config.output_folder,
             auxiliary_data,
             plot_graphs,

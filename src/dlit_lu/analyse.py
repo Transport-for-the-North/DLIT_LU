@@ -310,7 +310,7 @@ def data_report(
     results_report = parse_analysis_results(
         contra_constr_planning_tag,
         results_report,
-        "contra_construction_planning_tag",
+        "contradictory_construction_planning_tag",
         "NON FATAL: entries with contradictor construction_status,"
         " planning_status and or web_tag_certainty"
     )
@@ -322,7 +322,7 @@ def data_report(
     non_fatal_columns = [
         "inactive_entries",
         "missing_area",
-        "contra_construction_planning_tag",
+        "contradictory_construction_planning_tag",
     ]
 
     autofix_columns = [
@@ -1784,7 +1784,7 @@ def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str,
 
         not_permissioned = value[value["planning_status_id"] == 1]
         near_certain = value[value["web_tag_certainty_id"] == 1]
-        less_than_mtl = value[value["planning_status_id"] > 2]
+        less_than_mtl = value[value["web_tag_certainty_id"] > 2]
 
         contra_constr_perm = construction_started_completed[construction_started_completed.index.isin(
             not_permissioned.index)]
