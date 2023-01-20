@@ -402,8 +402,7 @@ def infill_one_missing_year(
             to_be_fixed.loc[end_no_start,
                             "start_year_id"] = end_no_start_values["end_year_id"]
             to_be_fixed.loc[start_no_end,
-                            "end_year_id"] = start_no_end_values["start_year_id"]
-
+                "end_year_id"] = start_no_end_values["start_year_id"]
             fixed_data.loc[to_be_fixed.index] = to_be_fixed
         fixed[key] = fixed_data
     return fixed
@@ -436,11 +435,14 @@ def infill_missing_years(
 
     fixed_data = {}
 
+    missing_year_id = analyse.find_multiple_missing_values(data,
+        dict((k, ["start_year_id", "end_year_id"]) for k in data.keys()),
+        dict((k, [14, ""]) for k in data.keys()))
+
     for key, value in data.items():
         fixed_data[key] = value.copy()
-        missing_years = fixed_data[key].loc[fixed_data[key]
-                                            ["missing_years"] == True]
-        filtered_data = missing_years[missing_years
+
+        filtered_data = missing_year_id[key][missing_year_id[key]
                                       ["web_tag_certainty_id"] != 0]
         for id_, value in average_years.items():
             id_ = int(id_)
