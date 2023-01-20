@@ -117,7 +117,7 @@ def infill_data(data: global_classes.DLogData,
 
     # infill values
     corrected_format = infill_missing_site_area(data_dict, area_columns_list,
-        [0, "-"], dict((k, int(average_area)) for k in (data_dict)))
+        [0, "-"], dict((k, float(average_area)) for k in (data_dict)))
     corrected_format = infill_units(corrected_format, units_columnns,
         area_columns, ["-", 0],
         {"residential": dwelling_area_ratio,
@@ -510,7 +510,7 @@ def infill_missing_site_area(
     data: dict[str, pd.DataFrame],
     area_columns: dict[str, list[str]],
     missing_values: list[str | int],
-    infill_area: dict[str, int],
+    infill_area: dict[str, float],
 ) -> dict[str, pd.DataFrame]:
     """infills missing site area with the a specific value
 
