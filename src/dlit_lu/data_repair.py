@@ -989,7 +989,7 @@ def mid_distribution(
     periods = (end_year - start_year+1)/5
 
     determinator = 1 + (year - start_year)/5
-    less_than_bool = determinator<=periods+1
+    less_than_bool = determinator<=(periods+1)/2
     more_than_bool = ~less_than_bool
     
     less_than_bool = pd.DataFrame([less_than_bool.reset_index(
@@ -1000,12 +1000,9 @@ def mid_distribution(
     more_than_bool.index = unit.index
 
     unit_years[less_than_bool] = unit[
-        less_than_bool]*((year-start_year[less_than_bool])/5).apply(two_pow)
+        less_than_bool]*((year-start_year[less_than_bool])/5).apply(two_pow)/((((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_pow)-1)+(((periods[more_than_bool])/2).apply(np.floor).apply(two_pow)-1))
 
-    unit_years[more_than_bool] = ((((periods[more_than_bool])/2).apply(
-        np.floor)).apply(two_pow)-1) + unit[
-            more_than_bool]*(periods[more_than_bool]-(year+1-start_year[
-                    more_than_bool])/5).apply(two_pow)/((((periods[more_than_bool]+1)/2).apply(np.floor)).apply(two_pow)-1)
+    unit_years[more_than_bool] = unit[more_than_bool]*((periods[more_than_bool]-((year-start_year[more_than_bool])/5+1)).apply(two_pow)/((((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_pow)-1)+(((periods[more_than_bool])/2).apply(np.floor).apply(two_pow)-1)))
     return unit_years
 
 def two_pow(x:float):

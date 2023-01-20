@@ -63,13 +63,13 @@ def main(log: utilities.DLitLog) -> None:
         config.regions_shapefiles_path,
     )
     # implement syntax fixes
-    initial_assessment_folder = config.output_folder/"initial_assessment"
+    initial_assessment_folder = config.output_folder/"00_initial_assessment"
     if INITIAL_ASSESSMENT:
         initial_assessment_folder.mkdir(exist_ok=True)
 
     data_filter_columns = analyse.data_report(
         dlog_data,
-        initial_assessment_folder/"DLOG_data_quality_assessment.xlsx",
+        initial_assessment_folder/"DLOG_initial_data_quality_assessment.xlsx",
         config.output_folder,
         auxiliary_data,
         PLOT_GRAPHS,
@@ -103,9 +103,9 @@ def main(log: utilities.DLitLog) -> None:
         if user_fixed_data is None:
             return
 
-        post_user_fix_path = config.output_folder / "post_user_fix"
+        post_user_fix_path = config.output_folder / "02_post_user_fix"
         post_user_fix_path.mkdir(exist_ok=True)
-        post_user_fix_report_path =post_user_fix_path/ "data_report.xlsx"
+        post_user_fix_report_path =post_user_fix_path/ "post_user_fix_data_report.xlsx"
 
         user_fixed_data = analyse.data_report(
             user_fixed_data,
@@ -133,7 +133,7 @@ def main(log: utilities.DLitLog) -> None:
         user_fixed_data, auxiliary_data)
 
     #post fixes data report and write post fix data
-    post_fix_output_path = config.output_folder / "post_fixes"
+    post_fix_output_path = config.output_folder / "03_post_fixes"
     post_fix_output_path.mkdir(exist_ok=True)
 
     post_fix_data_filter_columns = analyse.data_report(
@@ -144,11 +144,9 @@ def main(log: utilities.DLitLog) -> None:
                              utilities.to_dict(post_fix_data_filter_columns))
 
     # TODO finalise disagg mixed pipeline
-    
     LOG.info("Disaggregating mixed into residential and employment")
     disagg_fixed_data = utilities.disagg_mixed(
         utilities.to_dict(post_fix_data_filter_columns))
-
     LOG.info("Disaggregating proposed LUCs")
     disagg_fixed_data["employment"] = utilities.disagg_land_use({"employment": disagg_fixed_data["employment"]}, "proposed_land_use",
         {"residential": "units_(dwellings)", "employment":"units_(floorspace)"},
@@ -166,4 +164,3 @@ def main(log: utilities.DLitLog) -> None:
     {"residential":res_unit_year_columns ,"employment": emp_unit_year_columns}, dlog_data.lookup.years)
 
     print("sandwich")
-    
