@@ -24,9 +24,9 @@ LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
 
 #whether to plot graphs during data quality assessments
-PLOT_GRAPHS = False
+PLOT_GRAPHS = True
 #whether to write an initial data qualtity report
-INITIAL_ASSESSMENT = True
+INITIAL_ASSESSMENT = False
 
 
 def run() -> None:
@@ -69,8 +69,13 @@ def main(log: utilities.DLitLog) -> None:
 
     data_filter_columns = analyse.data_report(
         dlog_data,
+<<<<<<< Updated upstream
         initial_assessment_folder/"DLOG_initial_data_quality_assessment.xlsx",
         config.output_folder,
+=======
+        initial_assessment_folder/"initial_DLOG_data_quality_assessment.xlsx",
+        initial_assessment_folder,
+>>>>>>> Stashed changes
         auxiliary_data,
         PLOT_GRAPHS,
         INITIAL_ASSESSMENT,
@@ -111,7 +116,7 @@ def main(log: utilities.DLitLog) -> None:
         user_fixed_data = analyse.data_report(
             user_fixed_data,
             post_user_fix_report_path,
-            config.output_folder,
+            post_user_fix_path,
             auxiliary_data,
             PLOT_GRAPHS,
             True,
@@ -163,5 +168,7 @@ def main(log: utilities.DLitLog) -> None:
     disagg_fixed_data = data_repair.infill_year_units(disagg_fixed_data, {"residential":"res_distribution", "employment":"emp_distribution"},
     {"residential":"units_(dwellings)", "employment":"units_(floorspace)"},
     {"residential":res_unit_year_columns ,"employment": emp_unit_year_columns}, dlog_data.lookup.years)
+
+    utilities.msoa_site_geospacial_lookup(disagg_fixed_data, msoa)
 
     print("sandwich")

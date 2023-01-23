@@ -1335,6 +1335,7 @@ def geo_explorer(
         base = None
     explorer = None
     if base is not None:  # plot base
+        
         base = base.to_crs(epsg=4326)
         explorer = base.explore()
 
@@ -1358,7 +1359,7 @@ def geo_explorer(
         if explorer is None:
             for key, value in points.items():
                 temp = value[
-                    ["site_reference_id", "site_name", "geometry"]
+                    ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
                 temp = temp.to_crs(epsg=4326)
                 explorer = temp.explore(
@@ -1366,7 +1367,7 @@ def geo_explorer(
         else:
             for key, value in points.items():
                 temp = value[
-                    ["site_reference_id", "site_name", "geometry"]
+                    ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
                 temp = temp.to_crs(epsg=4326)
                 if len(temp) == 0:
@@ -1379,7 +1380,7 @@ def geo_explorer(
         LOG.warning(f"you have not given any data to explore {title}")
     else:
         folium.LayerControl().add_to(explorer)
-        explorer.save(path / f"{title}.html")
+        explorer.save(path / f"{title}.html", default=str)
 
 
 def spatial_invalid_ratio(

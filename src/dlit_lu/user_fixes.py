@@ -152,7 +152,7 @@ def implement_user_fixes(
         analyse.data_report(
             dlog_data,
             pre_user_fix_path/"pre_user_fix_data_report.xlsx",
-            config.output_folder,
+            pre_user_fix_path,
             auxiliary_data,
             plot_graphs,
             True,
