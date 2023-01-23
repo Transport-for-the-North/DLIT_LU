@@ -137,7 +137,7 @@ def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) ->
         for key, value in outputs.items():
             LOG.info(f"Writing {key}")
             value.to_excel(writer, sheet_name=key)
-    
+
 
 def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
     """converts dlog_data to a dictionary
@@ -158,9 +158,10 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
         "residential": dlog_data.residential_data,
         "employment": dlog_data.employment_data,
         "mixed": dlog_data.mixed_data,
-        }
+    }
 
-def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Lookup)->global_classes.DLogData:
+
+def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Lookup) -> global_classes.DLogData:
     try:
         return global_classes.DLogData(
             dlog_data["combined"],
@@ -168,7 +169,7 @@ def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Look
             dlog_data["employment"],
             dlog_data["mixed"],
             lookup,
-            )
+        )
     except KeyError:
         return global_classes.DLogData(
             None,
@@ -176,13 +177,14 @@ def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Look
             dlog_data["employment"],
             dlog_data["mixed"],
             lookup,
-            )
-def y_n_user_input(message: str)->bool:
-    
+        )
+
+
+def y_n_user_input(message: str) -> bool:
     """takes user input of y/n
 
     will loop until valid answer is given
-    
+
     Parameters
     ----------
     message : str
@@ -192,18 +194,20 @@ def y_n_user_input(message: str)->bool:
     -------
     bool
         true if y false if n
-    """ 
+    """
     while True:
         answer = input(message)
         answer_lower = answer.lower()
-        if answer_lower == "y" or answer_lower =="yes":
+        if answer_lower == "y" or answer_lower == "yes":
             return True
-        elif answer_lower == "n" or answer_lower =="no":
+        elif answer_lower == "n" or answer_lower == "no":
             return False
         else:
-            LOG.warning(f"{answer_lower} does not look like \"y\" or \"n\" to me...")
+            LOG.warning(
+                f"{answer_lower} does not look like \"y\" or \"n\" to me...")
 
-def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
+
+def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """disaggregates the mixed data set into residential and employment
 
     assumes the columns in mixed relevent to each sheet will have identical
@@ -218,39 +222,41 @@ def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
     -------
     dict[str, pd.DataFrame]
         data set with just residential and employment
-    """    
-    
+    """
+
     mix = data["mixed"]
     res = data["residential"].reset_index(drop=True)
     emp = data["employment"].reset_index(drop=True)
-    
-    mix_res = mix.loc[:,res.columns.unique()].reset_index(drop=True)
+
+    mix_res = mix.loc[:, res.columns.unique()].reset_index(drop=True)
     mix_emp = mix.loc[:, emp.columns.unique()].reset_index(drop=True)
 
+    res_new = pd.concat([res, mix_res],  ignore_index=True)
+    emp_new = pd.concat([emp, mix_emp], ignore_index=True)
 
-    res_new = pd.concat([res, mix_res],  ignore_index= True)
-    emp_new = pd.concat([emp, mix_emp], ignore_index= True)
+    return {"residential": res_new, "employment": emp_new}
 
-    return {"residential":res_new, "employment":emp_new}
 
-def msoa_site_geospacial_lookup(data: dict[str, pd.DataFrame], msoa)->gpd.GeoDataFrame:
-    print("inprogress")
+def msoa_site_geospatial_lookup(
+        data: dict[str, pd.DataFrame],
+        msoa: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     joined = {}
     for key, value in data.items():
-        #create value geodataframe 
-        #join msoa to geodataframe
-        # drop unwanted columns
-    # aggregate by common luc
+        dlog_geom = gpd.GeoDataFrame(value, geometry=gpd.points_from_xy(
+            value["easting"], value["northing"]))
+        dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
+
+        joined[key] = dlog_msoa
     # disagg by dwelling type
-    # aggregate common dwelling type
-        
+    return joined
+
 
 def disagg_land_use(
     data: dict[str, pd.DataFrame],
     luc_column: str,
     unit_columns: dict[str, str],
-    land_use_split:pd.DataFrame
-    )->pd.DataFrame:
+    land_use_split: pd.DataFrame
+) -> pd.DataFrame:
     """disaggregates land use into seperate rows
 
     calculates the split of the GFA using total GFA for each land use as a input
@@ -270,27 +276,27 @@ def disagg_land_use(
     -------
     pd.DataFrame
         disaggregated land use
-    """    
+    """
     disagg_data = {}
     for key, value in data.items():
         disagg = value.copy()
-        disagg = disagg.explode(luc_column).reset_index(drop= True)
+        disagg = disagg.explode(luc_column).reset_index(drop=True)
 
         for site in disagg["site_reference_id"].unique():
 
-            site_disagg = disagg.loc[disagg["site_reference_id"]==site]
+            site_disagg = disagg.loc[disagg["site_reference_id"] == site]
             site_luc = site_disagg[luc_column]
             site_luc = site_luc.to_frame().merge(
                 land_use_split,
-                how = "left",
+                how="left",
                 left_on=luc_column,
                 right_on="land_use_codes",
-                )
-            ratio = site_luc["total_floorspace"]/site_luc["total_floorspace"].sum()
+            )
+            ratio = site_luc["total_floorspace"] / \
+                site_luc["total_floorspace"].sum()
             ratio.index = site_disagg.index
-            site_disagg.loc[:,unit_columns[key]] = site_disagg.loc[
-                :,unit_columns[key]]*ratio
+            site_disagg.loc[:, unit_columns[key]] = site_disagg.loc[
+                :, unit_columns[key]]*ratio
             disagg.loc[site_disagg.index] = site_disagg
         disagg_data[key] = disagg
     return disagg_data
-

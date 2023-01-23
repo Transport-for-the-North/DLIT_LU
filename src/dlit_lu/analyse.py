@@ -1340,6 +1340,7 @@ def geo_explorer(
         explorer = base.explore()
 
     if choropleth is not None:
+        #TODO more robust CRS conversion
         choropleth = choropleth.to_crs(epsg=4326)
         if column is None:
             raise ValueError(
@@ -1361,6 +1362,7 @@ def geo_explorer(
                 temp = value[
                     ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
+                #TODO more robust CRS conversion
                 temp = temp.to_crs(epsg=4326)
                 explorer = temp.explore(
                     name=key, color=colour[key], legend=True, show=False)
@@ -1369,6 +1371,7 @@ def geo_explorer(
                 temp = value[
                     ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
+                #TODO more robust CRS conversion
                 temp = temp.to_crs(epsg=4326)
                 if len(temp) == 0:
                     continue
