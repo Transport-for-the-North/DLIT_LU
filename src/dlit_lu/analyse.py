@@ -1245,6 +1245,7 @@ def geo_explorer(
         base = None
     explorer = None
     if base is not None:  # plot base
+        #TODO more robust CRS conversion required
         base = base.to_crs(epsg=4326)
         explorer = base.explore()
 
@@ -1267,8 +1268,9 @@ def geo_explorer(
             raise ValueError("colour must be given when points is provided")
         if explorer is None:
             for key, value in points.items():
+                #TODO more robust CRS conversion required
                 temp = value[
-                    ["site_reference_id", "site_name", "geometry"]
+                    ["site_reference_id","geometry"]
                 ].set_geometry("geometry")
                 temp = temp.to_crs(epsg=4326)
                 explorer = temp.explore(
@@ -1276,8 +1278,9 @@ def geo_explorer(
         else:
             for key, value in points.items():
                 temp = value[
-                    ["site_reference_id", "site_name", "geometry"]
+                    ["site_reference_id","geometry"]
                 ].set_geometry("geometry")
+                #TODO more robust CRS conversion required
                 temp = temp.to_crs(epsg=4326)
                 if len(temp) == 0:
                     continue
