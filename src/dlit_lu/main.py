@@ -24,7 +24,7 @@ LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
 
 #whether to plot graphs during data quality assessments
-PLOT_GRAPHS = True
+PLOT_GRAPHS = False
 #whether to write an initial data qualtity report
 INITIAL_ASSESSMENT = False
 
@@ -69,13 +69,8 @@ def main(log: utilities.DLitLog) -> None:
 
     data_filter_columns = analyse.data_report(
         dlog_data,
-<<<<<<< Updated upstream
-        initial_assessment_folder/"DLOG_initial_data_quality_assessment.xlsx",
-        config.output_folder,
-=======
         initial_assessment_folder/"initial_DLOG_data_quality_assessment.xlsx",
         initial_assessment_folder,
->>>>>>> Stashed changes
         auxiliary_data,
         PLOT_GRAPHS,
         INITIAL_ASSESSMENT,
@@ -169,6 +164,5 @@ def main(log: utilities.DLitLog) -> None:
     {"residential":"units_(dwellings)", "employment":"units_(floorspace)"},
     {"residential":res_unit_year_columns ,"employment": emp_unit_year_columns}, dlog_data.lookup.years)
 
-    utilities.msoa_site_geospacial_lookup(disagg_fixed_data, msoa)
-
-    print("sandwich")
+    msoa_sites = utilities.msoa_site_geospatial_lookup(disagg_fixed_data, msoa)
+    utilities.write_to_excel(config.output_folder/ "site_with_msoa.xlsx", msoa_sites)
