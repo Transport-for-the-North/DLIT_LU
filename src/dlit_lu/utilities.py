@@ -239,16 +239,55 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
 def msoa_site_geospatial_lookup(
         data: dict[str, pd.DataFrame],
-        msoa: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        msoa: gpd.GeoDataFrame,
+        ) -> gpd.GeoDataFrame:
+    """spatially joins MSOA shapefile to DLOG sites
+
+    
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to join to msoa 
+    msoa : gpd.GeoDataFrame
+        msoa data
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        spatially joined data 
+    """    
+
     joined = {}
     for key, value in data.items():
+
         dlog_geom = gpd.GeoDataFrame(value, geometry=gpd.points_from_xy(
             value["easting"], value["northing"]))
         dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
-
         joined[key] = dlog_msoa
-    # disagg by dwelling type
+    
     return joined
+
+def calc_msoa_proportion(msoa_pop_shape_file: pd.DataFrame)->pd.DataFrame:
+    """
+
+    _extended_summary_
+
+    Parameters
+    ----------
+    msoa_pop_shape_file : pd.DataFrame
+        _description_
+
+    Returns
+    -------
+    pd.DataFrame
+        _description_
+    """    
+    msoa_pop = pd.read_csv(msoa_pop_shape_file)
+    msoa_pop.columns = msoa_pop.columns.columns.str.lower()
+    msoa_pop.set_index(["zone_id", "census_property_type"], inplace = True)
+    msoa_pop.loc[:,:, "dwelling_ratio"] = msoa_pop["UPRN"]/msoa_pop["UPRN"].groupby(level = "zone_id")
+    return msoa_pop
 
 
 def disagg_land_use(
