@@ -14,9 +14,8 @@ import pathlib
 import logging
 # third party imports
 from tqdm.contrib import logging as tqdm_log
-import pandas as pd
 # local imports
-from dlit_lu import analyse_and_infill, inputs, utilities, land_use
+from dlit_lu import analyse_and_infill, inputs, utilities, land_use, parser
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -41,15 +40,20 @@ def main(log: utilities.DLitLog) -> None:
     """
     #load in config file
     config = inputs.DLitConfig.load_yaml(CONFIG_PATH)
-
+    config.check_inputs()
+    
     config.output_folder.mkdir(exist_ok=True)
 
     #set log file
     log.add_file_handler(config.output_folder / LOG_FILE)
 
-    infilled_data = analyse_and_infill.run(config)
+    if config.run_infill:
+        infilled_data = analyse_and_infill.run(config)
+    else:
+        infilled_data = parser.parse_land_use_input(config)
 
-    land_use.run(infilled_data, config)
+    if config.run_land_use:
+        land_use.run(infilled_data, config)
 
     #________________end of infilling____________________
    

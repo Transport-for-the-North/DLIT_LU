@@ -9,10 +9,12 @@ from dlit_lu import utilities, global_classes, parser, inputs
 LOG = logging.getLogger(__name__)
 
 def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
-    LOG.info("Disaggregating mixed into residential and employment")
+    LOG.info("Initialising Land Use Module")
     
-    msoa = parser.parse_msoa(config.msoa_shapefile_path)
+    config.output_folder.mkdir(exist_ok=True)
 
+    msoa = parser.parse_msoa(config.msoa_shapefile_path)
+    LOG.info("Disaggregating mixed into residential and employment")
     data = utilities.disagg_mixed(
         utilities.to_dict(input_data))
 
@@ -28,3 +30,5 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     utilities.disagg_dwelling(msoa_sites["residential"], config.msoa_dwelling_pop_path)
 
     utilities.write_to_excel(config.output_folder/ "site_with_msoa.xlsx", msoa_sites)
+
+    LOG.info("Ending Land Use Module")

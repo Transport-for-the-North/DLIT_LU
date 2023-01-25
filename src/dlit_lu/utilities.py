@@ -119,7 +119,10 @@ def output_file_checks(output_function):
         # Do something after the function.
     return wrapper_func
 
-
+@output_file_checks
+def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
+    output.to_csv(file_path)
+    
 @output_file_checks
 def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) -> None:
     """write a dict of pandas DF to a excel spreadsheet

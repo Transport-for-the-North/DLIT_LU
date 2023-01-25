@@ -22,7 +22,7 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     log : utilities.DLitLog
         logging object
     """
-
+    LOG.info("Initilising Analysis and Infill Module")
     config.output_folder.mkdir(exist_ok=True)
 
     # parse data
@@ -64,11 +64,15 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         utilities.to_dict(syntax_fixed_data),
         auxiliary_data,
         "proposed_land_use")
+    
+    utilities.write_to_csv(config.proposed_luc_split_path, proposed_luc_split)
 
     existing_luc_split = analyse.luc_ratio(
         utilities.to_dict(syntax_fixed_data),
         auxiliary_data,
         "existing_land_use")
+
+    utilities.write_to_csv(config.existing_luc_split_path, existing_luc_split)
 
     # user fixes
     #TODO streamline user fixes pipeline
@@ -160,6 +164,7 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     utilities.write_to_excel(post_fix_output_path / "post_fix_data.xlsx",
                              utilities.to_dict(post_fix_data_filter_columns))
 
+    LOG.info("Ending Analysis and Infill Module, returning results")
     return global_classes.DLogData(
         None,
         post_fix_data_filter_columns.residential_data,
@@ -169,4 +174,4 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         proposed_luc_split,
         existing_luc_split,
     )
-    #________________end of infilling____________________
+    

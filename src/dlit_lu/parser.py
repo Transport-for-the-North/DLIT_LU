@@ -66,12 +66,39 @@ def parse_dlog(
         lookup=lookup,
     )
     return data_output
+def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
+    LOG.info(f"Parsing {str(config.land_use_input)}")
+    #parse sheets
+    LOG.info("Parsing Residential sheet")
+    residential_data = parse_sheet(
+        config.land_use_input, "residential")
+    LOG.info("Parsing Employment sheet")
+    employment_data = parse_sheet(
+        config.land_use_input, "employment")
+    LOG.info("Parsing Mixed sheet")
+    mixed_data = parse_sheet(
+        config.land_use_input, "mixed")
+    LOG.info("Parsing Lookup sheet")
+    lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
+    LOG.info("Parsing land use splits")
+    existing_split = pd.read_csv(config.existing_luc_split_path)
+    proposed_split = pd.read_csv(config.proposed_luc_split_path)
 
+    data_output = global_classes.DLogData(
+        combined_data=None,
+        residential_data=residential_data,
+        employment_data=employment_data,
+        mixed_data=mixed_data,
+        lookup=lookup,
+        existing_land_use_split=existing_split,
+        proposed_land_use_split=proposed_split,
+    )
+    return data_output
 
 def parse_sheet(
     input_file_path: pathlib.Path,
     sheet_name: str,
-    skip_rows: int,
+    skip_rows: int = 0,
     column_names: Optional[list[str]] = None,
     ignore_columns: Optional[list[str]] = None,
 ) -> pd.DataFrame:

@@ -3,6 +3,8 @@
 # standard imports
 import json
 import pathlib
+from typing import Optional
+import os 
 # third party imports
 import strictyaml
 import pydantic
@@ -142,39 +144,41 @@ class DLitConfig(BaseConfig):
     ValueError
         file doesn't exisit
     """
-    dlog_input_file: pathlib.Path
-    combined_sheet_name: str
-    residential_sheet_name: str
-    employment_sheet_name: str
-    mixed_sheet_name: str
-    lookups_sheet_name: str
+    #set up
+    run_infill: bool
+    run_land_use: bool
+
+    #mandatory
     output_folder: pathlib.Path
-    combined_column_names_path: pathlib.Path
-    residential_column_names_path: pathlib.Path
-    employment_column_names_path: pathlib.Path
-    mixed_column_names_path: pathlib.Path
-    ignore_columns_path: pathlib.Path
-    valid_luc_path: pathlib.Path
-    known_invalid_luc_path: pathlib.Path
-    out_of_date_luc_path: pathlib.Path
-    incomplete_luc_path: pathlib.Path
-    regions_shapefiles_path: pathlib.Path
-    user_input_path: pathlib.Path
-    msoa_shapefile_path: pathlib.Path
-    msoa_dwelling_pop_path: pathlib.Path
+    proposed_luc_split_path: pathlib.Path
+    existing_luc_split_path: pathlib.Path
+    dlog_input_file: pathlib.Path
+    lookups_sheet_name: str
+
+    #required for infill
+    combined_sheet_name: Optional[str]
+    residential_sheet_name: Optional[str]
+    employment_sheet_name: Optional[str]
+    mixed_sheet_name :Optional[str]
+    combined_column_names_path: Optional[pathlib.Path]
+    residential_column_names_path: Optional[pathlib.Path]
+    employment_column_names_path: Optional[pathlib.Path]
+    mixed_column_names_path: Optional[pathlib.Path]
+    ignore_columns_path: Optional[pathlib.Path]
+    user_input_path: Optional[pathlib.Path]
+    valid_luc_path: Optional[pathlib.Path]
+    out_of_date_luc_path: Optional[pathlib.Path]
+    incomplete_luc_path: Optional[pathlib.Path]
+    known_invalid_luc_path: Optional[pathlib.Path]
+    regions_shapefiles_path: Optional[pathlib.Path]
+
+    #required for land use
+    land_use_input: Optional[pathlib.Path]
+    msoa_shapefile_path: Optional[pathlib.Path]
+    msoa_dwelling_pop_path: Optional[pathlib.Path]
 
     @pydantic.validator(
         "dlog_input_file",
-        "regions_shapefiles_path",
-        "combined_column_names_path",
-        "residential_column_names_path",
-        "employment_column_names_path",
-        "mixed_column_names_path",
-        "valid_luc_path",
-        "out_of_date_luc_path",
-        "incomplete_luc_path",
-        "msoa_shapefile_path",
-        "msoa_dwelling_pop_path",
     )
     def _file_exists(  # Validator is class method pylint: disable=no-self-argument
         cls, value: pathlib.Path
@@ -182,3 +186,62 @@ class DLitConfig(BaseConfig):
         if not value.is_file():
             raise ValueError(f"file doesn't exist: {value}")
         return value
+
+    def check_inputs(self)->None:
+        if self.run_land_use:
+            self.check_land_use_params()
+        if self.run_infill:
+            self.check_infill_params()
+
+    def check_infill_params(self)->None:
+        str_params = [
+            self.combined_sheet_name,
+            self.residential_sheet_name,
+            self.employment_sheet_name,
+            self.mixed_sheet_name,
+        ]
+        read_path_params  = [
+            self.combined_column_names_path,
+            self.residential_column_names_path,
+            self.employment_column_names_path,
+            self.mixed_column_names_path,
+            self.ignore_columns_path,
+            self.valid_luc_path,
+            self.out_of_date_luc_path,
+            self.incomplete_luc_path,
+            self.known_invalid_luc_path,
+            self.regions_shapefiles_path,
+            ]
+        write_path_params  = [
+            self.user_input_path,
+        ]
+        for param in write_path_params + read_path_params + str_params:
+            if param is None:
+                raise ValueError("Infill Parameters incomplete, please"
+                " complete these within the config file before continuing. Cheers!")
+
+        for param in read_path_params:
+            if not os.path.exists(param):
+                raise ValueError("Infill parameters contains write file paths"
+                " that do not exist. Please update the config file before continuing. Cheers!")
+
+
+    def check_land_use_params(self)->None:
+    
+        read_path_params  = [
+            self.land_use_input,
+            self.msoa_shapefile_path,
+            self.msoa_dwelling_pop_path,
+            ]
+        write_path_params =[
+
+        ]
+        for param in read_path_params + write_path_params:
+            if param is None:
+                raise ValueError("Land use parameters incomplete, please"
+                " complete these within the config file before continuing. Cheers!")
+        for param in read_path_params:
+            if not os.path.exists(param) or param == pathlib.Path("."):
+                raise ValueError("Land use parameters contains write file paths"
+                " that do not exist. Please update the config file before continuing. Cheers!")
+    
