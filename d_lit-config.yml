@@ -21,7 +21,7 @@ known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_in
 
 regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
 msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
-msoa_dwelling_file_path: C:\Users\UKKXF022\Documents\DLOG\resi_gb_msoa_agg_prt_2018_dwells+pop.csv
+msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\DLOG\resi_gb_msoa_agg_prt_2018_dwells+pop.csv
 
 
 

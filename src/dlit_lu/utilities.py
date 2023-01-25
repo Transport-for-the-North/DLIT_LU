@@ -236,6 +236,13 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     return {"residential": res_new, "employment": emp_new}
 
+def disagg_dwelling(msoa_data: pd.DataFrame, msoa_pop_path:pathlib.Path)->pd.DataFrame:
+
+    msoa_ratio = calc_msoa_proportion(msoa_pop_path)
+
+    msoa_data = msoa_data.merge(
+        msoa_ratio, how = "left", left_on = "msoa11cd", right_on = "zone_id")
+    print("this is a stop point")
 
 def msoa_site_geospatial_lookup(
         data: dict[str, pd.DataFrame],
@@ -243,20 +250,19 @@ def msoa_site_geospatial_lookup(
         ) -> gpd.GeoDataFrame:
     """spatially joins MSOA shapefile to DLOG sites
 
-    
 
     Parameters
     ----------
     data : dict[str, pd.DataFrame]
-        data to join to msoa 
+        data to join to msoa
     msoa : gpd.GeoDataFrame
         msoa data
 
     Returns
     -------
     gpd.GeoDataFrame
-        spatially joined data 
-    """    
+        spatially joined data
+    """
 
     joined = {}
     for key, value in data.items():
@@ -268,7 +274,7 @@ def msoa_site_geospatial_lookup(
     
     return joined
 
-def calc_msoa_proportion(msoa_pop_shape_file: pd.DataFrame)->pd.DataFrame:
+def calc_msoa_proportion(msoa_pop_path: pathlib.Path)->pd.DataFrame:
     """
 
     _extended_summary_
@@ -283,17 +289,25 @@ def calc_msoa_proportion(msoa_pop_shape_file: pd.DataFrame)->pd.DataFrame:
     pd.DataFrame
         _description_
     """    
-    msoa_pop = pd.read_csv(msoa_pop_shape_file)
-    msoa_pop.columns = msoa_pop.columns.columns.str.lower()
+    msoa_pop = pd.read_csv(msoa_pop_path)
+    msoa_pop.columns = [
+        "zone_id",
+        "census_property_type",
+        "uprn",
+        "household_occupancy_18",
+        "population",
+        ]
     msoa_pop.set_index(["zone_id", "census_property_type"], inplace = True)
-    msoa_pop.loc[:,:, "dwelling_ratio"] = msoa_pop["UPRN"]/msoa_pop["UPRN"].groupby(level = "zone_id")
+    msoa_pop["dwelling_ratio"] = msoa_pop["uprn"
+        ]/msoa_pop["uprn"].groupby(level = "zone_id").sum()
+
     return msoa_pop
 
 
-def disagg_land_use(
-    data: dict[str, pd.DataFrame],
+def disagg_land_use_codes(
+    data: pd.DataFrame,
     luc_column: str,
-    unit_columns: dict[str, str],
+    unit_columns: list[str],
     land_use_split: pd.DataFrame
 ) -> pd.DataFrame:
     """disaggregates land use into seperate rows
@@ -316,26 +330,23 @@ def disagg_land_use(
     pd.DataFrame
         disaggregated land use
     """
-    disagg_data = {}
-    for key, value in data.items():
-        disagg = value.copy()
-        disagg = disagg.explode(luc_column).reset_index(drop=True)
 
-        for site in disagg["site_reference_id"].unique():
+    disagg = data.explode(luc_column).reset_index(drop=True)
 
-            site_disagg = disagg.loc[disagg["site_reference_id"] == site]
-            site_luc = site_disagg[luc_column]
-            site_luc = site_luc.to_frame().merge(
-                land_use_split,
-                how="left",
-                left_on=luc_column,
-                right_on="land_use_codes",
-            )
-            ratio = site_luc["total_floorspace"] / \
-                site_luc["total_floorspace"].sum()
-            ratio.index = site_disagg.index
-            site_disagg.loc[:, unit_columns[key]] = site_disagg.loc[
-                :, unit_columns[key]]*ratio
-            disagg.loc[site_disagg.index] = site_disagg
-        disagg_data[key] = disagg
-    return disagg_data
+    for site in disagg["site_reference_id"].unique():
+
+        site_disagg = disagg.loc[disagg["site_reference_id"] == site]
+        site_luc = site_disagg[luc_column]
+        site_luc = site_luc.to_frame().merge(
+            land_use_split,
+            how="left",
+            left_on=luc_column,
+            right_on="land_use_codes",
+        )
+        ratio = site_luc["total_floorspace"] / \
+            site_luc["total_floorspace"].sum()
+        ratio.index = site_disagg.index
+        site_disagg.loc[:, unit_columns] = site_disagg.loc[
+            :, unit_columns]*ratio
+        disagg.loc[site_disagg.index] = site_disagg
+    return disagg

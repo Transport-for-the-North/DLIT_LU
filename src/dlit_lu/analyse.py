@@ -505,7 +505,7 @@ def data_report(
 def luc_ratio(
     data: dict[str, pd.DataFrame],
     auxiliary_data: global_classes.AuxiliaryData,
-    columns: list[str] = ["proposed_land_use"]
+    column: str = "proposed_land_use", 
 ) -> pd.DataFrame:
     """calculates the average floorspace taken by each  luc
 
@@ -536,31 +536,30 @@ def luc_ratio(
             #do not use residential since they do not contain floorspace
             if key == "residential":
                 continue
-            for column in columns:
 
-                code_in_entry = find_lucs(value, column, code)
+            code_in_entry = find_lucs(value, column, code)
 
-                if code_in_entry is None:
-                    continue
+            if code_in_entry is None:
+                continue
 
-                have_floorspace = pd.DataFrame([code_in_entry[
-                    "missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
-                        code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(drop=True)]).transpose()
-                have_floorspace.index = code_in_entry.index
-                have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
+            have_floorspace = pd.DataFrame([code_in_entry[
+                "missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
+                    code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(drop=True)]).transpose()
+            have_floorspace.index = code_in_entry.index
+            have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
 
-                have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
-                    "units_(floorspace)"] / have_floorspace[column].apply(lambda x: len(x))
-                    
-                total_floorspace = have_floorspace["units_(floorspace)"].sum()
+            have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
+                "units_(floorspace)"] / have_floorspace[column].apply(lambda x: len(x))
+                
+            total_floorspace = have_floorspace["units_(floorspace)"].sum()
 
-                land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
-                    ] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"
-                        ] == code, "count"] + len(have_floorspace)
+            land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
+                ] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                    ] == code, "count"] + len(have_floorspace)
 
-                land_use_codes_count.loc[land_use_codes_count["land_use_codes"
-                    ]== code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
-                        "land_use_codes"] == code, "total_floorspace"] + total_floorspace
+            land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                ]== code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
+                    "land_use_codes"] == code, "total_floorspace"] + total_floorspace
 
     land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / \
         land_use_codes_count["count"]

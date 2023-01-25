@@ -161,7 +161,7 @@ class DLitConfig(BaseConfig):
     regions_shapefiles_path: pathlib.Path
     user_input_path: pathlib.Path
     msoa_shapefile_path: pathlib.Path
-    msoa_dwelling_file: pathlib.Path
+    msoa_dwelling_pop_path: pathlib.Path
 
     @pydantic.validator(
         "dlog_input_file",
@@ -174,7 +174,7 @@ class DLitConfig(BaseConfig):
         "out_of_date_luc_path",
         "incomplete_luc_path",
         "msoa_shapefile_path",
-        "msoa_dwelling_file",
+        "msoa_dwelling_pop_path",
     )
     def _file_exists(  # Validator is class method pylint: disable=no-self-argument
         cls, value: pathlib.Path

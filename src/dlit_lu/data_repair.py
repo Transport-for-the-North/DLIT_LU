@@ -860,57 +860,53 @@ def fix_site_ref_id(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
                            == True, "site_reference_id"] = new_ids
     return fixed_ids
 
-
 def infill_year_units(
-    data: dict[str, pd.DataFrame],
-    distribution_columns: dict[str, str],
-    unit_column: dict[str, str],
-    unit_year_column: dict[str, list[str]],
+    data: pd.DataFrame,
+    distribution_columns: str,
+    unit_column: str,
+    unit_year_column: list[str],
     years_lookup: pd.DataFrame,
-) -> dict[str, pd.DataFrame]:
+) -> global_classes.DLogData:
+    LOG.info("Calculating and infilling build out profile")
 
-    infilled_data = {}
-    for key, value in data.items():
-        to_infill = value.copy()
 
-        not_specified = value[value[distribution_columns[key]] == 0]
-        years_defined = value[value[distribution_columns[key]] == 1]
+    not_specified = data[data[distribution_columns] == 0]
+    years_defined = data[data[distribution_columns] == 1]
 
-        if len(not_specified) != 0 or len(years_defined) != 0:
-            raise ValueError(
-                "distrubtion contains not specified or defined years values")
+    if len(not_specified) != 0 or len(years_defined) != 0:
+        raise ValueError(
+            "distrubtion contains not specified or defined years values")
 
-        flat = value[value[distribution_columns[key]] == 2]
-        flat_years = strip_year(
-            flat["start_year_id"], flat["end_year_id"], years_lookup)
-        early = value[value[distribution_columns[key]] == 3]
-        early_years = strip_year(
-            early["start_year_id"], early["end_year_id"], years_lookup)
-        late = value[value[distribution_columns[key]] == 4]
-        late_years = strip_year(
-            late["start_year_id"], late["end_year_id"], years_lookup)
-        mid = value[value[distribution_columns[key]] == 5]
-        mid_years = strip_year(mid["start_year_id"],
-                               mid["end_year_id"], years_lookup)
+    flat = data[data[distribution_columns] == 2]
+    flat_years = strip_year(
+        flat["start_year_id"], flat["end_year_id"], years_lookup)
+    early = data[data[distribution_columns] == 3]
+    early_years = strip_year(
+        early["start_year_id"], early["end_year_id"], years_lookup)
+    late = data[data[distribution_columns] == 4]
+    late_years = strip_year(
+        late["start_year_id"], late["end_year_id"], years_lookup)
+    mid = data[data[distribution_columns] == 5]
+    mid_years = strip_year(mid["start_year_id"],
+                            mid["end_year_id"], years_lookup)
 
-        for column in unit_year_column[key]:
-            year = int(column.split("_")[2])
+    for column in unit_year_column:
+        year = int(column.split("_")[2])
 
-            flat.loc[:, column] = flat_distribution(
-                flat[unit_column[key]], flat_years["start_year"], flat_years["end_year"], year)
-            early.loc[:, column] = early_distribution(
-                early[unit_column[key]], early_years["start_year"], early_years["end_year"], year)
-            late.loc[:, column] = late_distribution(
-                late[unit_column[key]], late_years["start_year"], late_years["end_year"], year)
-            mid.loc[:, column] = mid_distribution(
-                mid[unit_column[key]], mid_years["start_year"], mid_years["end_year"], year)
+        flat.loc[:, column] = flat_distribution(
+            flat[unit_column], flat_years["start_year"], flat_years["end_year"], year)
+        early.loc[:, column] = early_distribution(
+            early[unit_column], early_years["start_year"], early_years["end_year"], year)
+        late.loc[:, column] = late_distribution(
+            late[unit_column], late_years["start_year"], late_years["end_year"], year)
+        mid.loc[:, column] = mid_distribution(
+            mid[unit_column], mid_years["start_year"], mid_years["end_year"], year)
 
-        to_infill.update(flat)
-        to_infill.update(early)
-        to_infill.update(late)
-        to_infill.update(mid)
-        infilled_data[key] = to_infill
-    return infilled_data
+    data.update(flat)
+    data.update(early)
+    data.update(late)
+    data.update(mid)
+    return data
 
 
 def strip_year(start_year_id: pd.Series, end_year_id: pd.Series, years_lookup: pd.DataFrame) -> pd.DataFrame:
