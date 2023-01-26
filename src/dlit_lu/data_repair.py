@@ -411,7 +411,7 @@ def infill_missing_years(
     ) -> dict[str, pd.DataFrame]:
     """infills missing years
 
-    infills using the modal start and end year for the tag certainty of the entry
+    infills using the model start and end year for the tag certainty of the entry
 
     Parameters
     ----------

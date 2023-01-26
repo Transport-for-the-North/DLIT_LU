@@ -1,25 +1,25 @@
-dlog_input_file: C:\Users\UKKXF022\Documents\DLOG\DLog_data\DLog21_v8_issued_v1.xlsx
+dlog_input_file: Y:\D_I-Log\D-Log21\D-Log21_v8\DLog21_v8_issued_v1.xlsx
 combined_sheet_name: "2021 Combined"
 residential_sheet_name: "2021 Residential"
 employment_sheet_name: "2021 Employment"
 mixed_sheet_name: "2021 Mixed"
 lookups_sheet_name: "Lookups"
 
-combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\combined_column_names.csv
-residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
-employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv
-mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_column_names.csv
-ignore_columns_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\drop_columns.csv
+combined_column_names_path: inputs\combined_column_names.csv
+residential_column_names_path: inputs\residential_column_names.csv
+employment_column_names_path: inputs\employment_column_names.csv
+mixed_column_names_path: inputs\mixed_column_names.csv
+ignore_columns_path: inputs\drop_columns.csv
 
-output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
-user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
+output_folder: DLIT_outputs
+user_input_path: DLIT_outputs\user_input.xlsx
 
-valid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\valid_luc.csv
-out_of_date_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\out_of_date_luc.csv
-incomplete_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\incomplete_luc.csv
-known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_invalid_luc.csv
+valid_luc_path: inputs\valid_luc.csv
+out_of_date_luc_path: inputs\out_of_date_luc.csv
+incomplete_luc_path: inputs\incomplete_luc.csv
+known_invalid_luc_path: inputs\known_invalid_luc.csv
 
-regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
+regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
 
 
 
