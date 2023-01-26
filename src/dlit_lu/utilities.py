@@ -136,7 +136,7 @@ def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) ->
     outputs : dict[str, pd.DataFrame]
         data to output, str = sheet names, DF = data to write
     """
-    with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+    with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
         for key, value in outputs.items():
             LOG.info(f"Writing {key}")
             value.to_excel(writer, sheet_name=key)
@@ -239,13 +239,20 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     return {"residential": res_new, "employment": emp_new}
 
-def disagg_dwelling(msoa_data: pd.DataFrame, msoa_pop_path:pathlib.Path)->pd.DataFrame:
+def disagg_dwelling(data: pd.DataFrame, msoa_pop_path:pathlib.Path, msoa_pop_column_names:list[str], unit_columns: list[str])->pd.DataFrame:
 
-    msoa_ratio = calc_msoa_proportion(msoa_pop_path)
+    msoa_ratio = calc_msoa_proportion(msoa_pop_path, msoa_pop_column_names)
 
-    msoa_data = msoa_data.merge(
+    msoa_ratio.reset_index("dwelling_type", inplace=True)
+
+    data = data.merge(
         msoa_ratio, how = "left", left_on = "msoa11cd", right_on = "zone_id")
-    print("this is a stop point")
+
+    for column in unit_columns:
+        data.loc[:, column] = data[column]*data["dwelling_ratio"]*data["pop_per_dwelling"]
+
+    return data 
+
 
 def msoa_site_geospatial_lookup(
         data: dict[str, pd.DataFrame],
@@ -277,7 +284,7 @@ def msoa_site_geospatial_lookup(
     
     return joined
 
-def calc_msoa_proportion(msoa_pop_path: pathlib.Path)->pd.DataFrame:
+def calc_msoa_proportion(msoa_pop_path: pathlib.Path, columns: list[str])->pd.DataFrame:
     """
 
     _extended_summary_
@@ -293,16 +300,10 @@ def calc_msoa_proportion(msoa_pop_path: pathlib.Path)->pd.DataFrame:
         _description_
     """    
     msoa_pop = pd.read_csv(msoa_pop_path)
-    msoa_pop.columns = [
-        "zone_id",
-        "census_property_type",
-        "uprn",
-        "household_occupancy_18",
-        "population",
-        ]
-    msoa_pop.set_index(["zone_id", "census_property_type"], inplace = True)
-    msoa_pop["dwelling_ratio"] = msoa_pop["uprn"
-        ]/msoa_pop["uprn"].groupby(level = "zone_id").sum()
+    msoa_pop.columns = columns
+    msoa_pop.set_index(["zone_id", "dwelling_type"], inplace = True)
+    msoa_pop["dwelling_ratio"] = msoa_pop["n_uprn"
+        ]/msoa_pop["n_uprn"].groupby(level = "zone_id").sum()
 
     return msoa_pop
 
@@ -349,7 +350,8 @@ def disagg_land_use_codes(
         ratio = site_luc["total_floorspace"] / \
             site_luc["total_floorspace"].sum()
         ratio.index = site_disagg.index
-        site_disagg.loc[:, unit_columns] = site_disagg.loc[
-            :, unit_columns]*ratio
+        for column in unit_columns:
+            site_disagg.loc[:, column] = site_disagg.loc[
+                :, column]*ratio
         disagg.loc[site_disagg.index] = site_disagg
     return disagg

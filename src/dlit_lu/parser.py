@@ -84,6 +84,19 @@ def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
     existing_split = pd.read_csv(config.existing_luc_split_path)
     proposed_split = pd.read_csv(config.proposed_luc_split_path)
 
+    existing_split.columns = existing_split.columns.str.lower()
+    proposed_split.columns = proposed_split.columns.str.lower()
+
+    for frame in [
+        residential_data,
+        employment_data,
+        mixed_data,
+        existing_split,
+        proposed_split,
+        ]:
+        if "unnamed: 0" in frame.columns:
+            frame.drop(columns = ["unnamed: 0"], inplace = True)
+
     data_output = global_classes.DLogData(
         combined_data=None,
         residential_data=residential_data,
