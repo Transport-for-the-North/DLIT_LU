@@ -111,9 +111,7 @@ def data_report(
     )
     missing_site_ref_filter_name = "missing_site_ref"
     invalid_data_filter = add_multiple_filter_columns(
-        data,
-        missing_ids,
-        missing_site_ref_filter_name,
+        data, missing_ids, missing_site_ref_filter_name,
     )
     analysis_summary.append(
         {
@@ -135,9 +133,7 @@ def data_report(
     )
     # --------------------find invalid land use codes---------------------------------
     results_report = invalid_land_use_report(
-        data,
-        auxiliary_data,
-        results_report,
+        data, auxiliary_data, results_report,
     )
     # -------------- find missing years------------------------
 
@@ -225,9 +221,7 @@ def data_report(
     all_missing_d_a = find_multiple_missing_values(
         data,
         {
-            "residential": [
-                "total_units",
-            ],
+            "residential": ["total_units",],
             "employment": ["total_area_sqm"],
             "mixed": ["floorspace_sqm", "dwellings"],
         },
@@ -241,9 +235,7 @@ def data_report(
     missing_d_a_no_sa = find_multiple_missing_values(
         all_missing_d_a,
         {
-            "residential": [
-                "total_site_area_size_hectares",
-            ],
+            "residential": ["total_site_area_size_hectares",],
             "employment": ["site_area_ha"],
             "mixed": ["total_area_ha"],
         },
@@ -922,9 +914,7 @@ def parse_luc_analysis(
     """
 
     data_filter = add_multiple_filter_columns(
-        results_report.data_filter,
-        results[key_name],
-        column_name,
+        results_report.data_filter, results[key_name], column_name,
     )
     analysis_summary = results_report.analysis_summary + [
         {
@@ -980,9 +970,7 @@ def parse_analysis_results(
         updated report
     """
     data_filter = add_multiple_filter_columns(
-        results_report.data_filter,
-        results,
-        index_name,
+        results_report.data_filter, results, index_name,
     )
     analysis_summary = results_report.analysis_summary + [
         {

@@ -3,6 +3,7 @@
 # standard imports
 import json
 import pathlib
+
 # third party imports
 import strictyaml
 import pydantic
@@ -138,6 +139,7 @@ class DLitConfig(BaseConfig):
     ValueError
         file doesn't exisit
     """
+
     dlog_input_file: pathlib.Path
     combined_sheet_name: str
     residential_sheet_name: str
