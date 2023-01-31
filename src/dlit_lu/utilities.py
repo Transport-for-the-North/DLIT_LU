@@ -121,6 +121,17 @@ def output_file_checks(output_function):
 
 @output_file_checks
 def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
+    """wirtes file to csv 
+
+    used so wrapper with logging and permission error checks can be applied
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        path to write csv to
+    output : pd.DataFrame
+        data to write
+    """    
     output.to_csv(file_path)
     
 @output_file_checks
@@ -136,7 +147,7 @@ def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) ->
     outputs : dict[str, pd.DataFrame]
         data to output, str = sheet names, DF = data to write
     """
-    with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
+    with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
         for key, value in outputs.items():
             LOG.info(f"Writing {key}")
             value.to_excel(writer, sheet_name=key)
@@ -165,6 +176,22 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
 
 
 def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Lookup) -> global_classes.DLogData:
+    """converts dictionary to DLOG data type 
+
+    will deal with combined not being present by using None in its place
+
+    Parameters
+    ----------
+    dlog_data : dict[str, pd.DataFrame]
+        _description_
+    lookup : global_classes.Lookup
+        _description_
+
+    Returns
+    -------
+    global_classes.DLogData
+        _description_
+    """    
     try:
         return global_classes.DLogData(
             dlog_data["combined"],
@@ -337,21 +364,16 @@ def disagg_land_use_codes(
 
     disagg = data.explode(luc_column).reset_index(drop=True)
 
-    for site in disagg["site_reference_id"].unique():
-
-        site_disagg = disagg.loc[disagg["site_reference_id"] == site]
-        site_luc = site_disagg[luc_column]
-        site_luc = site_luc.to_frame().merge(
-            land_use_split,
-            how="left",
-            left_on=luc_column,
-            right_on="land_use_codes",
-        )
-        ratio = site_luc["total_floorspace"] / \
-            site_luc["total_floorspace"].sum()
-        ratio.index = site_disagg.index
-        for column in unit_columns:
-            site_disagg.loc[:, column] = site_disagg.loc[
-                :, column]*ratio
-        disagg.loc[site_disagg.index] = site_disagg
+    site_luc = disagg.loc[:, ["site_reference_id", luc_column]]
+    site_luc = site_luc.merge(
+        land_use_split,
+        how="left",
+        left_on=luc_column,
+        right_on="land_use_codes",
+    )
+    ratio_demonitator = site_luc.groupby(["site_reference_id"])["total_floorspace"].sum()
+    site_luc.set_index("site_reference_id", inplace=True)
+    ratio = site_luc["total_floorspace"]/ratio_demonitator
+    ratio.index = disagg.index
+    disagg.loc[:, unit_columns].multiply(ratio, axis = 0)
     return disagg

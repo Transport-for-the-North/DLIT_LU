@@ -176,6 +176,7 @@ class DLitConfig(BaseConfig):
     land_use_input: Optional[pathlib.Path]
     msoa_shapefile_path: Optional[pathlib.Path]
     msoa_dwelling_pop_path: Optional[pathlib.Path]
+    msoa_traveller_type_path: Optional[pathlib.Path]
 
     @pydantic.validator(
         "dlog_input_file",
