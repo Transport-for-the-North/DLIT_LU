@@ -43,7 +43,7 @@ LOG = logging.getLogger(__name__)
 SIMPLIFY_TOLERANCE = 100
 
 # makes CRS conversions more robust but less accurate
-os.environ['PROJ_NETWORK'] = 'OFF'
+os.environ["PROJ_NETWORK"] = "OFF"
 
 
 def data_report(
@@ -56,7 +56,7 @@ def data_report(
 ) -> global_classes.DLogData:
     """Produces a data report to the provided file path
 
-    performs the anlysis and calcuations. outputs the results into and
+    performs the anlysis and calcuations. outputs the results into an
     excel spread sheet and produces visualations.
 
     Parameters
@@ -90,11 +90,16 @@ def data_report(
 
     analysis_summary_index_labels = ["total_entries"]
     analysis_summary_notes = [
-        "The total number of entries read from the DLOG data"]
+        "The total number of entries read from the DLOG data"
+    ]
     # -------------------find missing site reference ids---------------------------------
     # add missing ref ids filter - cant use parse_analysis_results since ResultsReport
     # hasnt been initiated
-    data = {"residential": res_data, "employment": emp_data, "mixed": mix_data}
+    data = {
+        "residential": res_data,
+        "employment": emp_data,
+        "mixed": mix_data,
+    }
     missing_ids = find_multiple_missing_values(
         data,
         {
@@ -106,9 +111,7 @@ def data_report(
     )
     missing_site_ref_filter_name = "missing_site_ref"
     invalid_data_filter = add_multiple_filter_columns(
-        data,
-        missing_ids,
-        missing_site_ref_filter_name,
+        data, missing_ids, missing_site_ref_filter_name,
     )
     analysis_summary.append(
         {
@@ -130,16 +133,13 @@ def data_report(
     )
     # --------------------find invalid land use codes---------------------------------
     results_report = invalid_land_use_report(
-        data,
-        auxiliary_data,
-        results_report,
+        data, auxiliary_data, results_report,
     )
     # -------------- find missing years------------------------
 
     missing_years_columns = [
         "start_year_id",
         "end_year_id",
-
     ]
 
     missing_years = find_multiple_missing_values(
@@ -162,33 +162,36 @@ def data_report(
         "Entries with start and end years not defined",
     )
     # find missing years without a tag-certainty specified
-    missing_years_no_webtag = find_multiple_missing_values(missing_years, {
-        "residential": ["web_tag_certainty_id"],
-        "employment": ["web_tag_certainty_id"],
-        "mixed": ["web_tag_certainty_id"],
-    },
+    missing_years_no_webtag = find_multiple_missing_values(
+        missing_years,
+        {
+            "residential": ["web_tag_certainty_id"],
+            "employment": ["web_tag_certainty_id"],
+            "mixed": ["web_tag_certainty_id"],
+        },
         {
             "residential": [0, "-"],
             "employment": [0, "-"],
             "mixed": [0, "-"],
-    }
+        },
     )
     results_report = parse_analysis_results(
         missing_years_no_webtag,
         results_report,
         "missing_years_no_webtag",
-        "Entries with missing years and no WEBTAG certainity status, infilling not possible"
+        "Entries with missing years and no WEBTAG certainity status, infilling not possible",
     )
     missing_years_with_webtag = {}
     for key, value in missing_years.items():
         missing_years_with_webtag[key] = value.drop(
-            index=missing_years_no_webtag[key].index)
+            index=missing_years_no_webtag[key].index
+        )
 
     results_report = parse_analysis_results(
         missing_years_with_webtag,
         results_report,
         "missing_years_with_webtag",
-        "Entries with missing years that do have WEBTAG certainity status, infilling possible"
+        "Entries with missing years that do have WEBTAG certainity status, infilling possible",
     )
     # ---------------------find missing areas--------------------------------------
 
@@ -199,7 +202,11 @@ def data_report(
             "employment": ["site_area_ha"],
             "mixed": ["total_area_ha"],
         },
-        {"residential": [0, "-"], "employment": [0, "-"], "mixed": [0, "-"]},
+        {
+            "residential": [0, "-"],
+            "employment": [0, "-"],
+            "mixed": [0, "-"],
+        },
     )
     results_report = parse_analysis_results(
         missing_area,
@@ -214,34 +221,38 @@ def data_report(
     all_missing_d_a = find_multiple_missing_values(
         data,
         {
-            "residential": [
-                "total_units",
-            ],
+            "residential": ["total_units",],
             "employment": ["total_area_sqm"],
             "mixed": ["floorspace_sqm", "dwellings"],
         },
-        {"residential": ["-", 0], "employment": ["-", 0], "mixed": ["-", 0]},
+        {
+            "residential": ["-", 0],
+            "employment": ["-", 0],
+            "mixed": ["-", 0],
+        },
     )
     # missing GFA or dwellings with no site area - no assumption can be made
     missing_d_a_no_sa = find_multiple_missing_values(
         all_missing_d_a,
         {
-            "residential": [
-                "total_site_area_size_hectares",
-            ],
+            "residential": ["total_site_area_size_hectares",],
             "employment": ["site_area_ha"],
             "mixed": ["total_area_ha"],
         },
-        {"residential": ["-", 0], "employment": ["-", 0], "mixed": ["-", 0]},
+        {
+            "residential": ["-", 0],
+            "employment": ["-", 0],
+            "mixed": ["-", 0],
+        },
     )
     # missing GFA or dwellings with site area provided - assumptions can be made
     missing_d_a_with_sa = {}
-    missing_d_a_with_sa["residential"] = all_missing_d_a["residential"].drop(
-        index=missing_d_a_no_sa["residential"].index
-    )
-    missing_d_a_with_sa["employment"] = all_missing_d_a["employment"].drop(
-        index=missing_d_a_no_sa["employment"].index
-    )
+    missing_d_a_with_sa["residential"] = all_missing_d_a[
+        "residential"
+    ].drop(index=missing_d_a_no_sa["residential"].index)
+    missing_d_a_with_sa["employment"] = all_missing_d_a[
+        "employment"
+    ].drop(index=missing_d_a_no_sa["employment"].index)
     missing_d_a_with_sa["mixed"] = all_missing_d_a["mixed"].drop(
         index=missing_d_a_no_sa["mixed"].index
     )
@@ -302,7 +313,7 @@ def data_report(
         inactive_entries,
         results_report,
         "inactive_entries",
-        "NON FATAL: entries where active has not been specified as \"t\""
+        'NON FATAL: entries where active has not been specified as "t"',
     )
     # ---------------------------contra constr, planning, tag------------------
     contra_constr_planning_tag = find_contradictory_tag_const_plan(data)
@@ -312,7 +323,7 @@ def data_report(
         results_report,
         "contradictory_construction_planning_tag",
         "NON FATAL: entries with contradictor construction_status,"
-        " planning_status and or web_tag_certainty"
+        " planning_status and or web_tag_certainty",
     )
     # used to calculate the number of entries with user intervention required
     user_intervention_required = [
@@ -341,18 +352,24 @@ def data_report(
         results_report,
         autofix_columns,
         user_intervention_required,
-        non_fatal_columns
+        non_fatal_columns,
     )
 
     # process data summary
     analysis_summary = results_report.analysis_summary
-    analysis_summary_index_labels = results_report.analysis_summary_index_labels
+    analysis_summary_index_labels = (
+        results_report.analysis_summary_index_labels
+    )
     analysis_summary_notes = results_report.analysis_summary_notes
 
     analysis_summary.append(
         {
-            "Residential": len(classified_data["non_fatal"]["residential"]),
-            "Employment": len(classified_data["non_fatal"]["employment"]),
+            "Residential": len(
+                classified_data["non_fatal"]["residential"]
+            ),
+            "Employment": len(
+                classified_data["non_fatal"]["employment"]
+            ),
             "Mixed": len(classified_data["non_fatal"]["mixed"]),
         }
     )
@@ -364,12 +381,18 @@ def data_report(
 
     analysis_summary.append(
         {
-            "Residential": len(classified_data["auto_fixes"]["residential"]),
-            "Employment": len(classified_data["auto_fixes"]["employment"]),
+            "Residential": len(
+                classified_data["auto_fixes"]["residential"]
+            ),
+            "Employment": len(
+                classified_data["auto_fixes"]["employment"]
+            ),
             "Mixed": len(classified_data["auto_fixes"]["mixed"]),
         }
     )
-    analysis_summary_index_labels.append("total_fixable_invalid_entries")
+    analysis_summary_index_labels.append(
+        "total_fixable_invalid_entries"
+    )
     analysis_summary_notes.append(
         "total number of entries with invalid values that can"
         " be fixed automatically. Either syntax errors or recoverable from assumptions"
@@ -377,13 +400,20 @@ def data_report(
 
     analysis_summary.append(
         {
-            "Residential": len(classified_data["intervention_required"]["residential"]),
-            "Employment": len(classified_data["intervention_required"]["employment"]),
-            "Mixed": len(classified_data["intervention_required"]["mixed"]),
+            "Residential": len(
+                classified_data["intervention_required"]["residential"]
+            ),
+            "Employment": len(
+                classified_data["intervention_required"]["employment"]
+            ),
+            "Mixed": len(
+                classified_data["intervention_required"]["mixed"]
+            ),
         }
     )
     analysis_summary_index_labels.append(
-        "total_invalid_entries_user_input_required")
+        "total_invalid_entries_user_input_required"
+    )
     analysis_summary_notes.append(
         "total number of entries with invalid values that require user"
         " intervention, E.G. missing critical values"
@@ -397,10 +427,13 @@ def data_report(
         }
     )
     analysis_summary_index_labels.append("total_valid_entries")
-    analysis_summary_notes.append("total number of complete and valid entries")
+    analysis_summary_notes.append(
+        "total number of complete and valid entries"
+    )
 
     summary = pd.DataFrame(
-        analysis_summary, index=analysis_summary_index_labels)
+        analysis_summary, index=analysis_summary_index_labels
+    )
     summary["Total"] = summary.sum(axis=1)
     summary["Notes"] = analysis_summary_notes
     # plot results
@@ -409,8 +442,12 @@ def data_report(
             "R invalid": gpd.GeoDataFrame(
                 classified_data["invalid"]["residential"],
                 geometry=gpd.points_from_xy(
-                    classified_data["invalid"]["residential"]["easting"],
-                    classified_data["invalid"]["residential"]["northing"],
+                    classified_data["invalid"]["residential"][
+                        "easting"
+                    ],
+                    classified_data["invalid"]["residential"][
+                        "northing"
+                    ],
                     crs=27700,
                 ),
             ),
@@ -426,7 +463,9 @@ def data_report(
                 classified_data["invalid"]["employment"],
                 geometry=gpd.points_from_xy(
                     classified_data["invalid"]["employment"]["easting"],
-                    classified_data["invalid"]["employment"]["northing"],
+                    classified_data["invalid"]["employment"][
+                        "northing"
+                    ],
                     crs=27700,
                 ),
             ),
@@ -489,7 +528,9 @@ def data_report(
             report_file_path,
             {
                 "report_summary": summary,
-                "Residential": classified_data["invalid"]["residential"],
+                "Residential": classified_data["invalid"][
+                    "residential"
+                ],
                 "Employment": classified_data["invalid"]["employment"],
                 "Mixed": classified_data["invalid"]["mixed"],
             },
@@ -499,8 +540,8 @@ def data_report(
         results_report.data_filter["residential"],
         results_report.data_filter["employment"],
         results_report.data_filter["mixed"],
-        dlog_data.lookup
-        )
+        dlog_data.lookup,
+    )
 
 
 def classify_data(
@@ -538,14 +579,21 @@ def classify_data(
     valid_output = {}
     non_fatal = {}
     for key, value in results_report.data_filter.items():
-        invalid_output[key] = value[value.loc[:, filter_names].any(axis=1)]
-        valid_output[key] = value[~value.loc[:, filter_names].any(axis=1)]
+        invalid_output[key] = value[
+            value.loc[:, filter_names].any(axis=1)
+        ]
+        valid_output[key] = value[
+            ~value.loc[:, filter_names].any(axis=1)
+        ]
         intervention_required[key] = value[
             value.loc[:, intervention_required_columns].any(axis=1)
         ]
-        non_fatal[key] = value[value.loc[:, non_fatal_columns].any(axis=1)
-                               ]
-        auto_fixes[key] = value[value.loc[:, auto_fix_columns].any(axis=1)]
+        non_fatal[key] = value[
+            value.loc[:, non_fatal_columns].any(axis=1)
+        ]
+        auto_fixes[key] = value[
+            value.loc[:, auto_fix_columns].any(axis=1)
+        ]
 
     return {
         "invalid": invalid_output,
@@ -577,7 +625,9 @@ def find_missing_lpas(
     """
     missing_lpas = {}
     for key, value in data.items():
-        lpas_with_entries = value["local_authority_id"].unique().tolist()
+        lpas_with_entries = (
+            value["local_authority_id"].unique().tolist()
+        )
         missing_lpas[key] = lpa_look_up.drop(index=lpas_with_entries)
     return missing_lpas
 
@@ -607,11 +657,19 @@ def contradictory_webtag_planning_status(
         #  yet record is near certain
         planning_not_permissioned = value["planning_status_id"] == 1
         planning_not_specified = value["planning_status_id"] == 0
-        planning_check = pd.DataFrame(
-            [planning_not_permissioned, planning_not_specified]).transpose().any(axis=1)
+        planning_check = (
+            pd.DataFrame(
+                [planning_not_permissioned, planning_not_specified]
+            )
+            .transpose()
+            .any(axis=1)
+        )
         webtag_check = value["web_tag_certainty_id"] == 1
-        contradictory[key] = value[pd.DataFrame(
-            [planning_check, webtag_check]).transpose().all(axis=1)]
+        contradictory[key] = value[
+            pd.DataFrame([planning_check, webtag_check])
+            .transpose()
+            .all(axis=1)
+        ]
     return contradictory
 
 
@@ -648,28 +706,33 @@ def invalid_land_use_report(
     # existing
     # residential - do not expect any land use to be given
     res_invalid_e_land_use = find_invalid_land_use_codes(
-        res_data, auxiliary_data.allowed_codes["land_use_codes"], [
-            "existing_land_use"]
+        res_data,
+        auxiliary_data.allowed_codes["land_use_codes"],
+        ["existing_land_use"],
     )
 
     emp_invalid_e_land_use = find_invalid_land_use_codes(
-        emp_data, auxiliary_data.allowed_codes["land_use_codes"], [
-            "existing_land_use"]
+        emp_data,
+        auxiliary_data.allowed_codes["land_use_codes"],
+        ["existing_land_use"],
     )
 
     mix_invalid_e_land_use = find_invalid_land_use_codes(
-        mix_data, auxiliary_data.allowed_codes["land_use_codes"], [
-            "existing_land_use"]
+        mix_data,
+        auxiliary_data.allowed_codes["land_use_codes"],
+        ["existing_land_use"],
     )
     # proposed
     emp_invalid_p_land_use = find_invalid_land_use_codes(
-        emp_data, auxiliary_data.allowed_codes["land_use_codes"], [
-            "proposed_land_use"]
+        emp_data,
+        auxiliary_data.allowed_codes["land_use_codes"],
+        ["proposed_land_use"],
     )
 
     mix_invalid_p_land_use = find_invalid_land_use_codes(
-        mix_data, auxiliary_data.allowed_codes["land_use_codes"], [
-            "proposed_land_use"]
+        mix_data,
+        auxiliary_data.allowed_codes["land_use_codes"],
+        ["proposed_land_use"],
     )
 
     # parse invalid land use code results
@@ -710,9 +773,12 @@ def invalid_land_use_report(
             "mixed": ["existing_land_use"],
         },
         auxiliary_data.allowed_codes["land_use_codes"],
-        auxiliary_data.out_of_date_luc["out_of_date_land_use_codes"].str.lower(
-        ),
-        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),
+        auxiliary_data.out_of_date_luc[
+            "out_of_date_land_use_codes"
+        ].str.lower(),
+        auxiliary_data.incomplete_luc[
+            "incomplete_land_use_codes"
+        ].str.lower(),
     )
     pluc_analysis = analyse_invalid_luc(
         {
@@ -724,9 +790,12 @@ def invalid_land_use_report(
             "mixed": ["proposed_land_use"],
         },
         auxiliary_data.allowed_codes["land_use_codes"],
-        auxiliary_data.out_of_date_luc["out_of_date_land_use_codes"].str.lower(
-        ),
-        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),
+        auxiliary_data.out_of_date_luc[
+            "out_of_date_land_use_codes"
+        ].str.lower(),
+        auxiliary_data.incomplete_luc[
+            "incomplete_land_use_codes"
+        ].str.lower(),
     )
     # create empty df's since these columns exist in the data report
     # TODO alter code so this is not necessary
@@ -734,9 +803,11 @@ def invalid_land_use_report(
         columns=res_data.columns
     )
     pluc_analysis["incomplete"]["residential"] = pd.DataFrame(
-        columns=res_data.columns)
+        columns=res_data.columns
+    )
     pluc_analysis["out_of_date"]["residential"] = pd.DataFrame(
-        columns=res_data.columns)
+        columns=res_data.columns
+    )
     pluc_analysis["other_issues"]["residential"] = pd.DataFrame(
         columns=res_data.columns
     )
@@ -843,9 +914,7 @@ def parse_luc_analysis(
     """
 
     data_filter = add_multiple_filter_columns(
-        results_report.data_filter,
-        results[key_name],
-        column_name,
+        results_report.data_filter, results[key_name], column_name,
     )
     analysis_summary = results_report.analysis_summary + [
         {
@@ -855,10 +924,12 @@ def parse_luc_analysis(
         }
     ]
 
-    analysis_summary_index_labels = results_report.analysis_summary_index_labels + [
-        column_name
+    analysis_summary_index_labels = (
+        results_report.analysis_summary_index_labels + [column_name]
+    )
+    analysis_summary_notes = results_report.analysis_summary_notes + [
+        notes
     ]
-    analysis_summary_notes = results_report.analysis_summary_notes + [notes]
 
     filter_columns = results_report.filter_columns + [column_name]
     return global_classes.ResultsReport(
@@ -899,9 +970,7 @@ def parse_analysis_results(
         updated report
     """
     data_filter = add_multiple_filter_columns(
-        results_report.data_filter,
-        results,
-        index_name,
+        results_report.data_filter, results, index_name,
     )
     analysis_summary = results_report.analysis_summary + [
         {
@@ -911,10 +980,12 @@ def parse_analysis_results(
         }
     ]
 
-    analysis_summary_index_labels = results_report.analysis_summary_index_labels + [
-        index_name
+    analysis_summary_index_labels = (
+        results_report.analysis_summary_index_labels + [index_name]
+    )
+    analysis_summary_notes = results_report.analysis_summary_notes + [
+        notes
     ]
-    analysis_summary_notes = results_report.analysis_summary_notes + [notes]
     filter_columns = results_report.filter_columns + [index_name]
     return global_classes.ResultsReport(
         data_filter,
@@ -955,7 +1026,9 @@ def plot_data(
     """
     LOG.info("Producing site_locations explorer & plot")
     simplified_base = base.copy()
-    simplified_base.loc[:, "geometry"] = base.simplify(SIMPLIFY_TOLERANCE)
+    simplified_base.loc[:, "geometry"] = base.simplify(
+        SIMPLIFY_TOLERANCE
+    )
     geo_explorer(
         "site_locations",
         folder_path,
@@ -991,14 +1064,19 @@ def plot_data(
         "total_dwellings",
     )
     total_dwellings.loc[:, "geometry"] = total_dwellings.simplify(
-        SIMPLIFY_TOLERANCE)
+        SIMPLIFY_TOLERANCE
+    )
     total_floorspace = spatial_analysis(
         pd.concat(
             [
                 data["E invalid"][["units_(floorspace)", "geometry"]],
-                data["E No invalid"][["units_(floorspace)", "geometry"]],
+                data["E No invalid"][
+                    ["units_(floorspace)", "geometry"]
+                ],
                 data["E invalid"][["units_(floorspace)", "geometry"]],
-                data["E No invalid"][["units_(floorspace)", "geometry"]],
+                data["E No invalid"][
+                    ["units_(floorspace)", "geometry"]
+                ],
             ],
         ),
         base,
@@ -1006,20 +1084,25 @@ def plot_data(
         "total_floorspace",
     )
     total_floorspace.loc[:, "geometry"] = total_floorspace.simplify(
-        SIMPLIFY_TOLERANCE)
+        SIMPLIFY_TOLERANCE
+    )
 
-    total_dwellings.loc[:,
-                        "total_dwellings"] = total_dwellings["total_dwellings"] / 1e3
+    total_dwellings.loc[:, "total_dwellings"] = (
+        total_dwellings["total_dwellings"] / 1e3
+    )
     total_dwellings.rename(
         columns={
-            "total_dwellings": "total dwellings (units: thousand dwellings)"},
+            "total_dwellings": "total dwellings (units: thousand dwellings)"
+        },
         inplace=True,
     )
     total_floorspace.loc[:, "total_floorspace"] = (
         total_floorspace["total_floorspace"] / 1e6
     )
     total_floorspace.rename(
-        columns={"total_floorspace": "total_floorspace (units: million sq m)"},
+        columns={
+            "total_floorspace": "total_floorspace (units: million sq m)"
+        },
         inplace=True,
     )
     invalid_ratio = spatial_invalid_ratio(
@@ -1167,7 +1250,11 @@ def geo_plotter(
                 "if a chloropleth is passesd, a column should be passed too"
             )
         choropleth.plot(
-            ax=ax, column=column, legend=True, edgecolor="black", label=column
+            ax=ax,
+            column=column,
+            legend=True,
+            edgecolor="black",
+            label=column,
         )
 
     if points is not None:  # plot points
@@ -1188,12 +1275,14 @@ def geo_plotter(
     ax.set_xticks([])  # turn off axis labels
     ax.set_yticks([])
     plt.title(title)
-    ax.text(0.01, 0.01,
-            s="Source: Office for National Statistics licensed under"
-            " the Open Government Licence v.3.0\n Contains OS data ©"
-            " Crown copyright and database right [2021]",
-            transform=fig.transFigure,
-            )
+    ax.text(
+        0.01,
+        0.01,
+        s="Source: Office for National Statistics licensed under"
+        " the Open Government Licence v.3.0\n Contains OS data ©"
+        " Crown copyright and database right [2021]",
+        transform=fig.transFigure,
+    )
     if limits is not None:  # set limits
         ax.set_xlim(limits["x"][0], limits["x"][1])
         ax.set_ylim(limits["y"][0], limits["y"][1])
@@ -1245,7 +1334,7 @@ def geo_explorer(
         base = None
     explorer = None
     if base is not None:  # plot base
-        #TODO more robust CRS conversion required
+        # TODO more robust CRS conversion required
         base = base.to_crs(epsg=4326)
         explorer = base.explore()
 
@@ -1258,34 +1347,42 @@ def geo_explorer(
         filtered_choropleth = choropleth.loc[choropleth[column] > 0, :]
         if explorer is None:
             explorer = filtered_choropleth.explore(
-                column, legend=True, name=column)
+                column, legend=True, name=column
+            )
         else:
             explorer = filtered_choropleth.explore(
                 column, m=explorer, legend=True, name=title
             )
     if points is not None:  # plot points
         if colour is None:
-            raise ValueError("colour must be given when points is provided")
+            raise ValueError(
+                "colour must be given when points is provided"
+            )
         if explorer is None:
             for key, value in points.items():
-                #TODO more robust CRS conversion required
+                # TODO more robust CRS conversion required
                 temp = value[
-                    ["site_reference_id","geometry"]
+                    ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
                 temp = temp.to_crs(epsg=4326)
                 explorer = temp.explore(
-                    name=key, color=colour[key], legend=True, show=False)
+                    name=key, color=colour[key], legend=True, show=False
+                )
         else:
             for key, value in points.items():
                 temp = value[
-                    ["site_reference_id","geometry"]
+                    ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
-                #TODO more robust CRS conversion required
+                # TODO more robust CRS conversion required
                 temp = temp.to_crs(epsg=4326)
                 if len(temp) == 0:
                     continue
                 explorer = temp.explore(
-                    m=explorer, color=colour[key], name=key, legend=True, show=False
+                    m=explorer,
+                    color=colour[key],
+                    name=key,
+                    legend=True,
+                    show=False,
                 )
 
     if explorer is None:
@@ -1321,7 +1418,9 @@ def spatial_invalid_ratio(
     gpd.GeoDataFrame
         base with the result appended as a column
     """
-    not_invalid_joined_data = not_invalid_data.sjoin(base, how="left").drop(
+    not_invalid_joined_data = not_invalid_data.sjoin(
+        base, how="left"
+    ).drop(
         columns=[
             "LPA19CD",
             "LPA19NM",
@@ -1356,7 +1455,10 @@ def spatial_invalid_ratio(
         not_invalid_region_data = not_invalid_joined_data[
             not_invalid_joined_data["OBJECTID"] == region_id
         ]
-        if len(invalid_regional_data) == 0 and len(not_invalid_region_data) == 0:
+        if (
+            len(invalid_regional_data) == 0
+            and len(not_invalid_region_data) == 0
+        ):
             invalid_percentage = 0.0
         else:
             invalid_percentage = (
@@ -1369,13 +1471,18 @@ def spatial_invalid_ratio(
             )
         region_invalid_percentage.append(invalid_percentage)
     region_results = pd.DataFrame(
-        region_invalid_percentage, index=object_id, columns=[new_column_name]
+        region_invalid_percentage,
+        index=object_id,
+        columns=[new_column_name],
     )
     return base.join(region_results, on="OBJECTID", how="left")
 
 
 def spatial_analysis(
-    data: gpd.GeoDataFrame, base: gpd.GeoDataFrame, column: str, new_column_name
+    data: gpd.GeoDataFrame,
+    base: gpd.GeoDataFrame,
+    column: str,
+    new_column_name,
 ) -> gpd.GeoDataFrame:
     """calculates the ratio of invalid data against all the data for each region
 
@@ -1423,7 +1530,9 @@ def spatial_analysis(
 
 
 def add_multiple_filter_columns(
-    original: dict[str, pd.DataFrame], subset: dict[str, pd.DataFrame], column_name: str
+    original: dict[str, pd.DataFrame],
+    subset: dict[str, pd.DataFrame],
+    column_name: str,
 ) -> dict[str, pd.DataFrame]:
     """adds a new filter column for multiple arrays
 
@@ -1445,7 +1554,9 @@ def add_multiple_filter_columns(
     """
     filter_added = {}
     for key, value in original.items():
-        filter_added[key] = add_filter_column(value, subset[key], column_name)
+        filter_added[key] = add_filter_column(
+            value, subset[key], column_name
+        )
     return filter_added
 
 
@@ -1505,8 +1616,9 @@ def add_filter_column(
     # TODO implement subset check
     invalid_filter_df = original_df.copy()
     invalid_filter_df[filter_name] = False
-    invalid_filter_df.loc[subset_df.index,
-                          filter_name] = True  # TODO do on entire row
+    invalid_filter_df.loc[
+        subset_df.index, filter_name
+    ] = True  # TODO do on entire row
     return invalid_filter_df
 
 
@@ -1528,15 +1640,20 @@ def data_completeness_assessment(record: pd.DataFrame) -> pd.DataFrame:
     """
     completeness = []
     for column in record.columns:
-        percent_complete = record[column].count() / len(record[column]) * 100
+        percent_complete = (
+            record[column].count() / len(record[column]) * 100
+        )
         LOG.debug(f"{column}: {percent_complete} % complete")
         completeness.append(
-            {"column": column, "percent_complete": percent_complete})
+            {"column": column, "percent_complete": percent_complete}
+        )
     return pd.DataFrame(completeness)
 
 
 def find_missing_values(
-    record: pd.DataFrame, columns: list[str], not_allowed: list[int | str]
+    record: pd.DataFrame,
+    columns: list[str],
+    not_allowed: list[int | str],
 ) -> pd.DataFrame:
     """finds and returns missing values
 
@@ -1580,7 +1697,10 @@ def find_missing_values(
 
 
 def check_id_value_consistency(
-    data: dict[str, pd.DataFrame], lookup_table: pd.DataFrame, id_name: str, value_name: str
+    data: dict[str, pd.DataFrame],
+    lookup_table: pd.DataFrame,
+    id_name: str,
+    value_name: str,
 ) -> dict[str, pd.DataFrame]:
     """checks whether the value_id is consistent with the value in the data
 
@@ -1614,7 +1734,8 @@ def check_id_value_consistency(
             suffixes=["", "_table"],
         )
         contra[key] = item[
-            check_record[value_name] != check_record[f"{value_name}_table"]
+            check_record[value_name]
+            != check_record[f"{value_name}_table"]
         ]
     return contra
 
@@ -1652,9 +1773,9 @@ def find_invalid_land_use_codes(
         )
         invalid_land_use.append(
             record.loc[
-                ~exploded_land_use_codes.isin(land_use_codes.tolist() + [None]).all(
-                    axis=1
-                )
+                ~exploded_land_use_codes.isin(
+                    land_use_codes.tolist() + [None]
+                ).all(axis=1)
             ]
         )
     if len(invalid_land_use) == 0:
@@ -1671,11 +1792,13 @@ def find_invalid_land_use_codes(
         )
 
 
-def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str, pd.DataFrame]:
+def find_contradictory_tag_const_plan(
+    data: dict[str, pd.DataFrame]
+) -> dict[str, pd.DataFrame]:
     """returns contradictory tag certainty, construction and planning status
 
     checks for combinations that do not make sense e.g. work completed but
-    plannong permission not granted 
+    planning permission not granted
 
     Parameters
     ----------
@@ -1686,30 +1809,46 @@ def find_contradictory_tag_const_plan(data: dict[str, pd.DataFrame])-> dict[str,
     -------
     dict[str, pd.DataFrame]
         contradictory rows
-    """    
+    """
     contra = {}
     for key, value in data.items():
 
-        construction_started_completed = value[pd.DataFrame(
-            [value["construction_status_id"] == 2, value[
-                "construction_status_id"] == 3]).transpose().any(axis=1)
+        construction_started_completed = value[
+            pd.DataFrame(
+                [
+                    value["construction_status_id"] == 2,
+                    value["construction_status_id"] == 3,
+                ]
+            )
+            .transpose()
+            .any(axis=1)
         ]
 
         not_permissioned = value[value["planning_status_id"] == 1]
         near_certain = value[value["web_tag_certainty_id"] == 1]
         less_than_mtl = value[value["web_tag_certainty_id"] > 2]
 
-        contra_constr_perm = construction_started_completed[construction_started_completed.index.isin(
-            not_permissioned.index)]
-        contra_plan_perm = not_permissioned[not_permissioned.index.isin(
-            near_certain.index)]
-        contra_constr_tag = construction_started_completed[construction_started_completed.index.isin(
-            less_than_mtl.index)]
+        contra_constr_perm = construction_started_completed[
+            construction_started_completed.index.isin(
+                not_permissioned.index
+            )
+        ]
+        contra_plan_perm = not_permissioned[
+            not_permissioned.index.isin(near_certain.index)
+        ]
+        contra_constr_tag = construction_started_completed[
+            construction_started_completed.index.isin(
+                less_than_mtl.index
+            )
+        ]
 
-        #can't drop duplicates of all column values as some columns are lists
+        # can't drop duplicates of all column values as some columns are lists
         all_contra = pd.concat(
-            [contra_constr_perm, contra_plan_perm, contra_constr_tag])
-        contra_values = all_contra.drop_duplicates(subset=["site_reference_id"])
+            [contra_constr_perm, contra_plan_perm, contra_constr_tag]
+        )
+        contra_values = all_contra.drop_duplicates(
+            subset=["site_reference_id"]
+        )
 
         contra[key] = contra_values
     return contra
@@ -1759,13 +1898,15 @@ def analyse_invalid_luc(
     other_issues_output = {}
 
     wrong_format_check = [
-        s for s in land_use_codes.tolist() if "(" in s or ")" in s]
+        s for s in land_use_codes.tolist() if "(" in s or ")" in s
+    ]
     wrong_format_check = [
         s.replace("(", "").replace(")", "") for s in wrong_format_check
     ]
 
-    incomplete_luc_ = [s for s in incomplete_luc.tolist()
-                       if "(" in s or ")" in s]
+    incomplete_luc_ = [
+        s for s in incomplete_luc.tolist() if "(" in s or ")" in s
+    ]
     incomplete_luc_ = incomplete_luc.tolist() + [
         s.replace("(", "").replace(")", "") for s in incomplete_luc_
     ]
@@ -1780,16 +1921,23 @@ def analyse_invalid_luc(
             out_of_date.append(
                 value.loc[
                     exploded_land_use_codes.isin(
-                        out_of_date_luc.tolist()).any(axis=1)
+                        out_of_date_luc.tolist()
+                    ).any(axis=1)
                 ]
             )
             incomplete.append(
-                value.loc[exploded_land_use_codes.isin(
-                    incomplete_luc_).any(axis=1)]
+                value.loc[
+                    exploded_land_use_codes.isin(incomplete_luc_).any(
+                        axis=1
+                    )
+                ]
             )
             formatting.append(
-                value.loc[exploded_land_use_codes.isin(
-                    wrong_format_check).any(axis=1)]
+                value.loc[
+                    exploded_land_use_codes.isin(
+                        wrong_format_check
+                    ).any(axis=1)
+                ]
             )
 
         if len(out_of_date) == 0:
@@ -1801,7 +1949,9 @@ def analyse_invalid_luc(
         else:
             out_of_date_output[key] = (
                 pd.concat(out_of_date)
-                .drop_duplicates(subset=["site_reference_id", "site_name"])
+                .drop_duplicates(
+                    subset=["site_reference_id", "site_name"]
+                )
                 .sort_values("site_reference_id")
             )
         if len(incomplete) == 0:
@@ -1830,7 +1980,11 @@ def analyse_invalid_luc(
                 .sort_values("site_reference_id")
             )
         temp = pd.concat(
-            [wrong_format_output[key], out_of_date_output[key], incomplete_output[key]]
+            [
+                wrong_format_output[key],
+                out_of_date_output[key],
+                incomplete_output[key],
+            ]
         ).drop_duplicates(subset=["site_reference_id", "site_name"])
         other_issues_output[key] = value.drop(index=temp.index)
     return {
@@ -1841,7 +1995,9 @@ def analyse_invalid_luc(
     }
 
 
-def find_missing_ids(ids_l: pd.Series, ids_s: pd.Series) -> Optional[pd.Series]:
+def find_missing_ids(
+    ids_l: pd.Series, ids_s: pd.Series
+) -> Optional[pd.Series]:
     """finds the IDs in ids_l that do not exist in id_s
 
     This should be used for series where id_s is a subset of id_l,
@@ -1867,12 +2023,16 @@ def find_missing_ids(ids_l: pd.Series, ids_s: pd.Series) -> Optional[pd.Series]:
     """
     if len(pd.merge(ids_s, ids_l, how="inner")) != len(ids_s):
         # checks if id_s is a subset of id_l and for duplicates
-        raise ValueError("find_missing_ids: ids_s is not a subset of id_l")
+        raise ValueError(
+            "find_missing_ids: ids_s is not a subset of id_l"
+        )
     missing_ids = ids_l[~ids_l.isin(ids_s)]
     return missing_ids
 
 
-def find_inactivate_entries(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+def find_inactivate_entries(
+    data: dict[str, pd.DataFrame]
+) -> dict[str, pd.DataFrame]:
     """returns any values that do not have a "t" value in the active column
 
     Parameters

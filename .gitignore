@@ -130,5 +130,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+# outputs folder
+*DLIT_outputs*
 
+#launch.json
 .vscode/launch.json
