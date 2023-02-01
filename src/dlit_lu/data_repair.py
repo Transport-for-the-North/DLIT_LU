@@ -5,11 +5,12 @@
 # standard imports
 import logging
 from typing import Optional
+import pathlib
 # third party imports
 import pandas as pd
 import numpy as np
 # local imports
-from dlit_lu import global_classes, utilities, analyse
+from dlit_lu import global_classes, utilities, analyse, inputs
 
 # constants
 LOG = logging.getLogger(__name__)
@@ -63,7 +64,8 @@ def fix_inavlid_syntax(
 
 
 def infill_data(data: global_classes.DLogData,
-                auxiliary_data: global_classes.AuxiliaryData) -> global_classes.DLogData:
+                auxiliary_data: global_classes.AuxiliaryData,
+                output_folder:pathlib.Path) -> global_classes.DLogData:
     """Infills data for which assumptions are required
 
     infills missing areas, units, land use codes with multiple possible values
@@ -114,10 +116,17 @@ def infill_data(data: global_classes.DLogData,
         dict((k, area_columns[k]) for k in (["employment", "mixed"])))
 
     average_area = calculate_average(data_dict, area_columns_list)
-
+    
+    inputs.InfillingAverages(
+        average_res_area = average_area["residential"],
+        average_emp_area= average_area["employment"],
+        average_mix_area=average_area["mixed"],
+        average_gfa_site_area_ratio=floorspace_area_ratio,
+        average_dwelling_site_area_ratio= dwelling_area_ratio,
+        ).save_yaml(output_folder/inputs.AVERAGE_INFILLING_VALUES_FILE)
     # infill values
     corrected_format = infill_missing_site_area(data_dict, area_columns_list,
-                                                [0, "-"], dict((k, float(average_area)) for k in (data_dict)))
+                                                [0, "-"],average_area)
     corrected_format = infill_units(corrected_format, units_columnns,
                                     area_columns, ["-", 0],
                                     {"residential": dwelling_area_ratio,
@@ -550,7 +559,7 @@ def infill_missing_site_area(
     return fixed_data
 
 
-def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str]]) -> float:
+def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str]]) -> dict[str, float]:
     """calculate the mean value
 
     will calculate the total average across all the columns
@@ -564,16 +573,14 @@ def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str
 
     Returns
     -------
-    float
-        mean
+    dict[str, float]
+        mean values
     """
-    all_values = np.array([])
+    mean_values = {}
     for key, value in data.items():
         for column in columns[key]:
-            all_values = np.append(
-                all_values, value.loc[value["missing_area"] == False, column])
-    return all_values.mean()
-
+            mean_values[key] = value.loc[value["missing_area"] == False, column].mean()
+    return mean_values
 
 def old_incomplete_known_luc(
     data: dict[str, pd.DataFrame],

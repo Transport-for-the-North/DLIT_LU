@@ -5,11 +5,12 @@ import json
 import pathlib
 from typing import Optional
 import os 
+import dataclasses
 # third party imports
 import strictyaml
 import pydantic
 
-
+AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
 class BaseConfig(pydantic.BaseModel):
     r"""Base class for storing model parameters.
 
@@ -87,6 +88,29 @@ class BaseConfig(pydantic.BaseModel):
         """
         with open(path, "wt") as file:
             file.write(self.to_yaml())
+@dataclasses.dataclass
+class InfillConfig:
+    combined_sheet_name: str
+    residential_sheet_name: str
+    employment_sheet_name: str
+    mixed_sheet_name: str
+    combined_column_names_path: pathlib.Path
+    residential_column_names_path: pathlib.Path
+    employment_column_names_path: pathlib.Path
+    mixed_column_names_path: pathlib.Path
+    ignore_columns_path: pathlib.Path
+    user_input_path: pathlib.Path
+    valid_luc_path: pathlib.Path
+    out_of_date_luc_path: pathlib.Path
+    incomplete_luc_path: pathlib.Path
+    known_invalid_luc_path: pathlib.Path
+    regions_shapefiles_path: pathlib.Path
+@dataclasses.dataclass
+class LandUseConfig:
+    land_use_input: pathlib.Path
+    msoa_shapefile_path: pathlib.Path
+    msoa_dwelling_pop_path: pathlib.Path
+    msoa_traveller_type_path: pathlib.Path
 
 
 class DLitConfig(BaseConfig):
@@ -156,27 +180,12 @@ class DLitConfig(BaseConfig):
     lookups_sheet_name: str
 
     #required for infill
-    combined_sheet_name: Optional[str]
-    residential_sheet_name: Optional[str]
-    employment_sheet_name: Optional[str]
-    mixed_sheet_name :Optional[str]
-    combined_column_names_path: Optional[pathlib.Path]
-    residential_column_names_path: Optional[pathlib.Path]
-    employment_column_names_path: Optional[pathlib.Path]
-    mixed_column_names_path: Optional[pathlib.Path]
-    ignore_columns_path: Optional[pathlib.Path]
-    user_input_path: Optional[pathlib.Path]
-    valid_luc_path: Optional[pathlib.Path]
-    out_of_date_luc_path: Optional[pathlib.Path]
-    incomplete_luc_path: Optional[pathlib.Path]
-    known_invalid_luc_path: Optional[pathlib.Path]
-    regions_shapefiles_path: Optional[pathlib.Path]
+    infill: Optional[InfillConfig]
+
+    land_use: Optional[LandUseConfig]
 
     #required for land use
-    land_use_input: Optional[pathlib.Path]
-    msoa_shapefile_path: Optional[pathlib.Path]
-    msoa_dwelling_pop_path: Optional[pathlib.Path]
-    msoa_traveller_type_path: Optional[pathlib.Path]
+
 
     @pydantic.validator(
         "dlog_input_file",
@@ -196,25 +205,25 @@ class DLitConfig(BaseConfig):
 
     def check_infill_params(self)->None:
         str_params = [
-            self.combined_sheet_name,
-            self.residential_sheet_name,
-            self.employment_sheet_name,
-            self.mixed_sheet_name,
+            self.infill.combined_sheet_name,
+            self.infill.residential_sheet_name,
+            self.infill.employment_sheet_name,
+            self.infill.mixed_sheet_name,
         ]
         read_path_params  = [
-            self.combined_column_names_path,
-            self.residential_column_names_path,
-            self.employment_column_names_path,
-            self.mixed_column_names_path,
-            self.ignore_columns_path,
-            self.valid_luc_path,
-            self.out_of_date_luc_path,
-            self.incomplete_luc_path,
-            self.known_invalid_luc_path,
-            self.regions_shapefiles_path,
+            self.infill.combined_column_names_path,
+            self.infill.residential_column_names_path,
+            self.infill.employment_column_names_path,
+            self.infill.mixed_column_names_path,
+            self.infill.ignore_columns_path,
+            self.infill.valid_luc_path,
+            self.infill.out_of_date_luc_path,
+            self.infill.incomplete_luc_path,
+            self.infill.known_invalid_luc_path,
+            self.infill.regions_shapefiles_path,
             ]
         write_path_params  = [
-            self.user_input_path,
+            self.infill.user_input_path,
         ]
         for param in write_path_params + read_path_params + str_params:
             if param is None:
@@ -230,9 +239,9 @@ class DLitConfig(BaseConfig):
     def check_land_use_params(self)->None:
     
         read_path_params  = [
-            self.land_use_input,
-            self.msoa_shapefile_path,
-            self.msoa_dwelling_pop_path,
+            self.land_use.land_use_input,
+            self.land_use.msoa_shapefile_path,
+            self.land_use.msoa_dwelling_pop_path,
             ]
         write_path_params =[
 
@@ -246,3 +255,9 @@ class DLitConfig(BaseConfig):
                 raise ValueError("Land use parameters contains write file paths"
                 " that do not exist. Please update the config file before continuing. Cheers!")
     
+class InfillingAverages(BaseConfig):
+    average_res_area: float
+    average_emp_area: float
+    average_mix_area: float
+    average_gfa_site_area_ratio: float
+    average_dwelling_site_area_ratio: float

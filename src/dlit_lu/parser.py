@@ -35,26 +35,26 @@ def parse_dlog(
     """
     # read in column names
     res_column_names = pd.read_csv(
-        config.residential_column_names_path).iloc[:, 0].tolist()
+        config.infill.residential_column_names_path).iloc[:, 0].tolist()
     emp_column_names = pd.read_csv(
-        config.employment_column_names_path).iloc[:, 0].tolist()
+        config.infill.employment_column_names_path).iloc[:, 0].tolist()
     mix_column_names = pd.read_csv(
-        config.mixed_column_names_path).iloc[:, 0].tolist()
+        config.infill.mixed_column_names_path).iloc[:, 0].tolist()
 
     #read in column to remove from data
     ignore_columns = pd.read_csv(
-        config.ignore_columns_path).iloc[:, 0].str.lower().tolist()
+        config.infill.ignore_columns_path).iloc[:, 0].str.lower().tolist()
 
     #parse sheets
     LOG.info("Parsing Residential sheet")
     residential_data = parse_sheet(
-        config.dlog_input_file, config.residential_sheet_name, 2, res_column_names, ignore_columns)
+        config.dlog_input_file, config.infill.residential_sheet_name, 2, res_column_names, ignore_columns)
     LOG.info("Parsing Employment sheet")
     employment_data = parse_sheet(
-        config.dlog_input_file, config.employment_sheet_name, 2, emp_column_names, ignore_columns)
+        config.dlog_input_file, config.infill.employment_sheet_name, 2, emp_column_names, ignore_columns)
     LOG.info("Parsing Mixed sheet")
     mixed_data = parse_sheet(
-        config.dlog_input_file, config.mixed_sheet_name, 2, mix_column_names, ignore_columns)
+        config.dlog_input_file, config.infill.mixed_sheet_name, 2, mix_column_names, ignore_columns)
     LOG.info("Parsing Lookup sheet")
     lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
 
@@ -67,17 +67,17 @@ def parse_dlog(
     )
     return data_output
 def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
-    LOG.info(f"Parsing {str(config.land_use_input)}")
+    LOG.info(f"Parsing {str(config.land_use.land_use_input)}")
     #parse sheets
     LOG.info("Parsing Residential sheet")
     residential_data = parse_sheet(
-        config.land_use_input, "residential")
+        config.land_use.land_use_input, "residential")
     LOG.info("Parsing Employment sheet")
     employment_data = parse_sheet(
-        config.land_use_input, "employment")
+        config.land_use.land_use_input, "employment")
     LOG.info("Parsing Mixed sheet")
     mixed_data = parse_sheet(
-        config.land_use_input, "mixed")
+        config.land_use.land_use_input, "mixed")
     LOG.info("Parsing Lookup sheet")
     lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
     LOG.info("Parsing land use splits")

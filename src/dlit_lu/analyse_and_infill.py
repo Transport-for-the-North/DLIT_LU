@@ -28,11 +28,11 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     # parse data
     dlog_data = parser.parse_dlog(config)
     auxiliary_data = parser.read_auxiliary_data(
-        config.valid_luc_path,
-        config.known_invalid_luc_path,
-        config.out_of_date_luc_path,
-        config.incomplete_luc_path,
-        config.regions_shapefiles_path,
+        config.infill.valid_luc_path,
+        config.infill.known_invalid_luc_path,
+        config.infill.out_of_date_luc_path,
+        config.infill.incomplete_luc_path,
+        config.infill.regions_shapefiles_path,
     )
     # implement syntax fixes
     initial_assessment_folder = config.output_folder/"00_initial_assessment"
@@ -112,11 +112,11 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
 
     # infill invalid data
     infilled_fixed_data = data_repair.infill_data(
-        user_fixed_data, auxiliary_data)
+        user_fixed_data, auxiliary_data, config.output_folder)
 
     #infill build out profile
-    res_columns = pd.read_csv(config.residential_column_names_path).iloc[:,0].to_list()
-    emp_columns = pd.read_csv(config.employment_column_names_path).iloc[:,0].to_list()
+    res_columns = pd.read_csv(config.infill.residential_column_names_path).iloc[:,0].to_list()
+    emp_columns = pd.read_csv(config.infill.employment_column_names_path).iloc[:,0].to_list()
 
     res_unit_year_columns = list(filter(lambda x: x.startswith("res_year_"), res_columns))
     emp_unit_year_columns = list(filter(lambda x: x.startswith("emp_year_"), emp_columns))
@@ -174,4 +174,3 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         proposed_luc_split,
         existing_luc_split,
     )
-    

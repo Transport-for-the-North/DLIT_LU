@@ -12,32 +12,30 @@ output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
 proposed_luc_split_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\proposed_luc_split_path.csv
 existing_luc_split_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\existing_luc_split_path.csv
 
-#Infilling Parameters
-#--Strings
-combined_sheet_name: "2021 Combined"
-residential_sheet_name: "2021 Residential"
-employment_sheet_name: "2021 Employment"
-mixed_sheet_name: "2021 Mixed"
-#--Read file paths 
-combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\combined_column_names.csv
-residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
-employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv
-mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_column_names.csv
-ignore_columns_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\drop_columns.csv
-valid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\valid_luc.csv
-out_of_date_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\out_of_date_luc.csv
-incomplete_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\incomplete_luc.csv
-known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_invalid_luc.csv
-regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
-#--write file paths  
-user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
+infill:
+  combined_sheet_name: "2021 Combined"
+  residential_sheet_name: "2021 Residential"
+  employment_sheet_name: "2021 Employment"
+  mixed_sheet_name: "2021 Mixed"
+  #--Read file paths 
+  combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\combined_column_names.csv
+  residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
+  employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv
+  mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_column_names.csv
+  ignore_columns_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\drop_columns.csv
+  valid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\valid_luc.csv
+  out_of_date_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\out_of_date_luc.csv
+  incomplete_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\incomplete_luc.csv
+  known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_invalid_luc.csv
+  regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
+  #--write file paths  
+  user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
 
-#Land Use Parameters
-#--Read file paths
-land_use_input: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\03_post_fixes\post_fix_data.xlsx
-msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
-msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\gb_msoa_agg_prt_2018_hh_pop.csv
-msoa_traveller_type_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_pop.csv
+land_use:
+  land_use_input: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\03_post_fixes\post_fix_data.xlsx
+  msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
+  msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\gb_msoa_agg_prt_2018_hh_pop.csv
+  msoa_traveller_type_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_pop.csv
 
 
 

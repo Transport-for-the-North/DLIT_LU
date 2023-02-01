@@ -260,7 +260,9 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     mix_res = mix.loc[:, res.columns.unique()].reset_index(drop=True)
     mix_emp = mix.loc[:, emp.columns.unique()].reset_index(drop=True)
-
+    
+    mix_res.loc[:,"total_site_area_size_hectares"] = mix_res["total_area_ha"]  
+    mix_emp.loc[:,"total_area_ha"] = mix_emp["site_area_ha"]
     res_new = pd.concat([res, mix_res],  ignore_index=True)
     emp_new = pd.concat([emp, mix_emp], ignore_index=True)
 
@@ -282,7 +284,7 @@ def disagg_dwelling(data: pd.DataFrame, msoa_pop_path:pathlib.Path, msoa_pop_col
 
 
 def msoa_site_geospatial_lookup(
-        data: dict[str, pd.DataFrame],
+        data: pd.DataFrame,
         msoa: gpd.GeoDataFrame,
         ) -> gpd.GeoDataFrame:
     """spatially joins MSOA shapefile to DLOG sites
@@ -290,7 +292,7 @@ def msoa_site_geospatial_lookup(
 
     Parameters
     ----------
-    data : dict[str, pd.DataFrame]
+    data : pd.DataFrame
         data to join to msoa
     msoa : gpd.GeoDataFrame
         msoa data
@@ -301,15 +303,10 @@ def msoa_site_geospatial_lookup(
         spatially joined data
     """
 
-    joined = {}
-    for key, value in data.items():
-
-        dlog_geom = gpd.GeoDataFrame(value, geometry=gpd.points_from_xy(
-            value["easting"], value["northing"]))
-        dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
-        joined[key] = dlog_msoa
-    
-    return joined
+    dlog_geom = gpd.GeoDataFrame(data, geometry=gpd.points_from_xy(
+        data["easting"], data["northing"]))
+    dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
+    return dlog_msoa
 
 def calc_msoa_proportion(msoa_pop_path: pathlib.Path, columns: list[str])->pd.DataFrame:
     """
