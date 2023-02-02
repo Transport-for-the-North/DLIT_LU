@@ -111,6 +111,8 @@ class LandUseConfig:
     msoa_shapefile_path: pathlib.Path
     msoa_dwelling_pop_path: pathlib.Path
     msoa_traveller_type_path: pathlib.Path
+    employment_density_matrix_path: pathlib.Path
+    luc_sic_conversion_path: pathlib.Path
 
 
 class DLitConfig(BaseConfig):

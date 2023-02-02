@@ -368,9 +368,9 @@ def disagg_land_use_codes(
         left_on=luc_column,
         right_on="land_use_codes",
     )
-    ratio_demonitator = site_luc.groupby(["site_reference_id"])["total_floorspace"].sum()
-    site_luc.set_index("site_reference_id", inplace=True)
-    ratio = site_luc["total_floorspace"]/ratio_demonitator
+    ratio_demonitator = site_luc.groupby(["site_reference_id"])["total_floorspace"].sum().rename({"total_floorspace":"denom"})
+    site_luc = site_luc.merge(ratio_demonitator, how = "left", left_on="site_reference_id", right_index=True, suffixes=["", "_denom"])
+    ratio = site_luc["total_floorspace"]/site_luc["total_floorspace_denom"]
     ratio.index = disagg.index
-    disagg.loc[:, unit_columns].multiply(ratio, axis = 0)
+    disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis = 0)
     return disagg

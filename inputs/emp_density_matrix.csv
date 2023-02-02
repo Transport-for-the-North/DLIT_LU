@@ -4,10 +4,10 @@ B8,80,GEA
 C1,50,specoified per bed
 C2,100,not specified
 C2A,100,not specified
-C3(a),0,not specified
-C3(b),0,not specified
-C3(c),0,not specified
-C4,0,not specified
+C3(a),,not specified
+C3(b),,not specified
+C3(c),,not specified
+C4,,not specified
 E(a),20,NIA needs modifing
 E(b),17,NIA needs modifing
 E(c)(i),16,NIA needs modifing
@@ -31,5 +31,5 @@ F2(b),100,not specified
 F2(c),100,not specified
 F2(d),100,not specified
 SG,70,gia
-brownfield,0,not specified
-greenfield,0,not specified
+brownfield,,not specified
+greenfield,,not specified
