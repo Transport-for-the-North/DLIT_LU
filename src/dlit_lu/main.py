@@ -52,5 +52,5 @@ def main(log: utilities.DLitLog) -> None:
     else:
         infilled_data = parser.parse_land_use_input(config)
 
-    if config.run_land_use:
+    if config.run_land_use and infilled_data is not None:
         land_use.run(infilled_data, config)

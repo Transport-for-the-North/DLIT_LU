@@ -9,6 +9,8 @@ import pathlib
 # third party imports
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # local imports
 from dlit_lu import global_classes, utilities, analyse, inputs
@@ -72,7 +74,8 @@ def fix_inavlid_syntax(
 
 def infill_data(data: global_classes.DLogData,
                 auxiliary_data: global_classes.AuxiliaryData,
-                output_folder:pathlib.Path) -> global_classes.DLogData:
+                output_folder:pathlib.Path,
+                config: inputs.DLitConfig) -> global_classes.DLogData:
     """Infills data for which assumptions are required
 
     infills missing areas, units, land use codes with multiple possible values
@@ -122,20 +125,24 @@ def infill_data(data: global_classes.DLogData,
     }
 
     # calculate ratios
+    distribution_path = config.output_folder/"distribution_plots"
+    distribution_path.mkdir(exist_ok=True)
 
     dwelling_area_ratio = unit_area_ratio(
         dict((k, data_dict[k]) for k in (["residential", "mixed"])),
         {"residential": "total_units", "mixed": "dwellings"},
         dict((k, area_columns[k]) for k in (["residential", "mixed"])),
+        distribution_path / "dwelling_site_area_ratio_dist.png"
     )
 
     floorspace_area_ratio = unit_area_ratio(
         dict((k, data_dict[k]) for k in (["employment", "mixed"])),
         {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
         dict((k, area_columns[k]) for k in (["employment", "mixed"])),
+        distribution_path / "GFA_site_area_ratio_dist.png"
     )
 
-    average_area = calculate_average(data_dict, area_columns_list)
+    average_area = calculate_average(data_dict, area_columns_list, distribution_path)
     
     inputs.InfillingAverages(
         average_res_area = average_area["residential"],
@@ -639,7 +646,7 @@ def infill_missing_site_area(
     return fixed_data
 
 
-def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str]]) -> dict[str, float]:
+def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str]], output_path:pathlib.Path) -> dict[str, float]:
     """calculate the mean value
 
     will calculate the total average across all the columns
@@ -660,6 +667,7 @@ def calculate_average(data: dict[str, pd.DataFrame], columns: dict[str, list[str
     for key, value in data.items():
         for column in columns[key]:
             mean_values[key] = value.loc[value["missing_area"] == False, column].mean()
+            distribution_plots( value.loc[value["missing_area"] == False, column].to_numpy(), key + " Site Area Distribution", output_path/ (key+"_site_area_dist.png"))
     return mean_values
 
 def old_incomplete_known_luc(
@@ -828,6 +836,7 @@ def unit_area_ratio(
     data: dict[str, pd.DataFrame],
     unit_columns: dict[str, str],
     area_columns: dict[str, str],
+    plot_path: pathlib.Path,
 ) -> float:
     """calculate the ratio for unit to area
 
@@ -864,7 +873,25 @@ def unit_area_ratio(
                 / data_subset[area_columns[key]]
             ),
         )
+    distribution_plots(all_ratios, "Unit-Site Area Ratio Plot", plot_path)
     return all_ratios.mean()
+
+
+def distribution_plots(data: np.ndarray, title:str, save_as: pathlib.Path)->None:
+
+    fig, ax = plt.subplots()
+    ax.set_title(title)
+    sns.kdeplot(data, ax = ax, label = "Kerbel Distribution Estimation")
+    kdeline = ax.lines[0]
+    xs = kdeline.get_xdata()
+    ys = kdeline.get_ydata()
+    mean = data.mean()
+    height = np.interp(mean, xs, ys)
+    ax.vlines(mean, 0, height, ls = "--", label = "Mean")
+    ax.legend()
+    fig.savefig(save_as)
+    plt.close()
+
 
 
 def find_and_replace_luc(
@@ -978,31 +1005,60 @@ def fix_site_ref_id(
 
 def infill_year_units(
     data: pd.DataFrame,
-    distribution_columns: str,
+    distribution_column: str,
     unit_column: str,
     unit_year_column: list[str],
     years_lookup: pd.DataFrame,
-) -> global_classes.DLogData:
+) -> pd.DataFrame:
+    """infills build out profile 
+
+    calculates and infills build out profile from start & end years,
+    total units and distribution (asumes infill years are 5 years apart)
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        data to infill
+    distribution_column : str
+        column that contains the distribution id 
+    unit_column : str
+        column that contains total units
+    unit_year_column : list[str]
+        columns to infill
+    years_lookup : pd.DataFrame
+        years lookup from unit
+
+    Returns
+    -------
+    pd.DataFrame
+        infilled data
+
+    Raises
+    ------
+    ValueError
+        if any values have distribution IDs of 0 (not specified) or 
+        1 (specified - unable to calculate build out from this)
+    """
     LOG.info("Calculating and infilling build out profile")
+    period = 5
 
-
-    not_specified = data[data[distribution_columns] == 0]
-    years_defined = data[data[distribution_columns] == 1]
+    not_specified = data[data[distribution_column] == 0]
+    years_defined = data[data[distribution_column] == 1]
 
     if len(not_specified) != 0 or len(years_defined) != 0:
         raise ValueError(
             "distrubtion contains not specified or defined years values")
 
-    flat = data[data[distribution_columns] == 2]
+    flat = data[data[distribution_column] == 2]
     flat_years = strip_year(
         flat["start_year_id"], flat["end_year_id"], years_lookup)
-    early = data[data[distribution_columns] == 3]
+    early = data[data[distribution_column] == 3]
     early_years = strip_year(
         early["start_year_id"], early["end_year_id"], years_lookup)
-    late = data[data[distribution_columns] == 4]
+    late = data[data[distribution_column] == 4]
     late_years = strip_year(
         late["start_year_id"], late["end_year_id"], years_lookup)
-    mid = data[data[distribution_columns] == 5]
+    mid = data[data[distribution_column] == 5]
     mid_years = strip_year(mid["start_year_id"],
                             mid["end_year_id"], years_lookup)
 
@@ -1010,13 +1066,13 @@ def infill_year_units(
         year = int(column.split("_")[2])
 
         flat.loc[:, column] = flat_distribution(
-            flat[unit_column], flat_years["start_year"], flat_years["end_year"], year)
+            flat[unit_column], flat_years["start_year"], flat_years["end_year"], year, period)
         early.loc[:, column] = early_distribution(
-            early[unit_column], early_years["start_year"], early_years["end_year"], year)
+            early[unit_column], early_years["start_year"], early_years["end_year"], year, period)
         late.loc[:, column] = late_distribution(
-            late[unit_column], late_years["start_year"], late_years["end_year"], year)
+            late[unit_column], late_years["start_year"], late_years["end_year"], year, period)
         mid.loc[:, column] = mid_distribution(
-            mid[unit_column], mid_years["start_year"], mid_years["end_year"], year)
+            mid[unit_column], mid_years["start_year"], mid_years["end_year"], year, period)
 
     data.update(flat)
     data.update(early)
@@ -1060,14 +1116,15 @@ def flat_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
-    year: pd.Series
+    year: pd.Series,
+    period: int,
 ) -> pd.Series:
     after_start = year >= start_year
     before_end = year <= end_year
     within_years = pd.DataFrame(
         [after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
-    periods = (end_year - start_year+1)/5
+    periods = (end_year - start_year+1)/period
     unit_years[within_years] = unit[within_years]/periods[within_years]
     return unit_years
 
@@ -1076,7 +1133,8 @@ def early_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
-    year: int
+    year: int,
+    period: int, 
 ) -> pd.Series:
 
     after_start = year >= start_year
@@ -1085,7 +1143,7 @@ def early_distribution(
         [after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
-    periods = (end_year - start_year+1)/5
+    periods = (end_year - start_year+1)/period
 
     unit_years[within_years] = unit[within_years]*((periods[within_years]-(
         ((year-start_year[within_years])/5)+1)).apply(two_to_pow)/(periods[within_years].apply(two_to_pow)-1))
@@ -1096,7 +1154,8 @@ def late_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
-    year: int
+    year: int,
+    period: int,
 ) -> pd.Series:
 
     after_start = year >= start_year
@@ -1105,7 +1164,7 @@ def late_distribution(
         [after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
-    periods = (end_year - start_year+1)/5
+    periods = (end_year - start_year+1)/period
 
     unit_years[within_years] = unit[within_years]*((periods[within_years]-(
         ((end_year[within_years]-(year+4))/5)+1))).apply(two_to_pow)/(periods[within_years].apply(two_to_pow)-1)
@@ -1116,7 +1175,8 @@ def mid_distribution(
     unit: pd.Series,
     start_year: pd.Series,
     end_year: pd.Series,
-    year: int
+    year: int,
+    period: int,
 ) -> pd.Series:
 
     after_start = year >= start_year
@@ -1125,9 +1185,9 @@ def mid_distribution(
         [after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
-    periods = (end_year - start_year+1)/5
+    periods = (end_year - start_year+1)/period
 
-    determinator = 1 + (year - start_year)/5
+    determinator = 1 + (year - start_year)/period
     less_than_bool = determinator <= (periods+1)/2
     more_than_bool = ~less_than_bool
 

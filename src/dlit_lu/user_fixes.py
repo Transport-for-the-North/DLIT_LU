@@ -348,7 +348,7 @@ def convert_list_to_string(value: list[str]) -> str:
     str
         list converted to string
     """
-    """
+    
     if isinstance(value, list):
         return ", ".join(value)
     return value

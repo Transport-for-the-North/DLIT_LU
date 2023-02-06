@@ -221,7 +221,7 @@ def data_report(
     all_missing_d_a = find_multiple_missing_values(
         data,
         {
-            "residential": ["total_units",],
+            "residential": ["total_units", ],
             "employment": ["total_area_sqm"],
             "mixed": ["floorspace_sqm", "dwellings"],
         },
@@ -235,7 +235,7 @@ def data_report(
     missing_d_a_no_sa = find_multiple_missing_values(
         all_missing_d_a,
         {
-            "residential": ["total_site_area_size_hectares",],
+            "residential": ["total_site_area_size_hectares", ],
             "employment": ["site_area_ha"],
             "mixed": ["total_area_ha"],
         },
@@ -543,10 +543,11 @@ def data_report(
         dlog_data.lookup,
     )
 
+
 def luc_ratio(
     data: dict[str, pd.DataFrame],
     auxiliary_data: global_classes.AuxiliaryData,
-    column: str = "proposed_land_use", 
+    column: str = "proposed_land_use",
 ) -> pd.DataFrame:
     """calculates the average floorspace taken by each  luc
 
@@ -574,7 +575,7 @@ def luc_ratio(
     land_use_codes_count["total_floorspace"] = 0
     for code in land_use_codes["land_use_codes"]:
         for key, value in data.items():
-            #do not use residential since they do not contain floorspace
+            # do not use residential since they do not contain floorspace
             if key == "residential":
                 continue
 
@@ -585,13 +586,14 @@ def luc_ratio(
 
             have_floorspace = pd.DataFrame([code_in_entry[
                 "missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
-                    code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(drop=True)]).transpose()
+                code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(
+                    drop=True)]).transpose()
             have_floorspace.index = code_in_entry.index
             have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
 
             have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
                 "units_(floorspace)"] / have_floorspace[column].apply(lambda x: len(x))
-                
+
             total_floorspace = have_floorspace["units_(floorspace)"].sum()
 
             land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
@@ -599,12 +601,13 @@ def luc_ratio(
                     ] == code, "count"] + len(have_floorspace)
 
             land_use_codes_count.loc[land_use_codes_count["land_use_codes"
-                ]== code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
+                ] == code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
                     "land_use_codes"] == code, "total_floorspace"] + total_floorspace
 
     land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / \
         land_use_codes_count["count"]
     return land_use_codes_count
+
 
 def find_lucs(data: pd.DataFrame, column: str, code: str) -> Optional[pd.DataFrame]:
     """returns all entries with a given land use code
@@ -1428,7 +1431,7 @@ def geo_explorer(
         explorer = base.explore()
 
     if choropleth is not None:
-        #TODO more robust CRS conversion
+        # TODO more robust CRS conversion
         choropleth = choropleth.to_crs(epsg=4326)
         if column is None:
             raise ValueError(
@@ -1454,7 +1457,7 @@ def geo_explorer(
                 temp = value[
                     ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
-                #TODO more robust CRS conversion
+                # TODO more robust CRS conversion
                 temp = temp.to_crs(epsg=4326)
                 explorer = temp.explore(
                     name=key, color=colour[key], legend=True, show=False
