@@ -8,6 +8,7 @@ import pathlib
 import os
 import logging
 from typing import Optional
+
 # third party imports
 import pandas as pd
 import numpy as np
@@ -77,11 +78,19 @@ def infill_user_inputs(
 
         # removes "" from luc lists
         data_subset["existing_land_use"] = data_subset[
-            "existing_land_use"].apply(lambda x: [
-                item for item in x if item != ""] if isinstance(x, list) else x)
+            "existing_land_use"
+        ].apply(
+            lambda x: [item for item in x if item != ""]
+            if isinstance(x, list)
+            else x
+        )
         data_subset["proposed_land_use"] = data_subset[
-            "proposed_land_use"].apply(lambda x: [
-                item for item in x if item != ""] if isinstance(x, list) else x)
+            "proposed_land_use"
+        ].apply(
+            lambda x: [item for item in x if item != ""]
+            if isinstance(x, list)
+            else x
+        )
 
         if uneditable_columns is None:
             infilled_data[key] = value.copy()
@@ -91,7 +100,9 @@ def infill_user_inputs(
 
         # Check whether any values in the specified columns have been changed
         else:
-            if not value[uneditable_columns[key]].equals(data_subset[uneditable_columns[key]]):
+            if not value[uneditable_columns[key]].equals(
+                data_subset[uneditable_columns[key]]
+            ):
                 infilled_data[key] = value.copy()
                 # Update the values in the original dataframe with the values in the subset
                 infilled_data[key].update(data_subset)
@@ -158,11 +169,15 @@ def implement_user_fixes(
             True,
         )
 
-        LOG.info(f"Intial data quality report saved as {pre_user_fix_path}")
+        LOG.info(
+            f"Intial data quality report saved as {pre_user_fix_path}"
+        )
 
         # checks if user wishes to infill data
-        user_changes = utilities.y_n_user_input("Do you wish to "
-                                                "manually fix data before it is infilled? (Y/N)\n")
+        user_changes = utilities.y_n_user_input(
+            "Do you wish to "
+            "manually fix data before it is infilled? (Y/N)\n"
+        )
 
         if user_changes:
             if os.path.exists(config.infill.user_input_path):
@@ -201,8 +216,8 @@ def implement_user_fixes(
 def create_user_changes_audit(
     file_path: pathlib.Path,
     input_modified: global_classes.DLogData,
-    input_original: global_classes.DLogData
-    ) -> None:
+    input_original: global_classes.DLogData,
+) -> None:
     """create user audit of changes implemented by the user
 
     produces an excel spreadsheet of the changed rows of
@@ -228,28 +243,41 @@ def create_user_changes_audit(
         modified_colour = value.copy()
 
         # convert to lists and datetime strings
-        modified_colour = modified_colour.applymap(convert_list_to_string)
+        modified_colour = modified_colour.applymap(
+            convert_list_to_string
+        )
         original_df = original[key].applymap(convert_list_to_string)
 
         datetime_columns = modified_colour.select_dtypes(
-            include="datetime").columns
-        modified_colour[datetime_columns] = modified_colour[datetime_columns].astype(
-            "string")
-        original_df[datetime_columns] = original_df[datetime_columns].astype(
-            "string")
+            include="datetime"
+        ).columns
+        modified_colour[datetime_columns] = modified_colour[
+            datetime_columns
+        ].astype("string")
+        original_df[datetime_columns] = original_df[
+            datetime_columns
+        ].astype("string")
 
         # seperate out numeric
 
-        modified_number = modified_colour.select_dtypes(include="number")
+        modified_number = modified_colour.select_dtypes(
+            include="number"
+        )
         original_number = original_df.select_dtypes(include="number")
 
         # use np.isclose() to solve rounding errors
 
         differences_number = np.isclose(
-            modified_number, original_number, rtol=1e-4, atol=0.001, equal_nan=True)
+            modified_number,
+            original_number,
+            rtol=1e-4,
+            atol=0.001,
+            equal_nan=True,
+        )
 
         differences_number = pd.DataFrame(
-            differences_number, columns=modified_number.columns)
+            differences_number, columns=modified_number.columns
+        )
 
         # seperate out other
 
@@ -265,7 +293,8 @@ def create_user_changes_audit(
 
         # mash numerical and other back together
         differences = pd.concat(
-            [differences_number, differences_other], axis=1)
+            [differences_number, differences_other], axis=1
+        )
 
         # reorder to match the df
         differences = differences[modified_colour.columns]
@@ -274,7 +303,10 @@ def create_user_changes_audit(
         modified_colour = modified_colour[~differences.all(axis=1)]
         # apply colour map
         modified_colour_coded[key] = modified_colour.style.apply(
-            color_different_red, axis=None, differences=differences[~differences.all(axis=1)])
+            color_different_red,
+            axis=None,
+            differences=differences[~differences.all(axis=1)],
+        )
     utilities.write_to_excel(file_path, modified_colour_coded)
 
 
@@ -302,7 +334,7 @@ def color_different_red(_:pd.DataFrame,
     return output
 
 
-def convert_list_to_string(value: list[str])->str:
+def convert_list_to_string(value: list[str]) -> str:
     """converts a list of strings to a string
 
     seperates values with ", "
@@ -316,6 +348,7 @@ def convert_list_to_string(value: list[str])->str:
     str
         list converted to string
     """
+    """
     if isinstance(value, list):
-        return ', '.join(value)
+        return ", ".join(value)
     return value

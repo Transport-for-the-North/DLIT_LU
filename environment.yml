@@ -1,0 +1,16 @@
+name: dlit-env
+
+dependencies:
+    - python=3.11
+    - geopandas>=0.12.2
+    - pandas>=1.5.2
+    - numpy>=1.23.5
+    - pydantic>=1.10.2
+    - openpyxl>=3.0.10
+    - tqdm>=4.64.1
+    - jinja2>=3.0
+    - folium
+    - matlpotlib>=6.6.2
+    - strictyaml
+channels:
+    - conda-forge
