@@ -1,5 +1,5 @@
 #Set Up Parameters
-run_infill: False
+run_infill: True
 run_land_use: True 
 
 #Mandatory Parameters
@@ -18,6 +18,7 @@ infill:
   employment_sheet_name: "2021 Employment"
   mixed_sheet_name: "2021 Mixed"
   #--Read file paths 
+  dlog_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\DLog_column_names.csv
   combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\combined_column_names.csv
   residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
   employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv

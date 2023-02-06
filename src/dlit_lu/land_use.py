@@ -1,12 +1,11 @@
 # standard imports
 import logging
+import pathlib
 # third party imports
 import pandas as pd
-import pathlib
 # local imports
 from dlit_lu import utilities, global_classes, parser, inputs
-DEMOLITION_ANALYSIS = True
-CONSTRUCTION_ANALYSIS = True
+
 # constants
 LOG = logging.getLogger(__name__)
 
@@ -47,12 +46,16 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Disaggregating employment proposed LUCs")
     construction_land_use_data = data.copy()
-    construction_land_use_data["employment"] = utilities.disagg_land_use_codes(construction_land_use_data["employment"], "proposed_land_use",
-                                                                               emp_unit_year_columns,
-                                                                               input_data.proposed_land_use_split)
+    construction_land_use_data["employment"
+        ] = utilities.disagg_land_use_codes(
+            construction_land_use_data["employment"],
+            "proposed_land_use",
+            emp_unit_year_columns,
+            input_data.proposed_land_use_split,
+            )
 
     demolition_land_use_data = data.copy()
-    demolition_land_use_data["residential"] = convert_to_GFA(
+    demolition_land_use_data["residential"] = convert_to_gfa(
         demolition_land_use_data["residential"],
         "total_site_area_size_hectares",
         "units_(dwellings)",
@@ -61,24 +64,34 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Disaggregating employment existing LUCs")
 
-    demolition_land_use_data["employment"] = utilities.disagg_land_use_codes(demolition_land_use_data["employment"], "existing_land_use",
-                                                                             emp_unit_year_columns,
-                                                                             input_data.existing_land_use_split)
+    demolition_land_use_data["employment"] = utilities.disagg_land_use_codes(
+        demolition_land_use_data["employment"],
+        "existing_land_use",
+        emp_unit_year_columns,
+        input_data.existing_land_use_split,
+        )
     LOG.info("Disaggregating residential existing LUCs")
-    demolition_land_use_data["residential"] = utilities.disagg_land_use_codes(demolition_land_use_data["residential"], "existing_land_use",
-                                                                              res_unit_year_columns,
-                                                                              input_data.existing_land_use_split)
+    demolition_land_use_data["residential"] = utilities.disagg_land_use_codes(
+        demolition_land_use_data["residential"],
+        "existing_land_use",
+        res_unit_year_columns,
+        input_data.existing_land_use_split,
+        )
 
     demolition_land_use_data["residential"].loc[:, res_unit_year_columns] = - \
         demolition_land_use_data["residential"].loc[:, res_unit_year_columns]
     demolition_land_use_data["employment"].loc[:, emp_unit_year_columns] = - \
         demolition_land_use_data["employment"].loc[:, emp_unit_year_columns]
 
-    demolition_land_use_data["residential"].columns = demolition_land_use_data["employment"].columns
+    demolition_land_use_data["residential"].columns = demolition_land_use_data[
+        "employment"].columns
 
-    construction_land_use_data["employment"]["land_use"] = construction_land_use_data["employment"]["proposed_land_use"]
-    demolition_land_use_data["employment"]["land_use"] = demolition_land_use_data["employment"]["existing_land_use"]
-    demolition_land_use_data["residential"]["land_use"] = demolition_land_use_data["residential"]["existing_land_use"]
+    construction_land_use_data["employment"]["land_use"] = construction_land_use_data[
+        "employment"]["proposed_land_use"]
+    demolition_land_use_data["employment"]["land_use"] = demolition_land_use_data[
+        "employment"]["existing_land_use"]
+    demolition_land_use_data["residential"]["land_use"] = demolition_land_use_data[
+        "residential"]["existing_land_use"]
 
     residential_build_out = construction_land_use_data["residential"]
     employment_build_out = pd.concat([
@@ -95,7 +108,8 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Disaggregating dwellings into population by dwelling type")
     msoa_pop_column_names = ["zone_id", "dwelling_type",
-                             "n_uprn", "pop_per_dwelling", "zone", "pop_aj_factor", "population"]
+                                "n_uprn", "pop_per_dwelling",
+                                "zone", "pop_aj_factor", "population"]
 
     res_msoa_sites = utilities.disagg_dwelling(
         res_msoa_sites,
@@ -152,7 +166,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
 
 def analyse_traveller_type_distribution(file_path: pathlib.Path) -> pd.DataFrame:
-    """calculates the factors for each traveller type 
+    """calculates the factors for each traveller type
 
     aggregates across all zones and dwelling types
 
@@ -181,7 +195,11 @@ def analyse_traveller_type_distribution(file_path: pathlib.Path) -> pd.DataFrame
     all_msoa_ratios.columns = ["ratios"]
     return all_msoa_ratios
 
-def apply_pop_land_use(data: pd.DataFrame, unit_columns: list[str],  tt_factors: pd.DataFrame) -> pd.DataFrame:
+def apply_pop_land_use(
+    data: pd.DataFrame,
+    unit_columns: list[str],
+    tt_factors: pd.DataFrame,
+    ) -> pd.DataFrame:
     """applies TfN population land use factors to data
 
     Parameters
@@ -196,16 +214,18 @@ def apply_pop_land_use(data: pd.DataFrame, unit_columns: list[str],  tt_factors:
     Returns
     -------
     pd.DataFrame
-        dataframe with updated unit values, indexed by msoa11cd, dwelling_type, and tfn_traveller_type
+        dataframe with updated unit values, indexed by msoa11cd,
+        dwelling_type, and tfn_traveller_type
     """
 
     data_ratios = data.reset_index(drop=False).merge(tt_factors.reset_index(
-        drop=False), left_on="msoa11cd", right_on="msoa_zone_id").set_index(["msoa11cd", "dwelling_type", "tfn_traveller_type"])
+        drop=False), left_on="msoa11cd", right_on="msoa_zone_id").set_index([
+            "msoa11cd", "dwelling_type", "tfn_traveller_type"])
     data_ratios = data_ratios.loc[:, unit_columns].multiply(
         data_ratios["ratios"], axis=0)
     return data_ratios
 
-def clean_column_names(df):
+def clean_column_names(data:pd.DataFrame)->pd.DataFrame:
     """Cleans up column names in a dataframe by extracting digits
 
     column names replaced with just the digits in the existing name
@@ -222,7 +242,7 @@ def clean_column_names(df):
         DataFrame with updated column names, containing only the extracted digits
     """
 
-    cols = df.columns
+    cols = data.columns
     new_cols = {}
     for col in cols:
         # Check if the column name contains a digit
@@ -233,14 +253,20 @@ def clean_column_names(df):
         else:
             # If it doesn't, use the original column name
             new_cols[col] = col
-    df.rename(columns=new_cols, inplace=True)
-    return df
+    data.rename(columns=new_cols, inplace=True)
+    return data
 
 
-def convert_to_GFA(data: pd.DataFrame, area_col: str, unit_col: str, unit_year_columns: list[str], factor: float) -> pd.DataFrame:
+def convert_to_gfa(
+    data: pd.DataFrame,
+    area_col: str,
+    unit_col: str,
+    unit_year_columns: list[str],
+    factor: float,
+    ) -> pd.DataFrame:
     """Converts dwellings to GFA 
 
-    uses site area and factor to calculate total GFA and 
+    uses site area and factor to calculate total GFA and
     distributes the build out profile in the orginal ratio
 
     Parameters
@@ -289,7 +315,7 @@ def convert_gfa_to_jobs(data: pd.DataFrame, matrix_path: pathlib.Path, unit_cols
         "land_use_code", "fte_floorspace"]]
     matrix.loc[:,"land_use_code"] = matrix["land_use_code"].str.lower()
     data_jobs = data.reset_index().merge(
-        matrix, how="left", left_on="land_use", right_on="land_use_code") 
+        matrix, how="left", left_on="land_use", right_on="land_use_code")
     data_jobs.loc[:, unit_cols] = data_jobs.loc[:, unit_cols].divide(
         data_jobs.loc[:, "fte_floorspace"], axis=0)
     data_jobs.loc[data_jobs["fte_floorspace"].isnull(), unit_cols] = 0
@@ -317,7 +343,12 @@ def convert_luc_to_sic(data: pd.DataFrame, conversion_path:pathlib.Path)->pd.Dat
     """
     conversion = pd.read_csv(conversion_path).loc[:,["land_use_code", "sic_code"]]
     conversion["land_use_code"] = conversion["land_use_code"].str.lower()
-    data_sic_code = data.reset_index(drop=False).merge(conversion, how="left", left_on="land_use", right_on="land_use_code")
+    data_sic_code = data.reset_index(drop=False).merge(
+        conversion,
+        how="left",
+        left_on="land_use",
+        right_on="land_use_code",
+    )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
     data_sic_code.set_index(["msoa_zone_id", "sic_code"], inplace=True)
     return data_sic_code

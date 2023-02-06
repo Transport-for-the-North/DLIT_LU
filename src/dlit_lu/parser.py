@@ -34,27 +34,39 @@ def parse_dlog(
         the parsed data
     """
     # read in column names
-    res_column_names = pd.read_csv(
-        config.infill.residential_column_names_path).iloc[:, 0].tolist()
-    emp_column_names = pd.read_csv(
-        config.infill.employment_column_names_path).iloc[:, 0].tolist()
-    mix_column_names = pd.read_csv(
-        config.infill.mixed_column_names_path).iloc[:, 0].tolist()
 
-    #read in column to remove from data
-    ignore_columns = pd.read_csv(
-        config.infill.ignore_columns_path).iloc[:, 0].str.lower().tolist()
+    column_names = pd.read_csv(config.infill.dlog_column_names_path)
+
+    res_column_names = column_names.loc[:, "residential_column_names"].dropna(how="any").tolist()
+    emp_column_names = column_names.loc[:, "employment_column_names"].dropna(how="any").tolist()
+    mix_column_names = column_names.loc[:, "mixed_column_names"].dropna(how="any").tolist()
+    #column to remove from data
+    ignore_columns = column_names.loc[:, "ignore_column_names"].dropna(how="any").tolist()
 
     #parse sheets
     LOG.info("Parsing Residential sheet")
     residential_data = parse_sheet(
-        config.dlog_input_file, config.infill.residential_sheet_name, 2, res_column_names, ignore_columns)
+        config.dlog_input_file,
+        config.infill.residential_sheet_name,
+        2,
+        res_column_names,
+        ignore_columns)
     LOG.info("Parsing Employment sheet")
     employment_data = parse_sheet(
-        config.dlog_input_file, config.infill.employment_sheet_name, 2, emp_column_names, ignore_columns)
+        config.dlog_input_file,
+        config.infill.employment_sheet_name,
+        2,
+        emp_column_names,
+        ignore_columns,
+        )
     LOG.info("Parsing Mixed sheet")
     mixed_data = parse_sheet(
-        config.dlog_input_file, config.infill.mixed_sheet_name, 2, mix_column_names, ignore_columns)
+        config.dlog_input_file,
+        config.infill.mixed_sheet_name,
+        2,
+        mix_column_names,
+        ignore_columns,
+        )
     LOG.info("Parsing Lookup sheet")
     lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
 
@@ -67,6 +79,17 @@ def parse_dlog(
     )
     return data_output
 def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
+    """Parse land use input data from a given input path.
+
+    Parameters:
+    ----------
+    config (inputs.DLitConfig): Input configuration object
+
+    Returns:
+    ----------
+    data_output (global_classes.DLogData): Parsed land use data in a DLogData object
+
+    """
     LOG.info(f"Parsing {str(config.land_use.land_use_input)}")
     #parse sheets
     LOG.info("Parsing Residential sheet")
@@ -150,7 +173,7 @@ def parse_sheet(
         data.columns = data.columns.str.lower()
 
     if ignore_columns is not None:
-        data = data.drop(columns=ignore_columns)
+        data = data.drop(columns=[name.lower() for name in ignore_columns])
 
     return data
 
@@ -339,6 +362,20 @@ def read_auxiliary_data(
     )
 
 def parse_msoa(file_path:pathlib.Path)->gpd.GeoDataFrame:
+    """parse msoa shape file
+
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        file path for msoa shapefile
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        msoa
+    """
     msoa = gpd.read_file(file_path)
     north_msoa = msoa[~msoa["north_msoa"].isna()]
     return north_msoa
+    

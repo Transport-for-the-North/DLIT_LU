@@ -1,4 +1,4 @@
-"""handles the user inputted fixes 
+"""handles the user inputted fixes
 
 takes user preference, generates file for user to input fixes and
 integrates fixes with the existing data
@@ -19,7 +19,7 @@ LOG = logging.getLogger(__name__)
 
 
 def user_input_file_builder(path: pathlib.Path, input_data: global_classes.DLogData) -> None:
-    """builds file for user to edit 
+    """builds file for user to edit
 
     file can then be read and edits integrated into data
 
@@ -43,7 +43,7 @@ def infill_user_inputs(
 
     will fail if user edits column names or indices
     should work if modified path contains a subset of data as
-    long as indices are consistent 
+    long as indices are consistent
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def infill_user_inputs(
     FileNotFoundError
         if inputted file path does not exist
     ValueError
-        if columns listed in uneditable have been modified 
+        if columns listed in uneditable have been modified
     """
     # Read in the Excel file containing the subset of the data
     infilled_data = {}
@@ -97,7 +97,8 @@ def infill_user_inputs(
                 infilled_data[key].update(data_subset)
             else:
                 raise ValueError(
-                    f"values in {uneditable_columns[key]} within {modified_path} have been modified, these values must remain constant")
+                    f"values in {uneditable_columns[key]} within {modified_path}"
+                    " have been modified, these values must remain constant")
     return infilled_data
 
 
@@ -105,13 +106,13 @@ def implement_user_fixes(
     config: inputs.DLitConfig,
     dlog_data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
-    plot_graphs: bool, 
+    plot_graphs: bool,
 ) -> Optional[global_classes.DLogData]:
     """intergrates user fixes into data
 
     handles user preferences writes the file for the user to edit,
     reads in user fixes and outputs the data with the user fixes
-    integrated. outputs None if user wishes to end program 
+    integrated. outputs None if user wishes to end program
 
     Parameters
     ----------
@@ -145,7 +146,6 @@ def implement_user_fixes(
         LOG.info(
             f"Existing file {config.infill.user_input_path} set as user infill input.")
     else:
-        
         pre_user_fix_path = config.output_folder / "01_pre_user_fix"
         pre_user_fix_path.mkdir(exist_ok=True)
 
@@ -168,19 +168,20 @@ def implement_user_fixes(
             if os.path.exists(config.infill.user_input_path):
                 LOG.info("Creating file for user to edit.")
                 # pauses to allow user to save existing file
-                input(f"Overwriting {config.infill.user_input_path}, if you wish to store any changes made"
-                      ", please make a copy with a different name and press enter, otherwise press"
-                      " enter.")
+                input(f"Overwriting {config.infill.user_input_path},"
+                    " if you wish to store any changes made"
+                    ", please make a copy with a different name and press enter, otherwise press"
+                    " enter.")
 
             user_input_file_builder(
                 config.infill.user_input_path, dlog_data)
 
             # allows user to end program to to edit data
             end_program = utilities.y_n_user_input(f"A file has been created at "
-                                                   f"{config.infill.user_input_path} for you to manually infill data. Would "
-                                                   "you like to end the program and rerun when you have finished? Y "
-                                                   "(end the program, modify the data then rerun) or N (data has been"
-                                                   " modified)\n")
+                f"{config.infill.user_input_path} for you to manually infill data. Would "
+                "you like to end the program and rerun when you have finished? Y "
+                "(end the program, modify the data then rerun) or N (data has been"
+                " modified)\n")
 
             if end_program:
                 LOG.info("Ending program")
@@ -204,7 +205,7 @@ def create_user_changes_audit(
     ) -> None:
     """create user audit of changes implemented by the user
 
-    produces an excel spreadsheet of the changed rows of 
+    produces an excel spreadsheet of the changed rows of
     input_modified when compared to input original, with the changed
     values highlighted in red.
 
@@ -216,7 +217,7 @@ def create_user_changes_audit(
         user modified data
     input_original : global_classes.DLogData
         original data
-    """    
+    """
     modified = utilities.to_dict(input_modified)
     original = utilities.to_dict(input_original)
     # Iterate over the dictionaries
@@ -277,9 +278,9 @@ def create_user_changes_audit(
     utilities.write_to_excel(file_path, modified_colour_coded)
 
 
-def color_different_red(_:pd.DataFrame, 
+def color_different_red(_:pd.DataFrame,
     differences:pd.DataFrame)->pd.DataFrame:
-    """used to highlight values in red based on a array of bools 
+    """used to highlight values in red based on a array of bools
 
     used when formatting an excel spread sheet
 
@@ -289,14 +290,14 @@ def color_different_red(_:pd.DataFrame,
         not used
     differences : pd.DataFrame
         bool array with same dimensions as the dataframe for which this
-        is applied 
+        is applied
 
     Returns
     -------
-    
+
     pd.DataFrame
         array of colours used to apply formatting in an excel spread sheet
-    """    
+    """
     output = np.where(differences, "", "background-color: red")
     return output
 
@@ -309,13 +310,12 @@ def convert_list_to_string(value: list[str])->str:
     Parameters
     ----------
     value : list[str]
-        
 
     Returns
     -------
     str
         list converted to string
-    """    
+    """
     if isinstance(value, list):
         return ', '.join(value)
     return value

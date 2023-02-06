@@ -115,8 +115,8 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         user_fixed_data, auxiliary_data, config.output_folder)
 
     #infill build out profile
-    res_columns = pd.read_csv(config.infill.residential_column_names_path).iloc[:,0].to_list()
-    emp_columns = pd.read_csv(config.infill.employment_column_names_path).iloc[:,0].to_list()
+    res_columns = infilled_fixed_data.residential_data.columns
+    emp_columns = infilled_fixed_data.employment_data.columns
 
     res_unit_year_columns = list(filter(lambda x: x.startswith("res_year_"), res_columns))
     emp_unit_year_columns = list(filter(lambda x: x.startswith("emp_year_"), emp_columns))
@@ -151,7 +151,9 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         emp_unit_year_columns,
         dlog_data.lookup.years,
     )
-    infilled_fixed_data = utilities.to_dlog_data(infilled_fixed_data_dict, infilled_fixed_data.lookup)
+    infilled_fixed_data = utilities.to_dlog_data(
+        infilled_fixed_data_dict,
+        infilled_fixed_data.lookup)
 
     #post fixes data report and write post fix data
     post_fix_output_path = config.output_folder / "03_post_fixes"
@@ -174,3 +176,4 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         proposed_luc_split,
         existing_luc_split,
     )
+    

@@ -121,7 +121,7 @@ def output_file_checks(output_function):
 
 @output_file_checks
 def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
-    """wirtes file to csv 
+    """wirtes file to csv
 
     used so wrapper with logging and permission error checks can be applied
 
@@ -131,14 +131,14 @@ def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
         path to write csv to
     output : pd.DataFrame
         data to write
-    """    
+    """
     output.to_csv(file_path)
-    
+
 @output_file_checks
 def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) -> None:
     """write a dict of pandas DF to a excel spreadsheet
 
-    the keys will become the sheet names 
+    the keys will become the sheet names
 
     Parameters
     ----------
@@ -175,8 +175,11 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
     }
 
 
-def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Lookup) -> global_classes.DLogData:
-    """converts dictionary to DLOG data type 
+def to_dlog_data(
+    dlog_data: dict[str, pd.DataFrame],
+    lookup: global_classes.Lookup
+    ) -> global_classes.DLogData:
+    """converts dictionary to DLOG data type
 
     will deal with combined not being present by using None in its place
 
@@ -191,7 +194,7 @@ def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Look
     -------
     global_classes.DLogData
         _description_
-    """    
+    """
     try:
         return global_classes.DLogData(
             dlog_data["combined"],
@@ -218,7 +221,7 @@ def y_n_user_input(message: str) -> bool:
     Parameters
     ----------
     message : str
-        message to give to the user 
+        message to give to the user
 
     Returns
     -------
@@ -260,15 +263,40 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     mix_res = mix.loc[:, res.columns.unique()].reset_index(drop=True)
     mix_emp = mix.loc[:, emp.columns.unique()].reset_index(drop=True)
-    
-    mix_res.loc[:,"total_site_area_size_hectares"] = mix_res["total_area_ha"]  
+
+    mix_res.loc[:,"total_site_area_size_hectares"] = mix_res["total_area_ha"]
     mix_emp.loc[:,"total_area_ha"] = mix_emp["site_area_ha"]
     res_new = pd.concat([res, mix_res],  ignore_index=True)
     emp_new = pd.concat([emp, mix_emp], ignore_index=True)
 
     return {"residential": res_new, "employment": emp_new}
 
-def disagg_dwelling(data: pd.DataFrame, msoa_pop_path:pathlib.Path, msoa_pop_column_names:list[str], unit_columns: list[str])->pd.DataFrame:
+def disagg_dwelling(
+    data: pd.DataFrame,
+    msoa_pop_path:pathlib.Path,
+    msoa_pop_column_names:list[str],
+    unit_columns: list[str],
+    )->pd.DataFrame:
+    """
+    Disaggregate dwellings by population ratios.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame containing dwelling data
+    msoa_pop_path : pathlib.Path
+        Path to the population data file
+    msoa_pop_column_names : list[str]
+        List of column names for the population data file
+    unit_columns : list[str]
+        List of column names to be disaggregated
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with the disaggregated dwelling data
+
+    """
 
     msoa_ratio = calc_msoa_proportion(msoa_pop_path, msoa_pop_column_names)
 
@@ -280,7 +308,8 @@ def disagg_dwelling(data: pd.DataFrame, msoa_pop_path:pathlib.Path, msoa_pop_col
     for column in unit_columns:
         data.loc[:, column] = data[column]*data["dwelling_ratio"]*data["pop_per_dwelling"]
 
-    return data 
+    return data
+
 
 
 def msoa_site_geospatial_lookup(
@@ -322,7 +351,7 @@ def calc_msoa_proportion(msoa_pop_path: pathlib.Path, columns: list[str])->pd.Da
     -------
     pd.DataFrame
         _description_
-    """    
+    """
     msoa_pop = pd.read_csv(msoa_pop_path)
     msoa_pop.columns = columns
     msoa_pop.set_index(["zone_id", "dwelling_type"], inplace = True)
@@ -368,8 +397,12 @@ def disagg_land_use_codes(
         left_on=luc_column,
         right_on="land_use_codes",
     )
-    ratio_demonitator = site_luc.groupby(["site_reference_id"])["total_floorspace"].sum().rename({"total_floorspace":"denom"})
-    site_luc = site_luc.merge(ratio_demonitator, how = "left", left_on="site_reference_id", right_index=True, suffixes=["", "_denom"])
+    ratio_demonitator = site_luc.groupby(
+        ["site_reference_id"])[
+            "total_floorspace"].sum().rename({"total_floorspace":"denom"})
+    site_luc = site_luc.merge(
+        ratio_demonitator, how = "left", left_on="site_reference_id",
+         right_index=True, suffixes=["", "_denom"])
     ratio = site_luc["total_floorspace"]/site_luc["total_floorspace_denom"]
     ratio.index = disagg.index
     disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis = 0)

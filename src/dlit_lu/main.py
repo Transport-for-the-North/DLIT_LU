@@ -41,7 +41,7 @@ def main(log: utilities.DLitLog) -> None:
     #load in config file
     config = inputs.DLitConfig.load_yaml(CONFIG_PATH)
     config.check_inputs()
-    
+
     config.output_folder.mkdir(exist_ok=True)
 
     #set log file
@@ -54,8 +54,3 @@ def main(log: utilities.DLitLog) -> None:
 
     if config.run_land_use:
         land_use.run(infilled_data, config)
-
-    #________________end of infilling____________________
-   
-
-    
