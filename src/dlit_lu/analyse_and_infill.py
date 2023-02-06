@@ -47,7 +47,6 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         PLOT_GRAPHS,
         INITIAL_ASSESSMENT,
     )
-    
 
     syntax_fixed_data = data_repair.fix_inavlid_syntax(
         data_filter_columns, auxiliary_data)
@@ -112,7 +111,7 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
 
     # infill invalid data
     infilled_fixed_data = data_repair.infill_data(
-        user_fixed_data, auxiliary_data, config.output_folder)
+        user_fixed_data, auxiliary_data, config.output_folder, config)
 
     #infill build out profile
     res_columns = infilled_fixed_data.residential_data.columns
