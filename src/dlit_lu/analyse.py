@@ -21,6 +21,8 @@ ValueError
     find_invalid_land_use_codes: no column found
 """
 # standard imports
+from __future__ import annotations
+
 import logging
 from typing import Optional
 import pathlib
