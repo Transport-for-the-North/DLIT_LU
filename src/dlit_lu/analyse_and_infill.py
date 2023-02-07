@@ -63,7 +63,7 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         utilities.to_dict(syntax_fixed_data),
         auxiliary_data,
         "proposed_land_use")
-    
+
     utilities.write_to_csv(config.proposed_luc_split_path, proposed_luc_split)
 
     existing_luc_split = analyse.luc_ratio(

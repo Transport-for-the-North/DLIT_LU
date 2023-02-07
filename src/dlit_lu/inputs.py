@@ -95,7 +95,7 @@ class BaseConfig(pydantic.BaseModel):
 @dataclasses.dataclass
 class InfillConfig:
     """
-    Manages 
+    Manages
 
     Parameters
     ----------
@@ -109,7 +109,7 @@ class InfillConfig:
         name of the mixed sheet within the D-log file
     dlog_column_names_path: pathlib.Path
         path to column names in the dlog. contains column names for each
-        sheet and column names to drop for all sheets 
+        sheet and column names to drop for all sheets
     user_input_path: pathlib.Path
         Path to file when user inpjut file with but read/written
     valid_luc_path: pathlib.Path
@@ -119,7 +119,7 @@ class InfillConfig:
     incomplete_luc_path: pathlib.Path
         path to incomplete land use codes file
     known_invalid_luc_path: pathlib.Path
-        path to known invalid land use codes and their replacements 
+        path to known invalid land use codes and their replacements
     regions_shapefiles_path: pathlib.Path
         path to LPA regions shapefile
 
@@ -137,6 +137,17 @@ class InfillConfig:
     regions_shapefiles_path: pathlib.Path
 
     def check_params(self) -> None:
+        """performs checks as to whether values exist
+
+        if path is a read file will also check if path is valid
+
+        Raises
+        ------
+        ValueError
+            if parameters are incomplete
+        ValueError
+            if read paths are invalid
+        """        
         str_params = [
             self.combined_sheet_name,
             self.residential_sheet_name,
@@ -157,12 +168,12 @@ class InfillConfig:
         for param in write_path_params + read_path_params + str_params:
             if param is None:
                 raise ValueError("Infill Parameters incomplete, please"
-                                 " complete these within the config file before continuing. Cheers!")
+                    " complete these within the config file before continuing. Cheers!")
 
         for param in read_path_params:
             if not os.path.exists(param):
                 raise ValueError("Infill parameters contains write file paths"
-                                 " that do not exist. Please update the config file before continuing. Cheers!")
+                    " that do not exist. Please update the config file before continuing. Cheers!")
 
 
 @dataclasses.dataclass
@@ -185,7 +196,7 @@ class LandUseConfig:
     luc_sic_conversion_path: pathlib.Path
         path to land use code to SIC code conversion matrix
     """
-    land_use_input: pathlib.Path
+    land_use_input: Optional[pathlib.Path]
     msoa_shapefile_path: pathlib.Path
     msoa_dwelling_pop_path: pathlib.Path
     msoa_traveller_type_path: pathlib.Path
@@ -193,9 +204,19 @@ class LandUseConfig:
     luc_sic_conversion_path: pathlib.Path
 
     def check_params(self) -> None:
+        """performs checks as to whether values exist
+
+        if path is a read file will also check if path is valid
+
+        Raises
+        ------
+        ValueError
+            if parameters are incomplete
+        ValueError
+            if read paths are invalid
+        """        
 
         read_path_params = [
-            self.land_use_input,
             self.msoa_shapefile_path,
             self.msoa_dwelling_pop_path,
             self.msoa_traveller_type_path,
@@ -278,6 +299,14 @@ class DLitConfig(BaseConfig):
             self.land_use.check_params()
         if self.run_infill:
             self.infill.check_params()
+
+        if (not self.run_infill) and self.run_land_use:
+            if self.land_use.land_use_input is None:
+                raise ValueError(
+                    "Land use input path is required when not running infilling module")
+            if not os.path.exists(self.land_use.land_use_input
+                    ) or self.land_use.land_use_input == pathlib.Path("."):
+                raise ValueError("Land use input path is not valid")
 
 
 class InfillingAverages(BaseConfig):
