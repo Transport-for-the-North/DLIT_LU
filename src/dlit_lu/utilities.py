@@ -213,33 +213,6 @@ def to_dlog_data(
         )
 
 
-def y_n_user_input(message: str) -> bool:
-    """takes user input of y/n
-
-    will loop until valid answer is given
-
-    Parameters
-    ----------
-    message : str
-        message to give to the user
-
-    Returns
-    -------
-    bool
-        true if y false if n
-    """
-    while True:
-        answer = input(message)
-        answer_lower = answer.lower()
-        if answer_lower == "y" or answer_lower == "yes":
-            return True
-        elif answer_lower == "n" or answer_lower == "no":
-            return False
-        else:
-            LOG.warning(
-                f"{answer_lower} does not look like \"y\" or \"n\" to me...")
-
-
 def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """disaggregates the mixed data set into residential and employment
 

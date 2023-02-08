@@ -144,18 +144,16 @@ def implement_user_fixes(
 
     # determines if user wishes to infill using exisiting file
     if os.path.exists(config.infill.user_input_path):
-        modification_file_ready = utilities.y_n_user_input(
-            f"A file already exists at {config.infill.user_input_path}."
-            " Does this contain the fixes you wish to implement? (Y/N)\n")
-    else:
-        modification_file_ready = False
-
-    # adds filter columns without producing report
-
-    if modification_file_ready:
-        user_changes = True
         LOG.info(
             f"Existing file {config.infill.user_input_path} set as user infill input.")
+        LOG.info("Implementing user fixes")
+        infilled_data = infill_user_inputs(
+            dict((k, utilities.to_dict(dlog_data)[k]) for k in (
+                ["residential", "employment", "mixed"])),
+            config.infill.user_input_path)
+        converted_infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
+        return converted_infilled_data
+        
     else:
         pre_user_fix_path = config.output_folder / "01_pre_user_fix"
         pre_user_fix_path.mkdir(exist_ok=True)
@@ -173,44 +171,18 @@ def implement_user_fixes(
             f"Intial data quality report saved as {pre_user_fix_path}"
         )
 
-        # checks if user wishes to infill data
-        user_changes = utilities.y_n_user_input(
-            "Do you wish to "
-            "manually fix data before it is infilled? (Y/N)\n"
-        )
+        LOG.info(f"Creating file for user {config.infill.user_input_path} to edit.")
 
-        if user_changes:
-            if os.path.exists(config.infill.user_input_path):
-                LOG.info("Creating file for user to edit.")
-                # pauses to allow user to save existing file
-                input(f"Overwriting {config.infill.user_input_path},"
-                    " if you wish to store any changes made"
-                    ", please make a copy with a different name and press enter, otherwise press"
-                    " enter.")
+        user_input_file_builder(
+            config.infill.user_input_path, dlog_data)
+        LOG.info("Edit file with required changes and rerun the program. Do not change"
+            f"the name or location of {config.infill.user_input_path}.")
+        #end program 
+        return None
 
-            user_input_file_builder(
-                config.infill.user_input_path, dlog_data)
 
-            # allows user to end program to to edit data
-            end_program = utilities.y_n_user_input(f"A file has been created at "
-                f"{config.infill.user_input_path} for you to manually infill data. Would "
-                "you like to end the program and rerun when you have finished? Y "
-                "(end the program, modify the data then rerun) or N (data has been"
-                " modified)\n")
 
-            if end_program:
-                LOG.info("Ending program")
-                return None
 
-    if user_changes:
-        LOG.info("Implementing user fixes")
-        infilled_data = infill_user_inputs(
-            dict((k, utilities.to_dict(dlog_data)[k]) for k in (
-                ["residential", "employment", "mixed"])),
-            config.infill.user_input_path)
-        converted_infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
-        return converted_infilled_data
-    return dlog_data
 
 
 def create_user_changes_audit(

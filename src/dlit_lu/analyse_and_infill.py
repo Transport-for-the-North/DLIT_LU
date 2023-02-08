@@ -77,37 +77,33 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     #TODO streamline user fixes pipeline
     data_to_fix = syntax_fixed_data
 
-    while True:
-        user_fixed_data = user_fixes.implement_user_fixes(
-            config, data_to_fix, auxiliary_data, PLOT_GRAPHS)
 
-        if user_fixed_data is None:
-            return
+    user_fixed_data = user_fixes.implement_user_fixes(
+        config, data_to_fix, auxiliary_data, PLOT_GRAPHS)
 
-        post_user_fix_path = config.output_folder / "02_post_user_fix"
-        post_user_fix_path.mkdir(exist_ok=True)
-        post_user_fix_report_path =post_user_fix_path/ "post_user_fix_data_report.xlsx"
+    #end program if no data is given
+    if user_fixed_data is None:
+        return
 
-        user_fixed_data = analyse.data_report(
-            user_fixed_data,
-            post_user_fix_report_path,
-            post_user_fix_path,
-            auxiliary_data,
-            PLOT_GRAPHS,
-            True,
-        )
-        LOG.info(f"post user fix report outputted to {post_user_fix_report_path}")
+    post_user_fix_path = config.output_folder / "02_post_user_fix"
+    post_user_fix_path.mkdir(exist_ok=True)
+    post_user_fix_report_path =post_user_fix_path/ "post_user_fix_data_report.xlsx"
 
-        continue_analysis = utilities.y_n_user_input("A data report has been outputted"
-            ", please review this. Would you like to continue (or add further changes)? (Y/N)\n")
+    user_fixed_data = analyse.data_report(
+        user_fixed_data,
+        post_user_fix_report_path,
+        post_user_fix_path,
+        auxiliary_data,
+        PLOT_GRAPHS,
+        True,
+    )
+    LOG.info(f"post user fix report outputted to {post_user_fix_report_path}")
 
-        if continue_analysis:
-            user_fixes.create_user_changes_audit(
-                config.output_folder/"user_changes_audit.xlsx", user_fixed_data, syntax_fixed_data)
-            break
-        else:
-            #if user wishes to make more ammendments loop is restarted
-            data_to_fix = user_fixed_data
+
+    user_fixes.create_user_changes_audit(
+        config.output_folder/"user_changes_audit.xlsx", user_fixed_data, syntax_fixed_data)
+
+
 
     # infill invalid data
     infilled_fixed_data = data_repair.infill_data(
