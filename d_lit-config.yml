@@ -1,4 +1,4 @@
-dlog_input_file: Y:\D_I-Log\D-Log21\D-Log21_v8\DLog21_v8_issued_v1.xlsx
+dlog_input_file: C:\Users\UKKXF022\Documents\DLOG\DLog_data\DLog21_v8_issued_v1.xlsx
 combined_sheet_name: "2021 Combined"
 residential_sheet_name: "2021 Residential"
 employment_sheet_name: "2021 Employment"
@@ -11,8 +11,8 @@ employment_column_names_path: inputs\employment_column_names.csv
 mixed_column_names_path: inputs\mixed_column_names.csv
 ignore_columns_path: inputs\drop_columns.csv
 
-output_folder: E:\DLIT_outputs
-user_input_path: E:\DLIT_outputs\user_input.xlsx
+output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
+user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
 
 valid_luc_path: inputs\valid_luc.csv
 out_of_date_luc_path: inputs\out_of_date_luc.csv

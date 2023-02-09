@@ -21,8 +21,6 @@ ValueError
     find_invalid_land_use_codes: no column found
 """
 # standard imports
-from __future__ import annotations
-
 import logging
 from typing import Optional
 import pathlib
@@ -81,252 +79,14 @@ def data_report(
     emp_data = dlog_data.employment_data
     mix_data = dlog_data.mixed_data
     LOG.info("Performing data quality check")
-    # calculates total entries
-    analysis_summary = [
-        {
-            "Residential": len(res_data),
-            "Employment": len(emp_data),
-            "Mixed": len(mix_data),
-        }
-    ]
-
-    analysis_summary_index_labels = ["total_entries"]
-    analysis_summary_notes = [
-        "The total number of entries read from the DLOG data"
-    ]
-    # -------------------find missing site reference ids---------------------------------
-    # add missing ref ids filter - cant use parse_analysis_results since ResultsReport
-    # hasnt been initiated
     data = {
         "residential": res_data,
         "employment": emp_data,
         "mixed": mix_data,
     }
-    missing_ids = find_multiple_missing_values(
-        data,
-        {
-            "residential": ["site_reference_id"],
-            "employment": ["site_reference_id"],
-            "mixed": ["site_reference_id"],
-        },
-        {"residential": [], "employment": [], "mixed": []},
-    )
-    missing_site_ref_filter_name = "missing_site_ref"
-    invalid_data_filter = add_multiple_filter_columns(
-        data, missing_ids, missing_site_ref_filter_name,
-    )
-    analysis_summary.append(
-        {
-            "Residential": len(missing_ids["residential"]),
-            "Employment": len(missing_ids["employment"]),
-            "Mixed": len(missing_ids["mixed"]),
-        }
-    )
-    analysis_summary_index_labels.append("missing_site_reference_id")
-    analysis_summary_notes.append(
-        "Entries where a site reference ID has not been provided"
-    )
-    results_report = global_classes.ResultsReport(
-        invalid_data_filter,
-        analysis_summary,
-        analysis_summary_index_labels,
-        analysis_summary_notes,
-        [missing_site_ref_filter_name],
-    )
-    # --------------------find invalid land use codes---------------------------------
-    results_report = invalid_land_use_report(
-        data, auxiliary_data, results_report,
-    )
-    # -------------- find missing years------------------------
+    # calculates total entries
+    results_report = create_data_report(data, auxiliary_data)
 
-    missing_years_columns = [
-        "start_year_id",
-        "end_year_id",
-    ]
-
-    missing_years = find_multiple_missing_values(
-        data,
-        {
-            "residential": missing_years_columns,
-            "employment": missing_years_columns,
-            "mixed": missing_years_columns,
-        },
-        {
-            "residential": ["unknown", 14],
-            "employment": ["unknown", 14],
-            "mixed": ["unknown", 14],
-        },
-    )
-    results_report = parse_analysis_results(
-        missing_years,
-        results_report,
-        "missing_years",
-        "Entries with start and end years not defined",
-    )
-    # find missing years without a tag-certainty specified
-    missing_years_no_webtag = find_multiple_missing_values(
-        missing_years,
-        {
-            "residential": ["web_tag_certainty_id"],
-            "employment": ["web_tag_certainty_id"],
-            "mixed": ["web_tag_certainty_id"],
-        },
-        {
-            "residential": [0, "-"],
-            "employment": [0, "-"],
-            "mixed": [0, "-"],
-        },
-    )
-    results_report = parse_analysis_results(
-        missing_years_no_webtag,
-        results_report,
-        "missing_years_no_webtag",
-        "Entries with missing years and no WEBTAG certainity status, infilling not possible",
-    )
-    missing_years_with_webtag = {}
-    for key, value in missing_years.items():
-        missing_years_with_webtag[key] = value.drop(
-            index=missing_years_no_webtag[key].index
-        )
-
-    results_report = parse_analysis_results(
-        missing_years_with_webtag,
-        results_report,
-        "missing_years_with_webtag",
-        "Entries with missing years that do have WEBTAG certainity status, infilling possible",
-    )
-    # ---------------------find missing areas--------------------------------------
-
-    missing_area = find_multiple_missing_values(
-        data,
-        {
-            "residential": ["total_site_area_size_hectares"],
-            "employment": ["site_area_ha"],
-            "mixed": ["total_area_ha"],
-        },
-        {
-            "residential": [0, "-"],
-            "employment": [0, "-"],
-            "mixed": [0, "-"],
-        },
-    )
-    results_report = parse_analysis_results(
-        missing_area,
-        results_report,
-        "missing_area",
-        "NON FATAL: Entries where site area have not been provided."
-        " Only becomes critical error if dwellings/floorspace have not been provided.",
-    )
-
-    # ------------------- find missing areas_dwellings------------------------------
-    # missing GFA or dwellings
-    all_missing_d_a = find_multiple_missing_values(
-        data,
-        {
-            "residential": ["total_units",],
-            "employment": ["total_area_sqm"],
-            "mixed": ["floorspace_sqm", "dwellings"],
-        },
-        {
-            "residential": ["-", 0],
-            "employment": ["-", 0],
-            "mixed": ["-", 0],
-        },
-    )
-    # missing GFA or dwellings with no site area - no assumption can be made
-    missing_d_a_no_sa = find_multiple_missing_values(
-        all_missing_d_a,
-        {
-            "residential": ["total_site_area_size_hectares",],
-            "employment": ["site_area_ha"],
-            "mixed": ["total_area_ha"],
-        },
-        {
-            "residential": ["-", 0],
-            "employment": ["-", 0],
-            "mixed": ["-", 0],
-        },
-    )
-    # missing GFA or dwellings with site area provided - assumptions can be made
-    missing_d_a_with_sa = {}
-    missing_d_a_with_sa["residential"] = all_missing_d_a[
-        "residential"
-    ].drop(index=missing_d_a_no_sa["residential"].index)
-    missing_d_a_with_sa["employment"] = all_missing_d_a[
-        "employment"
-    ].drop(index=missing_d_a_no_sa["employment"].index)
-    missing_d_a_with_sa["mixed"] = all_missing_d_a["mixed"].drop(
-        index=missing_d_a_no_sa["mixed"].index
-    )
-
-    results_report = parse_analysis_results(
-        missing_d_a_no_sa,
-        results_report,
-        "missing_gfa_or_dwellings_no_site_area",
-        "Entries where areas (employment/mixed) or dwellings (residential/mixed) are"
-        " not provided or are 0 where no site area is provided. User intervention required.",
-    )
-    results_report = parse_analysis_results(
-        missing_d_a_with_sa,
-        results_report,
-        "missing_gfa_or_dwellings_with_site_area",
-        "Entries where areas (employment/mixed) or dwellings (residential/mixed) are not provided"
-        " or are 0 where site area is provided. Assumptions can be made",
-    )
-
-    # --------------------------find missing coords-----------------------------
-
-    missing_coords_columns = ["easting", "northing"]
-    missing_coords = find_multiple_missing_values(
-        data,
-        {
-            "residential": missing_coords_columns,
-            "employment": missing_coords_columns,
-            "mixed": missing_coords_columns,
-        },
-        {"residential": [], "employment": [], "mixed": []},
-    )
-    results_report = parse_analysis_results(
-        missing_coords,
-        results_report,
-        "missing_coords",
-        "Entries where coordinates have not been provided (easting/northing)",
-    )
-    # --------------------------find missing distribution---------------------------
-    missing_dist = find_multiple_missing_values(
-        data,
-        {
-            "residential": ["res_distribution"],
-            "employment": ["emp_distribution"],
-            "mixed": ["res_distribution", "emp_distribution"],
-        },
-        {"residential": [0], "employment": [0], "mixed": [0]},
-    )
-    results_report = parse_analysis_results(
-        missing_dist,
-        results_report,
-        "missing_dist",
-        "Entries where a distribution (build up profile) has not been provided",
-    )
-    # --------------------------find inactive entries------------------------
-    inactive_entries = find_inactivate_entries(data)
-
-    results_report = parse_analysis_results(
-        inactive_entries,
-        results_report,
-        "inactive_entries",
-        'NON FATAL: entries where active has not been specified as "t"',
-    )
-    # ---------------------------contra constr, planning, tag------------------
-    contra_constr_planning_tag = find_contradictory_tag_const_plan(data)
-
-    results_report = parse_analysis_results(
-        contra_constr_planning_tag,
-        results_report,
-        "contradictory_construction_planning_tag",
-        "NON FATAL: entries with contradictor construction_status,"
-        " planning_status and or web_tag_certainty",
-    )
     # used to calculate the number of entries with user intervention required
     user_intervention_required = [
         "missing_coords",
@@ -358,172 +118,11 @@ def data_report(
     )
 
     # process data summary
-    analysis_summary = results_report.analysis_summary
-    analysis_summary_index_labels = (
-        results_report.analysis_summary_index_labels
-    )
-    analysis_summary_notes = results_report.analysis_summary_notes
+    summary = produce_data_report_summary(results_report, classified_data)
 
-    analysis_summary.append(
-        {
-            "Residential": len(
-                classified_data["non_fatal"]["residential"]
-            ),
-            "Employment": len(
-                classified_data["non_fatal"]["employment"]
-            ),
-            "Mixed": len(classified_data["non_fatal"]["mixed"]),
-        }
-    )
-    analysis_summary_index_labels.append("total_contradictory_entries")
-    analysis_summary_notes.append(
-        "total number of entries with non-fatal values,"
-        " these entries do not require modification to be included"
-    )
-
-    analysis_summary.append(
-        {
-            "Residential": len(
-                classified_data["auto_fixes"]["residential"]
-            ),
-            "Employment": len(
-                classified_data["auto_fixes"]["employment"]
-            ),
-            "Mixed": len(classified_data["auto_fixes"]["mixed"]),
-        }
-    )
-    analysis_summary_index_labels.append(
-        "total_fixable_invalid_entries"
-    )
-    analysis_summary_notes.append(
-        "total number of entries with invalid values that can"
-        " be fixed automatically. Either syntax errors or recoverable from assumptions"
-    )
-
-    analysis_summary.append(
-        {
-            "Residential": len(
-                classified_data["intervention_required"]["residential"]
-            ),
-            "Employment": len(
-                classified_data["intervention_required"]["employment"]
-            ),
-            "Mixed": len(
-                classified_data["intervention_required"]["mixed"]
-            ),
-        }
-    )
-    analysis_summary_index_labels.append(
-        "total_invalid_entries_user_input_required"
-    )
-    analysis_summary_notes.append(
-        "total number of entries with invalid values that require user"
-        " intervention, E.G. missing critical values"
-    )
-
-    analysis_summary.append(
-        {
-            "Residential": len(classified_data["valid"]["residential"]),
-            "Employment": len(classified_data["valid"]["employment"]),
-            "Mixed": len(classified_data["valid"]["mixed"]),
-        }
-    )
-    analysis_summary_index_labels.append("total_valid_entries")
-    analysis_summary_notes.append(
-        "total number of complete and valid entries"
-    )
-
-    summary = pd.DataFrame(
-        analysis_summary, index=analysis_summary_index_labels
-    )
-    summary["Total"] = summary.sum(axis=1)
-    summary["Notes"] = analysis_summary_notes
     # plot results
     if plot_maps:
-        split_data = {
-            "R invalid": gpd.GeoDataFrame(
-                classified_data["invalid"]["residential"],
-                geometry=gpd.points_from_xy(
-                    classified_data["invalid"]["residential"][
-                        "easting"
-                    ],
-                    classified_data["invalid"]["residential"][
-                        "northing"
-                    ],
-                    crs=27700,
-                ),
-            ),
-            "R No invalid": gpd.GeoDataFrame(
-                classified_data["valid"]["residential"],
-                geometry=gpd.points_from_xy(
-                    classified_data["valid"]["residential"]["easting"],
-                    classified_data["valid"]["residential"]["northing"],
-                    crs=27700,
-                ),
-            ),
-            "E invalid": gpd.GeoDataFrame(
-                classified_data["invalid"]["employment"],
-                geometry=gpd.points_from_xy(
-                    classified_data["invalid"]["employment"]["easting"],
-                    classified_data["invalid"]["employment"][
-                        "northing"
-                    ],
-                    crs=27700,
-                ),
-            ),
-            "E No invalid": gpd.GeoDataFrame(
-                classified_data["valid"]["employment"],
-                geometry=gpd.points_from_xy(
-                    classified_data["valid"]["employment"]["easting"],
-                    classified_data["valid"]["employment"]["northing"],
-                    crs=27700,
-                ),
-            ),
-            "M invalid": gpd.GeoDataFrame(
-                classified_data["invalid"]["mixed"],
-                geometry=gpd.points_from_xy(
-                    classified_data["invalid"]["mixed"]["easting"],
-                    classified_data["invalid"]["mixed"]["northing"],
-                    crs=27700,
-                ),
-            ),
-            "M No invalid": gpd.GeoDataFrame(
-                classified_data["valid"]["mixed"],
-                geometry=gpd.points_from_xy(
-                    classified_data["valid"]["mixed"]["easting"],
-                    classified_data["valid"]["mixed"]["northing"],
-                    crs=27700,
-                ),
-            ),
-        }
-        # visualisation parameters
-        plot_colours = {
-            "R invalid": "red",
-            "R No invalid": "black",
-            "E invalid": "red",
-            "E No invalid": "black",
-            "M invalid": "red",
-            "M No invalid": "black",
-        }
-        plot_markers = {
-            "R invalid": "*",
-            "R No invalid": "*",
-            "E invalid": "^",
-            "E No invalid": "^",
-            "M invalid": "o",
-            "M No invalid": "o",
-        }
-        plot_limits = {"x": [280000, 550000], "y": [325000, 670000]}
-        LOG.info("Plotting results")
-        plot_data(
-            split_data,
-            plot_colours,
-            plot_markers,
-            auxiliary_data.regions.to_crs("27700"),
-            plot_limits,
-            False,
-            output_folder_path,
-        )
+        plot_results(classified_data, auxiliary_data, output_folder_path)
     # output data report
     if write_report:
         utilities.write_to_excel(
@@ -545,12 +144,474 @@ def data_report(
         dlog_data.lookup,
     )
 
+def plot_results(classified_data:dict[str, dict[str, pd.DataFrame]], auxiliary_data: global_classes.AuxiliaryData, output_folder_path: pathlib.Path)->None:
+    split_data = {
+        "R invalid": gpd.GeoDataFrame(
+            classified_data["invalid"]["residential"],
+            geometry=gpd.points_from_xy(
+                classified_data["invalid"]["residential"][
+                    "easting"
+                ],
+                classified_data["invalid"]["residential"][
+                    "northing"
+                ],
+                crs=27700,
+            ),
+        ),
+        "R No invalid": gpd.GeoDataFrame(
+            classified_data["valid"]["residential"],
+            geometry=gpd.points_from_xy(
+                classified_data["valid"]["residential"]["easting"],
+                classified_data["valid"]["residential"]["northing"],
+                crs=27700,
+            ),
+        ),
+        "E invalid": gpd.GeoDataFrame(
+            classified_data["invalid"]["employment"],
+            geometry=gpd.points_from_xy(
+                classified_data["invalid"]["employment"]["easting"],
+                classified_data["invalid"]["employment"][
+                    "northing"
+                ],
+                crs=27700,
+            ),
+        ),
+        "E No invalid": gpd.GeoDataFrame(
+            classified_data["valid"]["employment"],
+            geometry=gpd.points_from_xy(
+                classified_data["valid"]["employment"]["easting"],
+                classified_data["valid"]["employment"]["northing"],
+                crs=27700,
+            ),
+        ),
+        "M invalid": gpd.GeoDataFrame(
+            classified_data["invalid"]["mixed"],
+            geometry=gpd.points_from_xy(
+                classified_data["invalid"]["mixed"]["easting"],
+                classified_data["invalid"]["mixed"]["northing"],
+                crs=27700,
+            ),
+        ),
+        "M No invalid": gpd.GeoDataFrame(
+            classified_data["valid"]["mixed"],
+            geometry=gpd.points_from_xy(
+                classified_data["valid"]["mixed"]["easting"],
+                classified_data["valid"]["mixed"]["northing"],
+                crs=27700,
+            ),
+        ),
+    }
+    # visualisation parameters
+    plot_colours = {
+        "R invalid": "red",
+        "R No invalid": "black",
+        "E invalid": "red",
+        "E No invalid": "black",
+        "M invalid": "red",
+        "M No invalid": "black",
+    }
+    plot_markers = {
+        "R invalid": "*",
+        "R No invalid": "*",
+        "E invalid": "^",
+        "E No invalid": "^",
+        "M invalid": "o",
+        "M No invalid": "o",
+    }
+    plot_limits = {"x": [280000, 550000], "y": [325000, 670000]}
+    LOG.info("Plotting results")
+    plot_data(
+        split_data,
+        plot_colours,
+        plot_markers,
+        auxiliary_data.regions.to_crs("27700"),
+        plot_limits,
+        False,
+        output_folder_path,
+    )
+
+def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_classes.AuxiliaryData)->global_classes.ResultsReport:
+    results_report = global_classes.ResultsReport(data, [], ["total_entries"], ["The total number of entries read from the DLOG data"])
+    # -------------------find missing site reference ids---------------------------------
+    # add missing ref ids filter - cant use parse_analysis_results since ResultsReport
+    # hasnt been initiated
+    
+    missing_ids = find_multiple_missing_values(
+        data,
+        {
+            "residential": ["site_reference_id"],
+            "employment": ["site_reference_id"],
+            "mixed": ["site_reference_id"],
+        },
+        {"residential": [], "employment": [], "mixed": []},
+    )
+    results_report.append_analysis_results(
+        missing_ids,
+        "missing_site_ref",
+        "Entries where a site reference ID has not been provided",
+    )
+    # --------------------find invalid land use codes---------------------------------
+    results_report = invalid_land_use_report(
+        data, auxiliary_data, results_report,
+    )
+    # -------------- find missing years------------------------
+
+    missing_years_columns = [
+        "start_year_id",
+        "end_year_id",
+    ]
+
+    missing_years = find_multiple_missing_values(
+        data,
+        {
+            "residential": missing_years_columns,
+            "employment": missing_years_columns,
+            "mixed": missing_years_columns,
+        },
+        {
+            "residential": ["unknown", 14],
+            "employment": ["unknown", 14],
+            "mixed": ["unknown", 14],
+        },
+    )
+    results_report.append_analysis_results(
+        missing_years,
+        "missing_years",
+        "Entries with start and end years not defined",
+    )
+    # find missing years without a tag-certainty specified
+    missing_years_no_webtag = find_multiple_missing_values(
+        missing_years,
+        {
+            "residential": ["web_tag_certainty_id"],
+            "employment": ["web_tag_certainty_id"],
+            "mixed": ["web_tag_certainty_id"],
+        },
+        {
+            "residential": [0, "-"],
+            "employment": [0, "-"],
+            "mixed": [0, "-"],
+        },
+    )
+    results_report.append_analysis_results(
+        missing_years_no_webtag,
+        "missing_years_no_webtag",
+        "Entries with missing years and no WEBTAG certainity status, infilling not possible",
+    )
+    missing_years_with_webtag = {}
+    for key, value in missing_years.items():
+        missing_years_with_webtag[key] = value.drop(
+            index=missing_years_no_webtag[key].index
+        )
+
+    results_report.append_analysis_results(
+        missing_years_with_webtag,
+        "missing_years_with_webtag",
+        "Entries with missing years that do have WEBTAG certainity status, infilling possible",
+    )
+    # ---------------------find missing areas--------------------------------------
+
+    missing_area = find_multiple_missing_values(
+        data,
+        {
+            "residential": ["total_site_area_size_hectares"],
+            "employment": ["site_area_ha"],
+            "mixed": ["total_area_ha"],
+        },
+        {
+            "residential": [0, "-"],
+            "employment": [0, "-"],
+            "mixed": [0, "-"],
+        },
+    )
+    results_report.append_analysis_results(
+        missing_area,
+        "missing_area",
+        "NON FATAL: Entries where site area have not been provided."
+        " Only becomes critical error if dwellings/floorspace have not been provided.",
+    )
+
+    # ------------------- find missing areas_dwellings------------------------------
+    # missing GFA or dwellings
+    all_missing_d_a = find_multiple_missing_values(
+        data,
+        {
+            "residential": ["total_units", ],
+            "employment": ["total_area_sqm"],
+            "mixed": ["floorspace_sqm", "dwellings"],
+        },
+        {
+            "residential": ["-", 0],
+            "employment": ["-", 0],
+            "mixed": ["-", 0],
+        },
+    )
+    # missing GFA or dwellings with no site area - no assumption can be made
+    missing_d_a_no_sa = find_multiple_missing_values(
+        all_missing_d_a,
+        {
+            "residential": ["total_site_area_size_hectares", ],
+            "employment": ["site_area_ha"],
+            "mixed": ["total_area_ha"],
+        },
+        {
+            "residential": ["-", 0],
+            "employment": ["-", 0],
+            "mixed": ["-", 0],
+        },
+    )
+    # missing GFA or dwellings with site area provided - assumptions can be made
+    missing_d_a_with_sa = {}
+    missing_d_a_with_sa["residential"] = all_missing_d_a[
+        "residential"
+    ].drop(index=missing_d_a_no_sa["residential"].index)
+    missing_d_a_with_sa["employment"] = all_missing_d_a[
+        "employment"
+    ].drop(index=missing_d_a_no_sa["employment"].index)
+    missing_d_a_with_sa["mixed"] = all_missing_d_a["mixed"].drop(
+        index=missing_d_a_no_sa["mixed"].index
+    )
+
+    results_report.append_analysis_results(
+        missing_d_a_no_sa,
+        "missing_gfa_or_dwellings_no_site_area",
+        "Entries where areas (employment/mixed) or dwellings (residential/mixed) are"
+        " not provided or are 0 where no site area is provided. User intervention required.",
+    )
+    results_report.append_analysis_results(
+        missing_d_a_with_sa,
+        "missing_gfa_or_dwellings_with_site_area",
+        "Entries where areas (employment/mixed) or dwellings (residential/mixed) are not provided"
+        " or are 0 where site area is provided. Assumptions can be made",
+    )
+
+    # --------------------------find missing coords-----------------------------
+
+    missing_coords_columns = ["easting", "northing"]
+    missing_coords = find_multiple_missing_values(
+        data,
+        {
+            "residential": missing_coords_columns,
+            "employment": missing_coords_columns,
+            "mixed": missing_coords_columns,
+        },
+        {"residential": [], "employment": [], "mixed": []},
+    )
+    results_report.append_analysis_results(
+        missing_coords,
+        "missing_coords",
+        "Entries where coordinates have not been provided (easting/northing)",
+    )
+    # --------------------------find missing distribution---------------------------
+    missing_dist = find_multiple_missing_values(
+        data,
+        {
+            "residential": ["res_distribution"],
+            "employment": ["emp_distribution"],
+            "mixed": ["res_distribution", "emp_distribution"],
+        },
+        {"residential": [0], "employment": [0], "mixed": [0]},
+    )
+    results_report.append_analysis_results(
+        missing_dist,
+        "missing_dist",
+        "Entries where a distribution (build up profile) has not been provided",
+    )
+    # --------------------------find inactive entries------------------------
+    inactive_entries = find_inactivate_entries(data)
+
+    results_report.append_analysis_results(
+        inactive_entries,
+        "inactive_entries",
+        'NON FATAL: entries where active has not been specified as "t"',
+    )
+    # ---------------------------contra constr, planning, tag------------------
+    contra_constr_planning_tag = find_contradictory_tag_const_plan(data)
+
+    results_report.append_analysis_results(
+        contra_constr_planning_tag,
+        "contradictory_construction_planning_tag",
+        "NON FATAL: entries with contradictor construction_status,"
+        " planning_status and or web_tag_certainty",
+    )
+    return results_report
+
+def produce_data_report_summary(results_report: global_classes.ResultsReport, classified_data: dict[str, pd.DataFrame])->pd.DataFrame:
+
+    results_report.analysis_summary.append(
+        {
+            "Residential": len(
+                classified_data["non_fatal"]["residential"]
+            ),
+            "Employment": len(
+                classified_data["non_fatal"]["employment"]
+            ),
+            "Mixed": len(classified_data["non_fatal"]["mixed"]),
+        }
+    )
+    results_report.analysis_summary_index_labels.append("total_contradictory_entries")
+    results_report.analysis_summary_notes.append(
+        "total number of entries with non-fatal values,"
+        " these entries do not require modification to be included"
+    )
+
+    results_report.analysis_summary.append(
+        {
+            "Residential": len(
+                classified_data["auto_fixes"]["residential"]
+            ),
+            "Employment": len(
+                classified_data["auto_fixes"]["employment"]
+            ),
+            "Mixed": len(classified_data["auto_fixes"]["mixed"]),
+        }
+    )
+    results_report.analysis_summary_index_labels.append(
+        "total_fixable_invalid_entries"
+    )
+    results_report.analysis_summary_notes.append(
+        "total number of entries with invalid values that can"
+        " be fixed automatically. Either syntax errors or recoverable from assumptions"
+    )
+
+    results_report.analysis_summary.append(
+        {
+            "Residential": len(
+                classified_data["intervention_required"]["residential"]
+            ),
+            "Employment": len(
+                classified_data["intervention_required"]["employment"]
+            ),
+            "Mixed": len(
+                classified_data["intervention_required"]["mixed"]
+            ),
+        }
+    )
+    results_report.analysis_summary_index_labels.append(
+        "total_invalid_entries_user_input_required"
+    )
+    results_report.analysis_summary_notes.append(
+        "total number of entries with invalid values that require user"
+        " intervention, E.G. missing critical values"
+    )
+
+    results_report.analysis_summary.append(
+        {
+            "Residential": len(classified_data["valid"]["residential"]),
+            "Employment": len(classified_data["valid"]["employment"]),
+            "Mixed": len(classified_data["valid"]["mixed"]),
+        }
+    )
+    results_report.analysis_summary_index_labels.append("total_valid_entries")
+    results_report.analysis_summary_notes.append(
+        "total number of complete and valid entries"
+    )
+
+    summary = pd.DataFrame(
+        results_report.analysis_summary, index=results_report.analysis_summary_index_labels
+    )
+    summary["Total"] = summary.sum(axis=1)
+    summary["Notes"] = results_report.analysis_summary_notes
+
+    return summary
+
+def luc_ratio(
+    data: dict[str, pd.DataFrame],
+    auxiliary_data: global_classes.AuxiliaryData,
+    column: str = "proposed_land_use",
+) -> pd.DataFrame:
+    """calculates the average floorspace taken by each  luc
+
+    assumes the floorspace is evenly distributed between the
+    luc defined in each entry
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to be analysed
+    auxiliary_data : global_classes.AuxiliaryData
+        auxiliary data read in from parser
+    columns : list[str], optional
+        columns to analyse, by default ["proposed_land_use"]
+
+    Returns
+    -------
+    pd.DataFrame
+        the total count, total floorspace and average floorspace for
+        each luc
+    """
+    land_use_codes = auxiliary_data.allowed_codes
+    land_use_codes_count = land_use_codes.copy()
+    land_use_codes_count["count"] = 0
+    land_use_codes_count["total_floorspace"] = 0
+    for code in land_use_codes["land_use_codes"]:
+        for key, value in data.items():
+            # do not use residential since they do not contain floorspace
+            if key == "residential":
+                continue
+
+            code_in_entry = find_lucs(value, column, code)
+
+            if code_in_entry is None:
+                continue
+
+            have_floorspace = pd.DataFrame([code_in_entry[
+                "missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
+                code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(
+                    drop=True)]).transpose()
+            have_floorspace.index = code_in_entry.index
+            have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
+
+            have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
+                "units_(floorspace)"] / have_floorspace[column].apply(lambda x: len(x))
+
+            total_floorspace = have_floorspace["units_(floorspace)"].sum()
+
+            land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"
+                ] = land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                    ] == code, "count"] + len(have_floorspace)
+
+            land_use_codes_count.loc[land_use_codes_count["land_use_codes"
+                ] == code, "total_floorspace"] = land_use_codes_count.loc[land_use_codes_count[
+                    "land_use_codes"] == code, "total_floorspace"] + total_floorspace
+
+    land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / \
+        land_use_codes_count["count"]
+    return land_use_codes_count
+
+
+def find_lucs(data: pd.DataFrame, column: str, code: str) -> Optional[pd.DataFrame]:
+    """returns all entries with a given land use code
+
+    if no entrues have the land use code, None is returned
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        data to be filtered
+    column : str
+        column to be filtered
+    code : str
+        code to filter by
+
+    Returns
+    -------
+    Optional[pd.DataFrame]
+        filtered data, if no entries are found returns None
+    """
+    exploded_luc = data[column].explode()
+    matching_lucs = exploded_luc[exploded_luc == code]
+    if len(matching_lucs) == 0:
+        return None
+    matching_data = data.loc[matching_lucs.index, :]
+    return matching_data
+
 
 def classify_data(
     results_report: global_classes.ResultsReport,
     auto_fix_columns: list[str],
     intervention_required_columns: list[str],
-    non_fatal_columns: list[str] = [],
+    non_fatal_columns: list[str],
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """seperates data into invalid, valid, fixable, intervention required and contradictory
 
@@ -678,7 +739,7 @@ def contradictory_webtag_planning_status(
 def invalid_land_use_report(
     data: dict[str, pd.DataFrame],
     auxiliary_data: global_classes.AuxiliaryData,
-    input_results_report: global_classes.ResultsReport,
+    results_report: global_classes.ResultsReport,
 ) -> global_classes.ResultsReport:
     """determines issues with land use codes
 
@@ -738,18 +799,16 @@ def invalid_land_use_report(
     )
 
     # parse invalid land use code results
-    results_report = parse_analysis_results(
-        {
+    results_report.append_analysis_results({
             "residential": res_invalid_e_land_use,
             "employment": emp_invalid_e_land_use,
             "mixed": mix_invalid_e_land_use,
         },
-        input_results_report,
         "all_invalid_existing_land_use_code",
         "Entries which contain existing land use code(s) that is not"
         " in the land use code table in lookup",
     )
-    results_report = parse_analysis_results(
+    results_report.append_analysis_results(
         {
             "residential": pd.DataFrame(
                 columns=res_data.columns
@@ -757,7 +816,6 @@ def invalid_land_use_report(
             "employment": emp_invalid_p_land_use,
             "mixed": mix_invalid_p_land_use,
         },
-        results_report,
         "all_invalid_proposed_land_use_code",
         "Entries which contain proposed land use code(s) that is not in the land"
         " use code table in lookup (residential proposed land use code ignored)",
@@ -815,73 +873,58 @@ def invalid_land_use_report(
     )
     # TODO put this in for loop
     # ------------------------parse eluc-------------------
-    results_report = parse_luc_analysis(
-        eluc_analysis,
-        results_report,
-        "wrong_format",
+    results_report.append_analysis_results(
+        eluc_analysis["wrong_format"],
         "wrong_format_existing_land_use_code",
         "Entries which contain existing land use code with incorrect syntax e.g."
         " Egi instead of E(g)(i) *codes are case insensitive*",
     )
 
-    results_report = parse_luc_analysis(
-        eluc_analysis,
-        results_report,
-        "out_of_date",
+    results_report.append_analysis_results(
+        eluc_analysis["out_of_date"],
         "out_of_date_existing_land_use_code",
         "Entries which contain existing land use code which have been revoked/replaced, eg. B1(a)",
     )
 
-    results_report = parse_luc_analysis(
-        eluc_analysis,
-        results_report,
-        "incomplete",
+    results_report.append_analysis_results(
+        eluc_analysis["incomplete"],
         "incomplete_existing_land_use_code",
         "Entries which contain existing land use code which are incomplete"
         " e.g. E(g) instead of E(g)(i)",
     )
 
-    results_report = parse_luc_analysis(
-        eluc_analysis,
-        results_report,
-        "other_issues",
+    results_report.append_analysis_results(
+        eluc_analysis["other_issues"],
         "other_issues_existing_land_use_code",
         "Entries which have a invalid existing land use code not defined above,"
         " These will require infilling",
     )
     # ------------------------------parse pluc-----------------------
-    results_report = parse_luc_analysis(
-        pluc_analysis,
-        results_report,
-        "wrong_format",
+    results_report.append_analysis_results(
+        pluc_analysis["wrong_format"],
         "wrong_format_proposed_land_use_code",
         "Entries which contain proposed land use code with incorrect syntax e.g."
         " Egi instead of E(g)(i) *codes are case insensitive*",
     )
 
-    results_report = parse_luc_analysis(
-        pluc_analysis,
-        results_report,
-        "out_of_date",
+    results_report.append_analysis_results(
+        pluc_analysis["out_of_date"],
         "out_of_date_proposed_land_use_code",
         "Entries which contain proposed land use code which have been revoked/replaced, eg. B1(a)",
     )
-    results_report = parse_luc_analysis(
-        pluc_analysis,
-        results_report,
-        "incomplete",
+    results_report.append_analysis_results(
+        pluc_analysis["incomplete"],
         "incomplete_proposed_land_use_code",
         "Entries which contain proposed land use code which are incomplete"
         " e.g. E(g) instead of E(g)(i)",
     )
-    results_report = parse_luc_analysis(
-        pluc_analysis,
-        results_report,
-        "other_issues",
+    results_report.append_analysis_results(
+        pluc_analysis["other_issues"],
         "other_issues_proposed_land_use_code",
         "Entries which have a invalid proposed land use code not defined"
         " above, These will require infilling",
     )
+
     return results_report
 
 
@@ -1341,6 +1384,7 @@ def geo_explorer(
         explorer = base.explore()
 
     if choropleth is not None:
+        # TODO more robust CRS conversion
         choropleth = choropleth.to_crs(epsg=4326)
         if column is None:
             raise ValueError(
@@ -1366,6 +1410,7 @@ def geo_explorer(
                 temp = value[
                     ["site_reference_id", "geometry"]
                 ].set_geometry("geometry")
+                # TODO more robust CRS conversion
                 temp = temp.to_crs(epsg=4326)
                 explorer = temp.explore(
                     name=key, color=colour[key], legend=True, show=False
@@ -1391,7 +1436,7 @@ def geo_explorer(
         LOG.warning(f"you have not given any data to explore {title}")
     else:
         folium.LayerControl().add_to(explorer)
-        explorer.save(path / f"{title}.html")
+        explorer.save(path / f"{title}.html", default=str)
 
 
 def spatial_invalid_ratio(
