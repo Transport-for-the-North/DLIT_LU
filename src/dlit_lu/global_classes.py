@@ -102,7 +102,7 @@ class AuxiliaryData(NamedTuple):
     incomplete_luc: pd.DataFrame
     regions: gpd.GeoDataFrame
 
-class ResultsReport(NamedTuple):
+class ResultsReport:
     """stores the results report
 
     Parameters
@@ -123,3 +123,176 @@ class ResultsReport(NamedTuple):
     analysis_summary_index_labels: list[str]
     analysis_summary_notes: list[str]
     filter_columns:list[str]
+
+    def __init__(
+        self,
+        data_filter: dict[str, pd.DataFrame], 
+        column_name: list[str],
+        index_name: list[str],
+        notes: list[str],
+    ) -> None:
+        """adds a new filter column to the data report
+
+        also updates the summary pages
+
+        Parameters
+        ----------
+        results : dict[str, pd.DataFrame]
+            filtered data set with invalid entries
+        results_report : global_classes.ResultsReport
+            report to append filter column to
+        key_name : str
+            name of the key of the luc analysis results to parse
+        column_name : str
+            new filter column name
+        notes : str
+            new filter column notes
+
+        Returns
+        -------
+        global_classes.ResultsReport
+            updated report
+        """
+
+        self.data_filter = data_filter
+
+        self.analysis_summary = [
+            {
+                "Residential": len(data_filter["residential"]),
+                "Employment": len(data_filter["employment"]),
+                "Mixed": len(data_filter["mixed"]),
+            }
+        ]
+
+        self.analysis_summary_index_labels = index_name
+        
+        self.analysis_summary_notes = notes
+        self.filter_columns = column_name
+
+    
+
+    def append_analysis_results(
+        self, 
+        results: dict[str, pd.DataFrame],
+        column_name: str,
+        notes: str,
+    ) -> None:
+        """adds a new filter column to the data report
+
+        also updates the summary pages
+
+        Parameters
+        ----------
+        results : dict[str, pd.DataFrame]
+            filtered data set with invalid entries
+        results_report : global_classes.ResultsReport
+            report to append filter column to
+        key_name : str
+            name of the key of the luc analysis results to parse
+        column_name : str
+            new filter column name
+        notes : str
+            new filter column notes
+
+        Returns
+        -------
+        global_classes.ResultsReport
+            updated report
+        """
+        for key, value in results.items():
+            self.data_filter[key][column_name] = False
+            self.data_filter[key].loc[
+                value.index, column_name
+            ] = True
+
+        self.analysis_summary = self.analysis_summary + [
+            {
+                "Residential": len(results["residential"]),
+                "Employment": len(results["employment"]),
+                "Mixed": len(results["mixed"]),
+            }
+        ]
+
+        self.analysis_summary_index_labels = (
+            self.analysis_summary_index_labels + [column_name]
+        )
+        self.analysis_summary_notes = self.analysis_summary_notes + [
+            notes
+        ]
+        self.filter_columns = self.filter_columns + [column_name]
+
+class ResultsReport_(NamedTuple):
+    """stores the results report
+
+    Parameters
+    ----------
+    data_filter: dict[str, pd.DataFrame]
+        data with the filter column added
+    analysis_summary: list[dict[str, int]]
+        the number of invalid values in each filter column
+    analysis_summary_index_labels: list[str]
+        labels each of the indexs in the summary
+    analysis_summary_notes: list[str]
+        notes for each of the filter column displayed in the summary sheet
+    filter_columns:list[str]
+        list of the filter column names
+    """
+    data_filter: dict[str, pd.DataFrame]
+    analysis_summary: list[dict[str, int]]
+    analysis_summary_index_labels: list[str]
+    analysis_summary_notes: list[str]
+    filter_columns:list[str]
+
+    
+
+    def append_analysis_results(
+        self, 
+        results: dict[str, pd.DataFrame],
+        column_name: str,
+        notes: str,
+    ) -> None:
+        """adds a new filter column to the data report
+
+        also updates the summary pages
+
+        Parameters
+        ----------
+        results : dict[str, pd.DataFrame]
+            filtered data set with invalid entries
+        results_report : global_classes.ResultsReport
+            report to append filter column to
+        key_name : str
+            name of the key of the luc analysis results to parse
+        column_name : str
+            new filter column name
+        notes : str
+            new filter column notes
+
+        Returns
+        -------
+        global_classes.ResultsReport
+            updated report
+        """
+        for key, value in results.items():
+            self.data_filter[key][column_name] = False
+            self.data_filter[key].loc[
+                value.index, column_name
+            ] = True
+
+        self.analysis_summary = self.analysis_summary + [
+            {
+                "Residential": len(results["residential"]),
+                "Employment": len(results["employment"]),
+                "Mixed": len(results["mixed"]),
+            }
+        ]
+
+        self.analysis_summary_index_labels = (
+            self.analysis_summary_index_labels + [column_name]
+        )
+        self.analysis_summary_notes = self.analysis_summary_notes + [
+            notes
+        ]
+        self.filter_columns = self.filter_columns + [column_name]
+
+    

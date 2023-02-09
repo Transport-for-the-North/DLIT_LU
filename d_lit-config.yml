@@ -18,17 +18,17 @@ infill:
   employment_sheet_name: "2021 Employment"
   mixed_sheet_name: "2021 Mixed"
   #--Read file paths 
-  dlog_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\DLog_column_names.csv
-  combined_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\combined_column_names.csv
-  residential_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\residential_column_names.csv
-  employment_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\employment_column_names.csv
-  mixed_column_names_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\mixed_column_names.csv
-  ignore_columns_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\drop_columns.csv
-  valid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\valid_luc.csv
-  out_of_date_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\out_of_date_luc.csv
-  incomplete_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\incomplete_luc.csv
-  known_invalid_luc_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\known_invalid_luc.csv
-  regions_shapefiles_path: C:\Users\UKKXF022\Documents\DLOG\dlit_lu\inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
+  dlog_column_names_path: inputs\DLog_column_names.csv
+  combined_column_names_path: inputs\combined_column_names.csv
+  residential_column_names_path: inputs\residential_column_names.csv
+  employment_column_names_path: inputs\employment_column_names.csv
+  mixed_column_names_path: inputs\mixed_column_names.csv
+  ignore_columns_path: inputs\drop_columns.csv
+  valid_luc_path: inputs\valid_luc.csv
+  out_of_date_luc_path: inputs\out_of_date_luc.csv
+  incomplete_luc_path: inputs\incomplete_luc.csv
+  known_invalid_luc_path: inputs\known_invalid_luc.csv
+  regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths  
   user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
 
@@ -38,8 +38,8 @@ land_use:
   msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\gb_msoa_agg_prt_2018_hh_pop.csv
   msoa_traveller_type_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_pop.csv
   msoa_jobs_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_emp.csv
-  employment_density_matrix_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\emp_density_matrix.csv
-  luc_sic_conversion_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\luc_sic_conversion.csv
+  employment_density_matrix_path: inputs\emp_density_matrix.csv
+  luc_sic_conversion_path: inputs\luc_sic_conversion.csv
 
 
 

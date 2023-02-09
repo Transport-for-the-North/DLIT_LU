@@ -1,11 +1,12 @@
 # Required libraries
-geopandas >= 0.12.2
-strictyaml >= 1.6.2
-matplotlib >= 3.6.2
-pandas >= 1.5.2
-numpy >= 1.23.5
-pydantic >= 1.10.2
-openpyxl >= 3.0.10
-tqdm >= 4.64.1
-jinja2 >= 3.1.2
+geopandas>=0.12.2
+strictyaml
+matplotlib>=3.6.2
+pandas>=1.5.2
+numpy>=1.23.5
+pydantic>=1.10.2
+openpyxl>=3.0.10
+tqdm>=4.64.1
+jinja2>=
 folium
+seaborn>=0.11.2

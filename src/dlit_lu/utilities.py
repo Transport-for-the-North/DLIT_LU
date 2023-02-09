@@ -67,7 +67,6 @@ class DLitLog:
         fh.setFormatter(form)
         self.logger.addHandler(fh)
 
-        self.init_message(logging.DEBUG)
         if not exists:
             self.logger.info("Created log file: %s", file)
         else:
