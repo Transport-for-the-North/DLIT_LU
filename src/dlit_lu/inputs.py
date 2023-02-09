@@ -191,6 +191,8 @@ class LandUseConfig:
         path to msoa dwelling population file 
     msoa_traveller_type_path: pathlib.Path
         path to msoa split of traveller type
+    msoa_jobs_path: pathlib.Path
+        path to msoa split of jobs
     employment_density_matrix_path: pathlib.Path
         path to employment density matrix
     luc_sic_conversion_path: pathlib.Path
@@ -200,6 +202,7 @@ class LandUseConfig:
     msoa_shapefile_path: pathlib.Path
     msoa_dwelling_pop_path: pathlib.Path
     msoa_traveller_type_path: pathlib.Path
+    msoa_jobs_path: pathlib.Path
     employment_density_matrix_path: pathlib.Path
     luc_sic_conversion_path: pathlib.Path
 
@@ -220,6 +223,7 @@ class LandUseConfig:
             self.msoa_shapefile_path,
             self.msoa_dwelling_pop_path,
             self.msoa_traveller_type_path,
+            self.msoa_jobs_path,
             self.employment_density_matrix_path,
             self.luc_sic_conversion_path,
         ]

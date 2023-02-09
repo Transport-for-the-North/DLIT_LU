@@ -1,5 +1,5 @@
 #Set Up Parameters
-run_infill: True
+run_infill: False
 run_land_use: True 
 
 #Mandatory Parameters
@@ -37,6 +37,7 @@ land_use:
   msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
   msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\gb_msoa_agg_prt_2018_hh_pop.csv
   msoa_traveller_type_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_pop.csv
+  msoa_jobs_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_emp.csv
   employment_density_matrix_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\emp_density_matrix.csv
   luc_sic_conversion_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_LU\inputs\luc_sic_conversion.csv
 
