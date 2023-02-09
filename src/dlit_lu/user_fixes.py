@@ -19,7 +19,10 @@ from dlit_lu import global_classes, utilities, parser, analyse, inputs
 LOG = logging.getLogger(__name__)
 
 
-def user_input_file_builder(path: pathlib.Path, input_data: global_classes.DLogData) -> None:
+def user_input_file_builder(
+    path: pathlib.Path,
+    input_data: global_classes.DLogData,
+    do_not_include_col: dict[str, list[str]]) -> None:
     """builds file for user to edit
 
     file can then be read and edits integrated into data
@@ -32,7 +35,10 @@ def user_input_file_builder(path: pathlib.Path, input_data: global_classes.DLogD
         data to save
     """
     data = utilities.to_dict(input_data)
-    utilities.write_to_excel(path, data)
+    output_data = {}
+    for key, value in data.items():
+        output_data[key] = value.drop(columns=do_not_include_col[key])
+    utilities.write_to_excel(path, output_data)
 
 
 def infill_user_inputs(
@@ -117,6 +123,7 @@ def implement_user_fixes(
     config: inputs.DLitConfig,
     dlog_data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
+    do_not_edit_cols:dict[str, list[str]],
     plot_graphs: bool,
 ) -> Optional[global_classes.DLogData]:
     """intergrates user fixes into data
@@ -174,7 +181,7 @@ def implement_user_fixes(
         LOG.info(f"Creating file for user {config.infill.user_input_path} to edit.")
 
         user_input_file_builder(
-            config.infill.user_input_path, dlog_data)
+            config.infill.user_input_path, dlog_data, do_not_edit_cols)
         LOG.info("Edit file with required changes and rerun the program. Do not change"
             f"the name or location of {config.infill.user_input_path}.")
         #end program 

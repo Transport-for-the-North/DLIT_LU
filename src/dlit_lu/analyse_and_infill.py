@@ -34,6 +34,14 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         config.infill.incomplete_luc_path,
         config.infill.regions_shapefiles_path,
     )
+
+    res_columns = dlog_data.residential_data.columns
+    emp_columns = dlog_data.employment_data.columns
+
+    res_unit_year_columns = list(filter(lambda x: x.startswith("res_year_"), res_columns))
+    emp_unit_year_columns = list(filter(lambda x: x.startswith("emp_year_"), emp_columns))
+
+
     # implement syntax fixes
     initial_assessment_folder = config.output_folder/"00_initial_assessment"
     if INITIAL_ASSESSMENT:
@@ -74,12 +82,15 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     utilities.write_to_csv(config.existing_luc_split_path, existing_luc_split)
 
     # user fixes
-    #TODO streamline user fixes pipeline
-    data_to_fix = syntax_fixed_data
+    do_not_edit_cols = {
+        "residential": res_unit_year_columns,
+        "employment": emp_unit_year_columns, 
+        "mixed": res_unit_year_columns + emp_unit_year_columns,
+        }
 
 
     user_fixed_data = user_fixes.implement_user_fixes(
-        config, data_to_fix, auxiliary_data, PLOT_GRAPHS)
+        config, syntax_fixed_data, auxiliary_data, do_not_edit_cols, PLOT_GRAPHS)
 
     #end program if no data is given
     if user_fixed_data is None:
@@ -110,11 +121,6 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         user_fixed_data, auxiliary_data, config.output_folder, config)
 
     #infill build out profile
-    res_columns = infilled_fixed_data.residential_data.columns
-    emp_columns = infilled_fixed_data.employment_data.columns
-
-    res_unit_year_columns = list(filter(lambda x: x.startswith("res_year_"), res_columns))
-    emp_unit_year_columns = list(filter(lambda x: x.startswith("emp_year_"), emp_columns))
 
     infilled_fixed_data_dict = utilities.to_dict(infilled_fixed_data)
 
