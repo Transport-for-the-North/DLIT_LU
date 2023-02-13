@@ -15,7 +15,7 @@ import logging
 # third party imports
 from tqdm.contrib import logging as tqdm_log
 # local imports
-from dlit_lu import analyse_and_infill, inputs, utilities, land_use, parser
+from dlit_lu import infilling, inputs, utilities, land_use, parser
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -48,7 +48,7 @@ def main(log: utilities.DLitLog) -> None:
     log.add_file_handler(config.output_folder / LOG_FILE)
 
     if config.run_infill:
-        infilled_data = analyse_and_infill.run(config)
+        infilled_data = infilling.run(config)
     else:
         infilled_data = parser.parse_land_use_input(config)
 
