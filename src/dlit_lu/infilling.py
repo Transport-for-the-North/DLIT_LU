@@ -1,12 +1,8 @@
-    """Infills D-Log using user inputs 
+"""Infills D-Log with synatx fixes, user infilled values and infered values where necessary
 
-    _extended_summary_
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
+analyses the DLog to determine the values that need repairing or infilling
+then performs automatic syntax fixes, user infill and then automatic infill using infered values
+"""
 # standard imports
 import logging
 # local imports

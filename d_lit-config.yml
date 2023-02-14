@@ -19,11 +19,6 @@ infill:
   mixed_sheet_name: "2021 Mixed"
   #--Read file paths 
   dlog_column_names_path: inputs\DLog_column_names.csv
-  combined_column_names_path: inputs\combined_column_names.csv
-  residential_column_names_path: inputs\residential_column_names.csv
-  employment_column_names_path: inputs\employment_column_names.csv
-  mixed_column_names_path: inputs\mixed_column_names.csv
-  ignore_columns_path: inputs\drop_columns.csv
   valid_luc_path: inputs\valid_luc.csv
   out_of_date_luc_path: inputs\out_of_date_luc.csv
   incomplete_luc_path: inputs\incomplete_luc.csv
