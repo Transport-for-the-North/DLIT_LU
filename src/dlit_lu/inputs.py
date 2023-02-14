@@ -12,8 +12,8 @@ import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
 
-
-class DLitConfig(caf.toolkit.BaseConfig):
+@dataclasses.dataclass
+class InfillConfig:
     """Manages reading / writing the tool's config file.
 
 
@@ -160,7 +160,7 @@ class LandUseConfig:
                                  " that do not exist. Please update the config file before continuing. Cheers!")
 
 
-class DLitConfig(BaseConfig):
+class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.
 
 
@@ -233,7 +233,7 @@ class DLitConfig(BaseConfig):
                 raise ValueError("Land use input path is not valid")
 
 
-class InfillingAverages(BaseConfig):
+class InfillingAverages(caf.toolkit.BaseConfig):
     average_res_area: float
     average_emp_area: float
     average_mix_area: float
