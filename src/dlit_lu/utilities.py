@@ -176,7 +176,7 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
 
 def to_dlog_data(
     dlog_data: dict[str, pd.DataFrame],
-    lookup: global_classes.Lookup
+    lookup: global_classes.DLogValueLookup
     ) -> global_classes.DLogData:
     """converts dictionary to DLOG data type
 

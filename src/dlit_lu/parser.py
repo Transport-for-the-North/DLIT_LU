@@ -219,7 +219,7 @@ def parse_landuse_codes(codes: pd.Series) -> pd.Series:
 
 def parse_lookup(
     input_file_path: pathlib.Path, lookup_sheet_name: str
-) -> global_classes.Lookup:
+) -> global_classes.DLogValueLookup:
     """parses the lookup tables from the lookup sheet
     Parameters
     ----------
@@ -284,7 +284,7 @@ def parse_lookup(
     local_authority.set_index("id", drop=True, inplace=True)
     local_authority.dropna(how="any", inplace=True)
 
-    lookup_exit_variable = global_classes.Lookup(
+    lookup_exit_variable = global_classes.DLogValueLookup(
         site_type=standard_format_tables["site_type"],
         construction_status=standard_format_tables[
             "construction_status"

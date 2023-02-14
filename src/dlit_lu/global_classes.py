@@ -6,7 +6,7 @@ from typing import NamedTuple, Optional
 import pandas as pd
 import geopandas as gpd
 
-class Lookup(NamedTuple):
+class DLogValueLookup(NamedTuple):
     """contains all the lookup tables from the DLog lookup sheet
 
     all tables are stored with the ID (int) as index and value as str
@@ -74,7 +74,7 @@ class DLogData(NamedTuple):
     residential_data: pd.DataFrame
     employment_data: pd.DataFrame
     mixed_data: pd.DataFrame
-    lookup: Lookup
+    lookup: DLogValueLookup
     proposed_land_use_split: Optional[pd.DataFrame] = None
     existing_land_use_split: Optional[pd.DataFrame] = None
 class AuxiliaryData(NamedTuple):
