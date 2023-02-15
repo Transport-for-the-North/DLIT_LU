@@ -1071,7 +1071,7 @@ def infill_year_units(
         if any values have distribution IDs of 0 (not specified) or
         1 (specified - unable to calculate build out from this)
     """
-    LOG.info("Calculating and infilling build out profile")
+
     period = 5
 
     not_specified = data[data[distribution_column] == 0]

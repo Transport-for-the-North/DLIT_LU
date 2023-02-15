@@ -1,6 +1,7 @@
 #Set Up Parameters
 run_infill: True
 run_land_use: True 
+user_infill: False
 
 #Mandatory Parameters
 #--str

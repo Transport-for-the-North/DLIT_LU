@@ -193,6 +193,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     # set up
     run_infill: bool
     run_land_use: bool
+    user_infill: bool
 
     # mandatory
     output_folder: pathlib.Path

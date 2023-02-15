@@ -5,19 +5,16 @@ then performs automatic syntax fixes, user infill and then automatic infill usin
 """
 # standard imports
 import logging
+import argparse
 # local imports
 from dlit_lu import data_repair, inputs, parser, utilities, analyse, user_fixes, global_classes
 
 # constants
 LOG = logging.getLogger(__name__)
-#whether to plot graphs during data quality assessments
-PLOT_GRAPHS = False
-#whether to write an initial data qualtity report
-INITIAL_ASSESSMENT = False
 
 
 
-def run(config: inputs.DLitConfig) -> global_classes.DLogData:
+def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.DLogData:
     """DLit DLog land use analysis and repair tool
 
     Parameters
@@ -27,6 +24,8 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     """
     LOG.info("Initilising Analysis and Infill Module")
     config.output_folder.mkdir(exist_ok=True)
+    initial_assessment = args.initial_report
+    plot_maps = args.maps
 
     # parse data
     dlog_data = parser.parse_dlog(config)
@@ -47,7 +46,7 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
 
     # implement syntax fixes
     initial_assessment_folder = config.output_folder/"00_initial_assessment"
-    if INITIAL_ASSESSMENT:
+    if initial_assessment:
         initial_assessment_folder.mkdir(exist_ok=True)
 
     data_filter_columns = analyse.data_report(
@@ -55,8 +54,8 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
         initial_assessment_folder/"initial_DLOG_data_quality_assessment.xlsx",
         initial_assessment_folder,
         auxiliary_data,
-        PLOT_GRAPHS,
-        INITIAL_ASSESSMENT,
+        plot_maps,
+        initial_assessment,
     )
 
     syntax_fixed_data = data_repair.correct_inavlid_syntax(
@@ -85,46 +84,48 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
     utilities.write_to_csv(config.existing_luc_split_path, existing_luc_split)
 
     # user fixes
-    do_not_edit_cols = {
-        "residential": res_unit_year_columns,
-        "employment": emp_unit_year_columns, 
-        "mixed": res_unit_year_columns + emp_unit_year_columns,
-        }
+    if config.user_infill:
+        do_not_edit_cols = {
+            "residential": res_unit_year_columns,
+            "employment": emp_unit_year_columns, 
+            "mixed": res_unit_year_columns + emp_unit_year_columns,
+            }
 
 
-    user_fixed_data = user_fixes.implement_user_fixes(
-        config, syntax_fixed_data, auxiliary_data, do_not_edit_cols, PLOT_GRAPHS)
+        user_fixed_data = user_fixes.implement_user_fixes(
+            config, syntax_fixed_data, auxiliary_data, do_not_edit_cols, plot_maps)
 
-    #end program if no data is given
-    if user_fixed_data is None:
-        return
+        #end program if no data is given
+        if user_fixed_data is None:
+            return
 
-    post_user_fix_path = config.output_folder / "02_post_user_fix"
-    post_user_fix_path.mkdir(exist_ok=True)
-    post_user_fix_report_path = post_user_fix_path/ "post_user_fix_data_report.xlsx"
+        post_user_fix_path = config.output_folder / "02_post_user_fix"
+        post_user_fix_path.mkdir(exist_ok=True)
+        post_user_fix_report_path = post_user_fix_path/ "post_user_fix_data_report.xlsx"
 
-    user_fixed_data = analyse.data_report(
-        user_fixed_data,
-        post_user_fix_report_path,
-        post_user_fix_path,
-        auxiliary_data,
-        PLOT_GRAPHS,
-        True,
-    )
+        user_fixed_data = analyse.data_report(
+            user_fixed_data,
+            post_user_fix_report_path,
+            post_user_fix_path,
+            auxiliary_data,
+            plot_maps,
+            True,
+        )
 
-    LOG.info(f"post user fix report outputted to {post_user_fix_report_path}")
-
-
-    user_fixes.create_user_changes_audit(
-        config.output_folder/"user_changes_audit.xlsx", user_fixed_data, syntax_fixed_data)
+        LOG.info(f"post user fix report outputted to {post_user_fix_report_path}")
 
 
+        user_fixes.create_user_changes_audit(
+            config.output_folder/"user_changes_audit.xlsx", user_fixed_data, syntax_fixed_data)
+        
+        data_to_fix = user_fixed_data
+
+    else:
+        data_to_fix = syntax_fixed_data
 
     # infill invalid data
     infilled_fixed_data = data_repair.infill_data(
-        user_fixed_data, auxiliary_data, config.output_folder, config)
-
-    #infill build out profile
+        data_to_fix, auxiliary_data, config.output_folder, config)
 
     infilled_fixed_data_dict = utilities.to_dict(infilled_fixed_data)
 
@@ -168,7 +169,7 @@ def run(config: inputs.DLitConfig) -> global_classes.DLogData:
 
     post_fix_data_filter_columns = analyse.data_report(
         infilled_fixed_data, post_fix_output_path / "post_fix_data_report.xlsx",
-        post_fix_output_path, auxiliary_data, PLOT_GRAPHS, True)
+        post_fix_output_path, auxiliary_data, plot_maps, True)
 
     post_fix_data_path = post_fix_output_path / "post_fix_data.xlsx"
 

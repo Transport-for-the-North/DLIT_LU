@@ -12,6 +12,7 @@
 # standard imports
 import pathlib
 import logging
+import argparse
 # third party imports
 from tqdm.contrib import logging as tqdm_log
 # local imports
@@ -22,15 +23,15 @@ CONFIG_PATH = pathlib.Path("d_lit-config.yml")
 LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
 
-def run() -> None:
+def run(args: argparse.Namespace) -> None:
     """initilises Logging and calls main
     """
     with utilities.DLitLog() as dlit_log:
         with tqdm_log.logging_redirect_tqdm([dlit_log.logger]):
-            main(dlit_log)
+            main(dlit_log, args)
 
 
-def main(log: utilities.DLitLog) -> None:
+def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     """DLit DLog land use analysis and repair tool
 
     Parameters
@@ -39,8 +40,9 @@ def main(log: utilities.DLitLog) -> None:
         logging object
     """
     #load in config file
-    config = inputs.DLitConfig.load_yaml(CONFIG_PATH)
+    config = inputs.DLitConfig.load_yaml(args.config)
     config.check_inputs()
+
 
     config.output_folder.mkdir(exist_ok=True)
 
@@ -48,7 +50,7 @@ def main(log: utilities.DLitLog) -> None:
     log.add_file_handler(config.output_folder / LOG_FILE)
 
     if config.run_infill:
-        infilled_data = infilling.run(config)
+        infilled_data = infilling.run(config, args)
     else:
         infilled_data = parser.parse_land_use_input(config)
 
