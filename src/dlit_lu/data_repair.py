@@ -3,6 +3,8 @@
     IN PROGRESS
 """
 # standard imports
+from __future__ import annotations
+
 import logging
 from typing import Optional
 
@@ -17,7 +19,7 @@ from dlit_lu import global_classes, utilities, analyse
 LOG = logging.getLogger(__name__)
 
 
-def fix_inavlid_syntax(
+def correct_inavlid_syntax(
     data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
 ) -> global_classes.DLogData:
@@ -455,64 +457,49 @@ def infill_one_missing_year(
     for key, value in data.items():
         fixed_data = value.copy()
         for id_, average_year in average_years.items():
+            #loop through average year for each webtag status
             to_be_fixed = fixed_data[
                 fixed_data["web_tag_certainty_id"] == id_
             ].copy()
-            period = average_year[1] - average_year[0]
+            #period is start year - end year
+            period = average_year[1] - average_year[0] 
+            #gets all entries with no start year
             no_start_index = missing_start_id[key][
                 missing_start_id[key]["web_tag_certainty_id"] == id_
             ].index
+            #gets all entries with no end year
             no_end_index = missing_end_id[key][
                 missing_end_id[key]["web_tag_certainty_id"] == id_
             ].index
+            #get all values that have only end year
             end_no_start = no_start_index[
                 ~no_start_index.isin(no_end_index)
             ]
+            end_no_start_values = to_be_fixed.loc[end_no_start]
+            #get all values that have only start year
             start_no_end = no_end_index[
                 ~no_end_index.isin(no_start_index)
             ]
-
-            end_no_start_values = to_be_fixed.loc[end_no_start]
             start_no_end_values = to_be_fixed.loc[start_no_end]
 
-            end_no_start_values.loc[
-                end_no_start_values["end_year_id"] <= period,
-                "start_year_id",
-            ] = end_no_start_values.loc[
-                end_no_start_values["end_year_id"] <= period,
-                "end_year_id",
-            ]
-
-            end_no_start_values.loc[
-                end_no_start_values["end_year_id"] > period,
-                "start_year_id",
-            ] = (
-                end_no_start_values.loc[
-                    end_no_start_values["end_year_id"] <= period,
-                    "end_year_id",
-                ]
-                - period
+            #set start to end if applying period will set value out of bounds
+            mask_end = end_no_start_values["end_year_id"] <= period
+            end_no_start_values.loc[mask_end, "start_year_id"
+                ] = end_no_start_values.loc[mask_end, "end_year_id"]
+            #set start to end - period if result in bounds
+            end_no_start_values.loc[~mask_end,"start_year_id"] = (
+                end_no_start_values.loc[~mask_end, "end_year_id"] - period
             )
 
-            start_no_end_values.loc[
-                start_no_end_values["start_year_id"] + period >= 14,
-                "end_year_id",
-            ] = start_no_end_values.loc[
-                start_no_end_values["start_year_id"] <= period,
-                "start_year_id",
-            ]
+            mask_start = start_no_end_values["start_year_id"] + period >= 14
+            #set end to start if result is out of bounds
+            start_no_end_values.loc[mask_start, "end_year_id",
+                ] = start_no_end_values.loc[mask_start, "start_year_id",]
+            #set end to start + period if result is in bounds
+            start_no_end_values.loc[~mask_start,"end_year_id"] = (
+                start_no_end_values.loc[~mask_start,"start_year_id"]+ period)
 
-            start_no_end_values.loc[
-                start_no_end_values["start_year_id"] + period < 14,
-                "end_year_id",
-            ] = (
-                start_no_end_values.loc[
-                    start_no_end_values["start_year_id"] <= period,
-                    "start_year_id",
-                ]
-                + period
-            )
-
+            #integrate results in to data set
             to_be_fixed.loc[
                 end_no_start, "start_year_id"
             ] = end_no_start_values["end_year_id"]
@@ -565,7 +552,7 @@ def infill_missing_years(
         filtered_data = missing_year_id[key][
             missing_year_id[key]["web_tag_certainty_id"] != 0
         ]
-        for id_, value in average_years.items():
+        for id_ in average_years.keys():
             id_ = int(id_)
             filtered_data.loc[
                 filtered_data["web_tag_certainty_id"] == id_,
@@ -584,7 +571,7 @@ def infill_units(
     unit_columns: dict[str, list[str]],
     area_columns: dict[str, str],
     missing_values: list[str | int],
-    unit_area_ratio: dict[str, float],
+    unit_to_area_ratio: dict[str, float],
 ) -> dict[str, pd.DataFrame]:
     """infills missing units
 
@@ -636,7 +623,7 @@ def infill_units(
             fixed_data[key].loc[
                 filtered_data_with_area.index, area_columns[key]
             ]
-            * unit_area_ratio[key]
+            * unit_to_area_ratio[key]
         )
 
     return fixed_data
@@ -910,7 +897,7 @@ def fix_undefined_invalid_luc(
 def luc_ratio(
     data: dict[str, pd.DataFrame],
     auxiliary_data: global_classes.AuxiliaryData,
-    columns: list[str] = ["proposed_land_use"],
+    columns: list[str],
 ) -> pd.DataFrame:
     """calculates the average floorspace taken by each  luc
 

@@ -75,7 +75,7 @@ def main(log: utilities.DLitLog) -> None:
         INITIAL_ASSESSMENT,
     )
 
-    syntax_fixed_data = data_repair.fix_inavlid_syntax(
+    syntax_fixed_data = data_repair.correct_inavlid_syntax(
         data_filter_columns, auxiliary_data)
 
     syntax_fixed_data = analyse.data_report(

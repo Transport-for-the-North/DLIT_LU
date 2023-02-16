@@ -1,0 +1,35 @@
+﻿land_use_code,fte_floorspace,Notes
+B2,36,GIA
+B8,80,GEA
+C1,50,specified per bed (estimated)
+C2,100,not specified (estimated)
+C2A,100,not specified (estimated)
+C3(a),,not specified (assumed to produce no jobs)
+C3(b),,not specified (assumed to produce no jobs)
+C3(c),,not specified (assumed to produce no jobs)
+C4,,not specified (assumed to produce no jobs)
+E(a),20,NIA needs modifing
+E(b),17,NIA needs modifing
+E(c)(i),16,NIA needs modifing
+E(c)(ii),16,NIA needs modifing
+E(c)(iii),16,NIA needs modifing
+E(d),65,NIA needs modifing
+E(e),20,not specified (estimated)
+E(f),30,not specified (estimated)
+E(g)(i),12,NIA needs modifing
+E(g)(ii),50,NIA needs modifing
+E(g)(iii),36,NIA needs modifing
+F1(a),30,not specified (estimated)
+F1(b),260,not specified (estimated)
+F1(c),50,not specified (estimated)
+F1(d),125,not specified (estimated)
+F1(e),260,not specified (estimated)
+F1(f),260,not specified (estimated)
+F1(g),50,not specified (estimated)
+F2(a),20,not specified (estimated)
+F2(b),100,not specified (estimated)
+F2(c),100,not specified (estimated)
+F2(d),100,not specified (estimated)
+SG,70,gia
+brownfield,,not specified (assumed to produce no jobs)
+greenfield,,not specified (assumed to produce no jobs)

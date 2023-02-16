@@ -66,7 +66,6 @@ class DLitLog:
         fh.setFormatter(form)
         self.logger.addHandler(fh)
 
-        self.init_message(logging.DEBUG)
         if not exists:
             self.logger.info("Created log file: %s", file)
         else:
@@ -159,7 +158,7 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
         "mixed": dlog_data.mixed_data,
         }
 
-def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.Lookup)->global_classes.DLogData:
+def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.DLogValueLookup)->global_classes.DLogData:
     try:
         return global_classes.DLogData(
             dlog_data["combined"],
