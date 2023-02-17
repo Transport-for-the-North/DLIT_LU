@@ -127,15 +127,15 @@ def infill_data(
     # calculate ratios
 
     dwelling_area_ratio = unit_area_ratio(
-        dict((k, data_dict[k]) for k in (["residential", "mixed"])),
+        dict((key, data_dict[key]) for key in (["residential", "mixed"])),
         {"residential": "total_units", "mixed": "dwellings"},
-        dict((k, area_columns[k]) for k in (["residential", "mixed"])),
+        dict((key, area_columns[key]) for key in (["residential", "mixed"])),
     )
 
     floorspace_area_ratio = unit_area_ratio(
-        dict((k, data_dict[k]) for k in (["employment", "mixed"])),
+        dict((key, data_dict[key]) for key in (["employment", "mixed"])),
         {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
-        dict((k, area_columns[k]) for k in (["employment", "mixed"])),
+        dict((key, area_columns[key]) for key in (["employment", "mixed"])),
     )
 
     average_area = calculate_average(data_dict, area_columns_list)
@@ -145,7 +145,7 @@ def infill_data(
         data_dict,
         area_columns_list,
         [0, "-"],
-        dict((k, float(average_area)) for k in (data_dict)),
+        dict((key, float(average_area)) for key in (data_dict)),
     )
     corrected_format = infill_units(
         corrected_format,
