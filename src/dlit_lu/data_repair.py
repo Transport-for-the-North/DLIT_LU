@@ -1279,7 +1279,7 @@ def late_distribution(
     periods = (end_year - start_year+1)/period
 
     unit_years[within_years] = unit[within_years]*((periods[within_years]-(
-        ((end_year[within_years]-(year+4))/period)+1))).apply(two_to_pow
+        ((end_year[within_years]-(year+(period-1)))/period)+1))).apply(two_to_pow
         )/(periods[within_years].apply(two_to_pow)-1)
     return unit_years
 
