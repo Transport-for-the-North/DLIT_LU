@@ -1232,7 +1232,7 @@ def early_distribution(
     periods = (end_year - start_year+1)/period
 
     unit_years[within_years] = unit[within_years]*((periods[within_years]-(
-        ((year-start_year[within_years])/5)+1)).apply(two_to_pow
+        ((year-start_year[within_years])/period)+1)).apply(two_to_pow
         )/(periods[within_years].apply(two_to_pow)-1))
     return unit_years
 
@@ -1279,7 +1279,7 @@ def late_distribution(
     periods = (end_year - start_year+1)/period
 
     unit_years[within_years] = unit[within_years]*((periods[within_years]-(
-        ((end_year[within_years]-(year+4))/5)+1))).apply(two_to_pow
+        ((end_year[within_years]-(year+4))/period)+1))).apply(two_to_pow
         )/(periods[within_years].apply(two_to_pow)-1)
     return unit_years
 
@@ -1337,12 +1337,12 @@ def mid_distribution(
     more_than_bool.index = unit.index
 
     unit_years[less_than_bool] = unit[
-        less_than_bool]*((year-start_year[less_than_bool])/5).apply(two_to_pow)/(
+        less_than_bool]*((year-start_year[less_than_bool])/period).apply(two_to_pow)/(
             (((periods[less_than_bool]+1)/2).apply(np.floor).apply(two_to_pow)-1)+(
                 ((periods[less_than_bool])/2).apply(np.floor).apply(two_to_pow)-1))
 
     unit_years[more_than_bool] = unit[more_than_bool]*((periods[more_than_bool]-(
-        (year-start_year[more_than_bool])/5+1)).apply(two_to_pow)/(
+        (year-start_year[more_than_bool])/period+1)).apply(two_to_pow)/(
             (((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_to_pow)-1)+(
                 ((periods[more_than_bool])/2).apply(np.floor).apply(two_to_pow)-1)))
     return unit_years
