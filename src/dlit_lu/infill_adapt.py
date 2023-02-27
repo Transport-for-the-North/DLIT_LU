@@ -51,7 +51,7 @@ def predict_missing_values_tree(df, columns):
     y = y[not_nan_indices]
 
     # Train the random forest regressor on the data
-    model = RandomForestRegressor(n_estimators=1000).fit(X, y)
+    model = RandomForestRegressor(n_estimators=100).fit(X, y)
     loo = LeaveOneOut()
     n = loo.get_n_splits(y)
     scores = cross_val_score(
