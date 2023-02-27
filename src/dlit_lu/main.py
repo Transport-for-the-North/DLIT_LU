@@ -23,7 +23,7 @@ LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
 
 #whether to plot graphs during data quality assessments
-PLOT_GRAPHS = False
+PLOT_GRAPHS = True
 #whether to write an initial data qualtity report
 INITIAL_ASSESSMENT = True
 
