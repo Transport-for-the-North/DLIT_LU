@@ -19,6 +19,8 @@ class InfillConfig:
 
     Parameters
     ----------
+    user_infill: bool
+        whether to run user infilling functionality
     combined_sheet_name: str
         name of the combined sheet within the D-Log file
     residential_sheet_name: str
@@ -44,6 +46,7 @@ class InfillConfig:
         path to LPA regions shapefile
 
     """
+    user_infill: bool
     combined_sheet_name: str
     residential_sheet_name: str
     employment_sheet_name: str
@@ -193,7 +196,6 @@ class DLitConfig(caf.toolkit.BaseConfig):
     # set up
     run_infill: bool
     run_land_use: bool
-    user_infill: bool
 
     # mandatory
     output_folder: pathlib.Path

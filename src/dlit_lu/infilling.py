@@ -84,7 +84,7 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
     utilities.write_to_csv(config.existing_luc_split_path, existing_luc_split)
 
     # user fixes
-    if config.user_infill:
+    if config.infill.user_infill:
         do_not_edit_cols = {
             "residential": res_unit_year_columns,
             "employment": emp_unit_year_columns, 

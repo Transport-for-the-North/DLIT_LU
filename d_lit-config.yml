@@ -1,7 +1,7 @@
 #Set Up Parameters
 run_infill: True
 run_land_use: True 
-user_infill: False
+
 
 #Mandatory Parameters
 #--str
@@ -14,6 +14,7 @@ proposed_luc_split_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\proposed_
 existing_luc_split_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\existing_luc_split_path.csv
 
 infill:
+  user_infill: False
   combined_sheet_name: "2021 Combined"
   residential_sheet_name: "2021 Residential"
   employment_sheet_name: "2021 Employment"
