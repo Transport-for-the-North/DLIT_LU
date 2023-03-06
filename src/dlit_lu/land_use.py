@@ -205,7 +205,7 @@ def compare_existing_proposed_jobs(
     proposed_jobs = proposed_data.groupby(
         "msoa_zone_id")["total_proposed_jobs"].sum()
     comparison = existing_jobs.merge(
-        proposed_jobs, left_index=True, right_index=True)
+        proposed_jobs, how= "outer", left_index=True, right_index=True)
     comparison["ratio (percentage)"] = 100 * comparison["total_proposed_jobs"] / \
         comparison["total_existing_jobs"]
     utilities.write_to_csv(file_path, comparison)
@@ -302,7 +302,7 @@ def compare_existing_proposed_dwellings(
     proposed_dwellings = proposed_data.groupby(
         "msoa11cd")["total_proposed_dwellings"].sum()
     comparison = existing_dwellings.merge(
-        proposed_dwellings, left_index=True, right_index=True)
+        proposed_dwellings, how = "outer", left_index=True, right_index=True)
     comparison["ratio (percentage)"] = 100 * comparison["total_proposed_dwellings"] / \
         comparison["total_existing_dwellings"]
     utilities.write_to_csv(file_path, comparison)
@@ -581,19 +581,20 @@ def msoa_site_geospatial_lookup(
 
 
 def calc_msoa_proportion(msoa_pop_path: pathlib.Path, columns: list[str]) -> pd.DataFrame:
-    """
+    """calculates the msoa population by dwelling type
 
-    _extended_summary_
 
     Parameters
     ----------
-    msoa_pop_shape_file : pd.DataFrame
-        _description_
+    msoa_pop_path : pathlib.Path
+        path to TfN population land use
+    columns : list[str]
+        column names in for the land use data
 
     Returns
     -------
     pd.DataFrame
-        _description_
+        population and ratio of dwellings by dwelling type
     """
     msoa_pop = pd.read_csv(msoa_pop_path)
     msoa_pop.columns = columns
