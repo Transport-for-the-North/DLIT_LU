@@ -1,4 +1,5 @@
-# TODO header
+"""General functions and classes used by tool. 
+"""
 # standard imports
 import logging
 import pathlib

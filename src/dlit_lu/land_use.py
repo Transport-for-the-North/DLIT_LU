@@ -1,3 +1,14 @@
+"""Performs the conversion from D-Log formatting to the input to the Trip-Ends Module.
+Conversion process involves disagregating by:
+    land use code,
+    aggregating by MSOA
+    
+    Residential:
+        disagregate by dwelling type and convert to population
+    Employment:
+        convert to jobs and SIC codes
+
+"""
 # standard imports
 import logging
 import pathlib
@@ -199,6 +210,22 @@ def compare_existing_proposed_jobs(
     build_out_profile_cols: list[str],
     file_path:pathlib.Path,
     )->None:
+    """compares the number of existing jobsto the number of proposed jobs
+
+    outputs a comparion the number of existing jobs from an external input,
+    to the number of proposed jobs infered from the D-Log
+
+    Parameters
+    ----------
+    existing_data : pd.DataFrame
+        data containing the number of existing jobs (TfN land use data)
+    proposed_data : pd.DataFrame
+        data containing the number of proposed jobs (from D-Log)
+    build_out_profile_cols : list[str]
+        build-out profiles columns
+    file_path : pathlib.Path
+        path to save comparison output
+    """    
     existing_jobs = (existing_data.groupby("msoa_zone_id")["jobs"].sum()).to_frame(name="total_existing_jobs")
     proposed_data["total_proposed_jobs"] = proposed_data[build_out_profile_cols].sum(
         axis=1)
@@ -281,8 +308,9 @@ def compare_existing_proposed_dwellings(
     ) -> None:
     """produces a comparison of existing and proposed dwelling types
 
-    outputs a csvfile at defined location with the total existing and proposed
-    dwellings by msoa
+    outputs a csvfile at a defined location with the total existing and proposed
+    dwellings by msoa. existing jobs are taken from a defined external data
+    source (TfN landuse)
 
     Parameters
     ----------
@@ -521,26 +549,24 @@ def disagg_dwelling(
     msoa_ratio: pd.DataFrame,
     unit_columns: list[str],
 ) -> pd.DataFrame:
-    """
-    Disaggregate dwellings by population ratios.
+    """_summary_
+
+    _extended_summary_
 
     Parameters
     ----------
     data : pd.DataFrame
-        DataFrame containing dwelling data
-    msoa_pop_path : pathlib.Path
-        Path to the population data file
-    msoa_pop_column_names : list[str]
-        List of column names for the population data file
+        DataFrame containing residential dwelling data
+    msoa_ratio : pd.DataFrame
+        contains the existing ratio of each type of dwelling and average occupancy for each MSOA
     unit_columns : list[str]
-        List of column names to be disaggregated
+        columns names for dwelling column to be disaggregated
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with the disaggregated dwelling data
-
-    """
+        Path to the population data file
+    """    
 
     msoa_ratio.reset_index("dwelling_type", inplace=True)
 
