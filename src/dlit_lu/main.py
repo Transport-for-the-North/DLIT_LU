@@ -13,8 +13,10 @@
 import pathlib
 import logging
 import argparse
+
 # third party imports
 from tqdm.contrib import logging as tqdm_log
+
 # local imports
 from dlit_lu import infilling, inputs, utilities, land_use, parser
 
@@ -23,9 +25,9 @@ CONFIG_PATH = pathlib.Path("d_lit-config.yml")
 LOG = logging.getLogger(__package__)
 LOG_FILE = "DLIT.log"
 
+
 def run(args: argparse.Namespace) -> None:
-    """initilises Logging and calls main
-    """
+    """initilises Logging and calls main"""
     with utilities.DLitLog() as dlit_log:
         with tqdm_log.logging_redirect_tqdm([dlit_log.logger]):
             main(dlit_log, args)
@@ -39,14 +41,13 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     log : utilities.DLitLog
         logging object
     """
-    #load in config file
+    # load in config file
     config = inputs.DLitConfig.load_yaml(args.config)
     config.check_inputs()
 
-
     config.output_folder.mkdir(exist_ok=True)
 
-    #set log file
+    # set log file
     log.add_file_handler(config.output_folder / LOG_FILE)
 
     if config.run_infill:

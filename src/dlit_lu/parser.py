@@ -35,11 +35,19 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
 
     column_names = pd.read_csv(config.infill.dlog_column_names_path)
 
-    res_column_names = column_names.loc[:, "residential_column_names"].dropna(how="any").tolist()
-    emp_column_names = column_names.loc[:, "employment_column_names"].dropna(how="any").tolist()
-    mix_column_names = column_names.loc[:, "mixed_column_names"].dropna(how="any").tolist()
-    #column to remove from data
-    ignore_columns = column_names.loc[:, "ignore_column_names"].dropna(how="any").tolist()
+    res_column_names = (
+        column_names.loc[:, "residential_column_names"].dropna(how="any").tolist()
+    )
+    emp_column_names = (
+        column_names.loc[:, "employment_column_names"].dropna(how="any").tolist()
+    )
+    mix_column_names = (
+        column_names.loc[:, "mixed_column_names"].dropna(how="any").tolist()
+    )
+    # column to remove from data
+    ignore_columns = (
+        column_names.loc[:, "ignore_column_names"].dropna(how="any").tolist()
+    )
 
     # parse sheets
     LOG.info("Parsing Residential sheet")
@@ -48,7 +56,8 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
         config.infill.residential_sheet_name,
         2,
         res_column_names,
-        ignore_columns)
+        ignore_columns,
+    )
     LOG.info("Parsing Employment sheet")
     employment_data = parse_sheet(
         config.dlog_input_file,
@@ -56,7 +65,7 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
         2,
         emp_column_names,
         ignore_columns,
-        )
+    )
     LOG.info("Parsing Mixed sheet")
     mixed_data = parse_sheet(
         config.dlog_input_file,
@@ -64,11 +73,9 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
         2,
         mix_column_names,
         ignore_columns,
-        )
-    LOG.info("Parsing Lookup sheet")
-    lookup = parse_lookup(
-        config.dlog_input_file, config.lookups_sheet_name
     )
+    LOG.info("Parsing Lookup sheet")
+    lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
 
     data_output = global_classes.DLogData(
         combined_data=None,
@@ -78,7 +85,9 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
         lookup=lookup,
     )
     return data_output
-def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
+
+
+def parse_land_use_input(config: inputs.DLitConfig) -> global_classes.DLogData:
     """Parse land use input data from a given input path.
 
     Parameters:
@@ -91,16 +100,13 @@ def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
 
     """
     LOG.info(f"Parsing {str(config.land_use.land_use_input)}")
-    #parse sheets
+    # parse sheets
     LOG.info("Parsing Residential sheet")
-    residential_data = parse_sheet(
-        config.land_use.land_use_input, "residential")
+    residential_data = parse_sheet(config.land_use.land_use_input, "residential")
     LOG.info("Parsing Employment sheet")
-    employment_data = parse_sheet(
-        config.land_use.land_use_input, "employment")
+    employment_data = parse_sheet(config.land_use.land_use_input, "employment")
     LOG.info("Parsing Mixed sheet")
-    mixed_data = parse_sheet(
-        config.land_use.land_use_input, "mixed")
+    mixed_data = parse_sheet(config.land_use.land_use_input, "mixed")
     LOG.info("Parsing Lookup sheet")
     lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
     LOG.info("Parsing land use splits")
@@ -116,9 +122,9 @@ def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
         mixed_data,
         existing_split,
         proposed_split,
-        ]:
+    ]:
         if "unnamed: 0" in frame.columns:
-            frame.drop(columns = ["unnamed: 0"], inplace = True)
+            frame.drop(columns=["unnamed: 0"], inplace=True)
 
     data_output = global_classes.DLogData(
         combined_data=None,
@@ -130,6 +136,7 @@ def parse_land_use_input(config: inputs.DLitConfig)->global_classes.DLogData:
         proposed_land_use_split=proposed_split,
     )
     return data_output
+
 
 def parse_sheet(
     input_file_path: pathlib.Path,
@@ -167,12 +174,8 @@ def parse_sheet(
         engine="openpyxl",
         skiprows=skip_rows,
     )
-    data["existing_land_use"] = parse_landuse_codes(
-        data["existing_land_use"]
-    )
-    data["proposed_land_use"] = parse_landuse_codes(
-        data["proposed_land_use"]
-    )
+    data["existing_land_use"] = parse_landuse_codes(data["existing_land_use"])
+    data["proposed_land_use"] = parse_landuse_codes(data["proposed_land_use"])
 
     if column_names is not None:
         data.columns = [name.lower() for name in column_names]
@@ -203,16 +206,8 @@ def parse_landuse_codes(codes: pd.Series) -> pd.Series:
 
     codes = codes.astype("string")
     codes = codes.str.lower()
-    codes = (
-        codes.str.replace("and", ",")
-        .str.replace("/", ",")
-        .str.replace(r"\s+", "")
-    )
-    codes = (
-        codes.str.replace("[", "")
-        .str.replace("]", "")
-        .str.replace("'", "")
-    )
+    codes = codes.str.replace("and", ",").str.replace("/", ",").str.replace(r"\s+", "")
+    codes = codes.str.replace("[", "").str.replace("]", "").str.replace("'", "")
     codes = codes.str.split(",")
     return codes
 
@@ -286,16 +281,12 @@ def parse_lookup(
 
     lookup_exit_variable = global_classes.DLogValueLookup(
         site_type=standard_format_tables["site_type"],
-        construction_status=standard_format_tables[
-            "construction_status"
-        ],
+        construction_status=standard_format_tables["construction_status"],
         webtag=standard_format_tables["webtag"],
         development_type=standard_format_tables["development_type"],
         planning_status=standard_format_tables["planning_status"],
         years=standard_format_tables["years"],
-        distribution_profile=standard_format_tables[
-            "distribution_profile"
-        ],
+        distribution_profile=standard_format_tables["distribution_profile"],
         land_use_codes=land_use_codes,
         adoption_status=standard_format_tables["adoption_status"],
         local_authority=local_authority,
@@ -341,9 +332,7 @@ def read_auxiliary_data(
     # parse land use code file
     allowed_land_use_codes = pd.read_csv(valid_luc_path)
     allowed_land_use_codes.loc[:, "land_use_codes"] = (
-        allowed_land_use_codes["land_use_codes"]
-        .str.lower()
-        .str.replace(r"\s+", "")
+        allowed_land_use_codes["land_use_codes"].str.lower().str.replace(r"\s+", "")
     )
 
     # parse out of date land use codes
@@ -360,9 +349,7 @@ def read_auxiliary_data(
     # parse incomplete land use codes
     incomplete_luc = pd.read_csv(incomplete_luc_path)
     incomplete_luc.loc[:, "incomplete_land_use_codes"] = (
-        incomplete_luc["incomplete_land_use_codes"]
-        .str.lower()
-        .str.replace(r"\s+", "")
+        incomplete_luc["incomplete_land_use_codes"].str.lower().str.replace(r"\s+", "")
     )
     incomplete_luc.loc[:, "land_use_code"] = parse_landuse_codes(
         incomplete_luc["land_use_code"]
@@ -371,9 +358,7 @@ def read_auxiliary_data(
     # parse known invalid land use codes
     known_invalid_luc = pd.read_csv(known_invalid_luc_path)
     known_invalid_luc.loc[:, "known_invalid_code"] = (
-        known_invalid_luc["known_invalid_code"]
-        .str.lower()
-        .str.replace(r"\s+", "")
+        known_invalid_luc["known_invalid_code"].str.lower().str.replace(r"\s+", "")
     )
     known_invalid_luc.loc[:, "corrected_code"] = parse_landuse_codes(
         known_invalid_luc["corrected_code"]
@@ -390,7 +375,8 @@ def read_auxiliary_data(
         regions,
     )
 
-def parse_msoa(file_path:pathlib.Path)->gpd.GeoDataFrame:
+
+def parse_msoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
     """parse msoa shape file
 
 
@@ -407,4 +393,3 @@ def parse_msoa(file_path:pathlib.Path)->gpd.GeoDataFrame:
     msoa = gpd.read_file(file_path)
     north_msoa = msoa[~msoa["north_msoa"].isna()]
     return north_msoa
-    

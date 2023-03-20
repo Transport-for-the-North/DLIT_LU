@@ -6,11 +6,13 @@ import pathlib
 from typing import Optional
 import os
 import dataclasses
+
 # third party imports
 import pydantic
 import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
+
 
 @dataclasses.dataclass
 class InfillConfig:
@@ -46,6 +48,7 @@ class InfillConfig:
         path to LPA regions shapefile
 
     """
+
     user_infill: bool
     combined_sheet_name: str
     residential_sheet_name: str
@@ -70,7 +73,7 @@ class InfillConfig:
             if parameters are incomplete
         ValueError
             if read paths are invalid
-        """        
+        """
         str_params = [
             self.combined_sheet_name,
             self.residential_sheet_name,
@@ -90,13 +93,17 @@ class InfillConfig:
         ]
         for param in write_path_params + read_path_params + str_params:
             if param is None:
-                raise ValueError("Infill Parameters incomplete, please"
-                    " complete these within the config file before continuing. Cheers!")
+                raise ValueError(
+                    "Infill Parameters incomplete, please"
+                    " complete these within the config file before continuing. Cheers!"
+                )
 
         for param in read_path_params:
             if not os.path.exists(param):
-                raise ValueError("Infill parameters contains write file paths"
-                    " that do not exist. Please update the config file before continuing. Cheers!")
+                raise ValueError(
+                    "Infill parameters contains write file paths"
+                    " that do not exist. Please update the config file before continuing. Cheers!"
+                )
 
 
 @dataclasses.dataclass
@@ -111,7 +118,7 @@ class LandUseConfig:
     msoa_shapefile_path: pathlib.Path
         path to msoa shape file
     msoa_dwelling_pop_path: pathlib.Path
-        path to msoa dwelling population file 
+        path to msoa dwelling population file
     msoa_traveller_type_path: pathlib.Path
         path to msoa split of traveller type
     msoa_jobs_path: pathlib.Path
@@ -121,6 +128,7 @@ class LandUseConfig:
     luc_sic_conversion_path: pathlib.Path
         path to land use code to SIC code conversion matrix
     """
+
     land_use_input: Optional[pathlib.Path]
     msoa_shapefile_path: pathlib.Path
     msoa_dwelling_pop_path: pathlib.Path
@@ -140,7 +148,7 @@ class LandUseConfig:
             if parameters are incomplete
         ValueError
             if read paths are invalid
-        """        
+        """
 
         read_path_params = [
             self.msoa_shapefile_path,
@@ -150,17 +158,19 @@ class LandUseConfig:
             self.employment_density_matrix_path,
             self.luc_sic_conversion_path,
         ]
-        write_path_params = [
-
-        ]
+        write_path_params = []
         for param in read_path_params + write_path_params:
             if param is None:
-                raise ValueError("Land use parameters incomplete, please"
-                                 " complete these within the config file before continuing. Cheers!")
+                raise ValueError(
+                    "Land use parameters incomplete, please"
+                    " complete these within the config file before continuing. Cheers!"
+                )
         for param in read_path_params:
             if not os.path.exists(param) or param == pathlib.Path("."):
-                raise ValueError("Land use parameters contains write file paths"
-                                 " that do not exist. Please update the config file before continuing. Cheers!")
+                raise ValueError(
+                    "Land use parameters contains write file paths"
+                    " that do not exist. Please update the config file before continuing. Cheers!"
+                )
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -178,7 +188,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     proposed_luc_split_path: pathlib.Path
         path to proposed land use split (output from infill)
     existing_luc_split_path: pathlib.Path
-        path to existing land use split (output from infill) 
+        path to existing land use split (output from infill)
     dlog_input_file: pathlib.Path
         path to D-log file
     lookups_sheet_name: str
@@ -193,6 +203,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     ValueError
         file doesn't exisit
     """
+
     # set up
     run_infill: bool
     run_land_use: bool
@@ -230,9 +241,11 @@ class DLitConfig(caf.toolkit.BaseConfig):
         if (not self.run_infill) and self.run_land_use:
             if self.land_use.land_use_input is None:
                 raise ValueError(
-                    "Land use input path is required when not running infilling module")
-            if not os.path.exists(self.land_use.land_use_input
-                    ) or self.land_use.land_use_input == pathlib.Path("."):
+                    "Land use input path is required when not running infilling module"
+                )
+            if not os.path.exists(
+                self.land_use.land_use_input
+            ) or self.land_use.land_use_input == pathlib.Path("."):
                 raise ValueError("Land use input path is not valid")
 
 

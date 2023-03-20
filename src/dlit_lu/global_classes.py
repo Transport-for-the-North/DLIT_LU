@@ -1,10 +1,12 @@
 """contains NamedTuple subclasses and other classes used globally
-"""#docstring
-#standard imports
+"""  # docstring
+# standard imports
 from typing import NamedTuple, Optional
-#third party imports
+
+# third party imports
 import pandas as pd
 import geopandas as gpd
+
 
 class DLogValueLookup(NamedTuple):
     """contains all the lookup tables from the DLog lookup sheet
@@ -37,6 +39,7 @@ class DLogValueLookup(NamedTuple):
     local_authority: pd.DataFrame
         local authority id look up table
     """
+
     site_type: pd.DataFrame
     construction_status: pd.DataFrame
     planning_status: pd.DataFrame
@@ -70,6 +73,7 @@ class DLogData(NamedTuple):
     existing_land_use_split: Optional[pd.DataFrame] = None
         the split of existing land use codes that appears in the dlog
     """
+
     combined_data: Optional[pd.DataFrame]
     residential_data: pd.DataFrame
     employment_data: pd.DataFrame
@@ -77,6 +81,8 @@ class DLogData(NamedTuple):
     lookup: DLogValueLookup
     proposed_land_use_split: Optional[pd.DataFrame] = None
     existing_land_use_split: Optional[pd.DataFrame] = None
+
+
 class AuxiliaryData(NamedTuple):
     """stores data not contained in the DLog required for processing
 
@@ -96,11 +102,13 @@ class AuxiliaryData(NamedTuple):
     regions: gpd.GeoDataFrame
         regions shape file
     """
-    allowed_codes:pd.DataFrame
+
+    allowed_codes: pd.DataFrame
     known_invalid_luc: pd.DataFrame
     out_of_date_luc: pd.DataFrame
     incomplete_luc: pd.DataFrame
     regions: gpd.GeoDataFrame
+
 
 class ResultsReport:
     """stores the results report
@@ -118,15 +126,16 @@ class ResultsReport:
     filter_columns:list[str]
         list of the filter column names
     """
+
     data_filter: dict[str, pd.DataFrame]
     analysis_summary: list[dict[str, int]]
     analysis_summary_index_labels: list[str]
     analysis_summary_notes: list[str]
-    filter_columns:list[str]
+    filter_columns: list[str]
 
     def __init__(
         self,
-        data_filter: dict[str, pd.DataFrame], 
+        data_filter: dict[str, pd.DataFrame],
         column_name: list[str],
         index_name: list[str],
         notes: list[str],
@@ -165,14 +174,12 @@ class ResultsReport:
         ]
 
         self.analysis_summary_index_labels = index_name
-        
+
         self.analysis_summary_notes = notes
         self.filter_columns = column_name
 
-    
-
     def append_analysis_results(
-        self, 
+        self,
         results: dict[str, pd.DataFrame],
         column_name: str,
         notes: str,
@@ -201,9 +208,7 @@ class ResultsReport:
         """
         for key, value in results.items():
             self.data_filter[key][column_name] = False
-            self.data_filter[key].loc[
-                value.index, column_name
-            ] = True
+            self.data_filter[key].loc[value.index, column_name] = True
 
         self.analysis_summary = self.analysis_summary + [
             {
@@ -213,13 +218,12 @@ class ResultsReport:
             }
         ]
 
-        self.analysis_summary_index_labels = (
-            self.analysis_summary_index_labels + [column_name]
-        )
-        self.analysis_summary_notes = self.analysis_summary_notes + [
-            notes
+        self.analysis_summary_index_labels = self.analysis_summary_index_labels + [
+            column_name
         ]
+        self.analysis_summary_notes = self.analysis_summary_notes + [notes]
         self.filter_columns = self.filter_columns + [column_name]
+
 
 class ResultsReport_(NamedTuple):
     """stores the results report
@@ -237,16 +241,15 @@ class ResultsReport_(NamedTuple):
     filter_columns:list[str]
         list of the filter column names
     """
+
     data_filter: dict[str, pd.DataFrame]
     analysis_summary: list[dict[str, int]]
     analysis_summary_index_labels: list[str]
     analysis_summary_notes: list[str]
-    filter_columns:list[str]
-
-    
+    filter_columns: list[str]
 
     def append_analysis_results(
-        self, 
+        self,
         results: dict[str, pd.DataFrame],
         column_name: str,
         notes: str,
@@ -275,9 +278,7 @@ class ResultsReport_(NamedTuple):
         """
         for key, value in results.items():
             self.data_filter[key][column_name] = False
-            self.data_filter[key].loc[
-                value.index, column_name
-            ] = True
+            self.data_filter[key].loc[value.index, column_name] = True
 
         self.analysis_summary = self.analysis_summary + [
             {
@@ -287,12 +288,8 @@ class ResultsReport_(NamedTuple):
             }
         ]
 
-        self.analysis_summary_index_labels = (
-            self.analysis_summary_index_labels + [column_name]
-        )
-        self.analysis_summary_notes = self.analysis_summary_notes + [
-            notes
+        self.analysis_summary_index_labels = self.analysis_summary_index_labels + [
+            column_name
         ]
+        self.analysis_summary_notes = self.analysis_summary_notes + [notes]
         self.filter_columns = self.filter_columns + [column_name]
-
-    

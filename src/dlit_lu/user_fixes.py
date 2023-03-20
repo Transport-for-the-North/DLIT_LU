@@ -22,7 +22,8 @@ LOG = logging.getLogger(__name__)
 def user_input_file_builder(
     path: pathlib.Path,
     input_data: global_classes.DLogData,
-    do_not_include_col: dict[str, list[str]]) -> None:
+    do_not_include_col: dict[str, list[str]],
+) -> None:
     """builds file for user to edit
 
     file can then be read and edits integrated into data
@@ -83,19 +84,11 @@ def infill_user_inputs(
         data_subset = parser.parse_sheet(modified_path, key, 0)
 
         # removes "" from luc lists
-        data_subset["existing_land_use"] = data_subset[
-            "existing_land_use"
-        ].apply(
-            lambda x: [item for item in x if item != ""]
-            if isinstance(x, list)
-            else x
+        data_subset["existing_land_use"] = data_subset["existing_land_use"].apply(
+            lambda x: [item for item in x if item != ""] if isinstance(x, list) else x
         )
-        data_subset["proposed_land_use"] = data_subset[
-            "proposed_land_use"
-        ].apply(
-            lambda x: [item for item in x if item != ""]
-            if isinstance(x, list)
-            else x
+        data_subset["proposed_land_use"] = data_subset["proposed_land_use"].apply(
+            lambda x: [item for item in x if item != ""] if isinstance(x, list) else x
         )
 
         if uneditable_columns is None:
@@ -115,7 +108,8 @@ def infill_user_inputs(
             else:
                 raise ValueError(
                     f"values in {uneditable_columns[key]} within {modified_path}"
-                    " have been modified, these values must remain constant")
+                    " have been modified, these values must remain constant"
+                )
     return infilled_data
 
 
@@ -123,7 +117,7 @@ def implement_user_fixes(
     config: inputs.DLitConfig,
     dlog_data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
-    do_not_edit_cols:dict[str, list[str]],
+    do_not_edit_cols: dict[str, list[str]],
     plot_graphs: bool,
 ) -> Optional[global_classes.DLogData]:
     """intergrates user fixes into data
@@ -152,44 +146,47 @@ def implement_user_fixes(
     # determines if user wishes to infill using exisiting file
     if os.path.exists(config.infill.user_input_path):
         LOG.info(
-            f"Existing file {config.infill.user_input_path} set as user infill input.")
+            f"Existing file {config.infill.user_input_path} set as user infill input."
+        )
         LOG.info("Implementing user fixes")
         infilled_data = infill_user_inputs(
-            dict((k, utilities.to_dict(dlog_data)[k]) for k in (
-                ["residential", "employment", "mixed"])),
-            config.infill.user_input_path)
-        converted_infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
+            dict(
+                (k, utilities.to_dict(dlog_data)[k])
+                for k in (["residential", "employment", "mixed"])
+            ),
+            config.infill.user_input_path,
+        )
+        converted_infilled_data = utilities.to_dlog_data(
+            infilled_data, dlog_data.lookup
+        )
         return converted_infilled_data
-        
+
     else:
         pre_user_fix_path = config.output_folder / "01_pre_user_fix"
         pre_user_fix_path.mkdir(exist_ok=True)
 
         analyse.data_report(
             dlog_data,
-            pre_user_fix_path/"pre_user_fix_data_report.xlsx",
+            pre_user_fix_path / "pre_user_fix_data_report.xlsx",
             pre_user_fix_path,
             auxiliary_data,
             plot_graphs,
             True,
         )
 
-        LOG.info(
-            f"Intial data quality report saved as {pre_user_fix_path}"
-        )
+        LOG.info(f"Intial data quality report saved as {pre_user_fix_path}")
 
         LOG.info(f"Creating file for user {config.infill.user_input_path} to edit.")
 
         user_input_file_builder(
-            config.infill.user_input_path, dlog_data, do_not_edit_cols)
-        LOG.info("Edit file with required changes and rerun the program. Do not change"
-            f"the name or location of {config.infill.user_input_path}.")
-        #end program 
+            config.infill.user_input_path, dlog_data, do_not_edit_cols
+        )
+        LOG.info(
+            "Edit file with required changes and rerun the program. Do not change"
+            f"the name or location of {config.infill.user_input_path}."
+        )
+        # end program
         return None
-
-
-
-
 
 
 def create_user_changes_audit(
@@ -222,26 +219,18 @@ def create_user_changes_audit(
         modified_colour = value.copy()
 
         # convert to lists and datetime strings
-        modified_colour = modified_colour.applymap(
-            convert_list_to_string
-        )
+        modified_colour = modified_colour.applymap(convert_list_to_string)
         original_df = original[key].applymap(convert_list_to_string)
 
-        datetime_columns = modified_colour.select_dtypes(
-            include="datetime"
-        ).columns
-        modified_colour[datetime_columns] = modified_colour[
-            datetime_columns
-        ].astype("string")
-        original_df[datetime_columns] = original_df[
-            datetime_columns
-        ].astype("string")
+        datetime_columns = modified_colour.select_dtypes(include="datetime").columns
+        modified_colour[datetime_columns] = modified_colour[datetime_columns].astype(
+            "string"
+        )
+        original_df[datetime_columns] = original_df[datetime_columns].astype("string")
 
         # seperate out numeric
 
-        modified_number = modified_colour.select_dtypes(
-            include="number"
-        )
+        modified_number = modified_colour.select_dtypes(include="number")
         original_number = original_df.select_dtypes(include="number")
 
         # use np.isclose() to solve rounding errors
@@ -271,9 +260,7 @@ def create_user_changes_audit(
         differences_other = modified_other.eq(original_other)
 
         # mash numerical and other back together
-        differences = pd.concat(
-            [differences_number, differences_other], axis=1
-        )
+        differences = pd.concat([differences_number, differences_other], axis=1)
 
         # reorder to match the df
         differences = differences[modified_colour.columns]
@@ -289,8 +276,7 @@ def create_user_changes_audit(
     utilities.write_to_excel(file_path, modified_colour_coded)
 
 
-def color_different_red(_:pd.DataFrame,
-    differences:pd.DataFrame)->pd.DataFrame:
+def color_different_red(_: pd.DataFrame, differences: pd.DataFrame) -> pd.DataFrame:
     """used to highlight values in red based on a array of bools
 
     used when formatting an excel spread sheet
@@ -327,7 +313,7 @@ def convert_list_to_string(value: list[str]) -> str:
     str
         list converted to string
     """
-    
+
     if isinstance(value, list):
         return ", ".join(value)
     return value
