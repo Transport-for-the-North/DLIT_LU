@@ -39,6 +39,9 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     config : inputs.DLitConfig
         config file
     """
+    if config.land_use is None:
+        raise ValueError("cannot run land use without any land use parameters")
+
     LOG.info("Initialising Land Use Module")
 
     config.output_folder.mkdir(exist_ok=True)
@@ -116,7 +119,21 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         input_data.proposed_land_use_split,
     )
 
-    demolition_land_use_data = data.copy()
+    msg = "Demolitions calculated with dampener = %.2f"
+    if config.land_use.demolition_dampener == 1:
+        msg += ", i.e. no damping"
+    elif config.land_use.demolition_dampener == 0:
+        msg += ", i.e. no demolitions"
+    LOG.info(msg, config.land_use.demolition_dampener)
+
+    demolition_land_use_data: dict[str, pd.DataFrame] = {}
+    for key, df in data.items():
+        demos = df.copy()
+        demos.loc[:, build_out_columns] = demos.loc[:, build_out_columns].multiply(
+            config.land_use.demolition_dampener
+        )
+        demolition_land_use_data[key] = demos
+
     demolition_land_use_data["residential"] = convert_to_gfa(
         demolition_land_use_data["residential"],
         "total_site_area_size_hectares",

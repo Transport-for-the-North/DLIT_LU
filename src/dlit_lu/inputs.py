@@ -127,6 +127,10 @@ class LandUseConfig:
         path to employment density matrix
     luc_sic_conversion_path: pathlib.Path
         path to land use code to SIC code conversion matrix
+    demolition_dampener: float, default 1.0
+        Factor to apply when calculating number of demolitions,
+        0 would mean no demolitions and 1 would mean maximum
+        demolitions.
     """
 
     land_use_input: Optional[pathlib.Path]
@@ -136,6 +140,7 @@ class LandUseConfig:
     msoa_jobs_path: pathlib.Path
     employment_density_matrix_path: pathlib.Path
     luc_sic_conversion_path: pathlib.Path
+    demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
 
     def check_params(self) -> None:
         """performs checks as to whether values exist
