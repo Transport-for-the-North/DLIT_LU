@@ -128,6 +128,12 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     demolition_land_use_data: dict[str, pd.DataFrame] = {}
     for key, df in data.items():
+        negative_sites = (df.loc[:, build_out_columns] < 0).any(axis=1).sum()
+        if negative_sites > 0:
+            LOG.info(
+                "Explicit demolitions found on %s sites in %s data", negative_sites, key
+            )
+
         demos = df.copy()
         demos.loc[:, build_out_columns] = demos.loc[:, build_out_columns].multiply(
             config.land_use.demolition_dampener
