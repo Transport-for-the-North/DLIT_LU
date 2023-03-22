@@ -139,7 +139,10 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
 
     # infill invalid data
     infilled_fixed_data = data_repair.infill_data(
-        data_to_fix, auxiliary_data, config.output_folder, config
+        data_to_fix,
+        auxiliary_data,
+        config.output_folder,
+        config.infill.gfa_infill_method,
     )
 
     infilled_fixed_data_dict = utilities.to_dict(infilled_fixed_data)

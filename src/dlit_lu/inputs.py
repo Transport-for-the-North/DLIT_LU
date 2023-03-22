@@ -1,7 +1,7 @@
 """handles reading config file
 """
 # standard imports
-import json
+import enum
 import pathlib
 from typing import Optional
 import os
@@ -12,6 +12,13 @@ import pydantic
 import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
+
+
+class GFAInfillMethod(enum.Enum):
+    """Method for infilling the GFA from the site area."""
+
+    MEAN = "mean"
+    REGRESSION = "regression"
 
 
 @dataclasses.dataclass
@@ -46,7 +53,8 @@ class InfillConfig:
         path to known invalid land use codes and their replacements
     regions_shapefiles_path: pathlib.Path
         path to LPA regions shapefile
-
+    gfa_infill_method : GFAInfillMethod
+        Method to use when infilling the site area and GFA columns.
     """
 
     user_infill: bool
@@ -61,6 +69,7 @@ class InfillConfig:
     incomplete_luc_path: pathlib.Path
     known_invalid_luc_path: pathlib.Path
     regions_shapefiles_path: pathlib.Path
+    gfa_infill_method: GFAInfillMethod
 
     def check_params(self) -> None:
         """performs checks as to whether values exist

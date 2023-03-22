@@ -20,6 +20,22 @@ from dlit_lu import global_classes, utilities, analyse, inputs
 
 # constants
 LOG = logging.getLogger(__name__)
+_AREA_COLUMNS_LIST = {
+    "residential": ["total_site_area_size_hectares"],
+    "employment": ["site_area_ha"],
+    "mixed": ["total_area_ha"],
+}
+_AREA_COLUMNS = {k: v[0] for k, v in _AREA_COLUMNS_LIST.items()}
+_UNITS_COLUMNS = {
+    "residential": ["units_(dwellings)", "total_units"],
+    "employment": ["total_area_sqm", "units_(floorspace)"],
+    "mixed": ["floorspace_sqm", "units_(floorspace)"],
+}
+_LAND_USE_COLUMNS = {
+    "residential": ["existing_land_use"],
+    "employment": ["existing_land_use", "proposed_land_use"],
+    "mixed": ["existing_land_use", "proposed_land_use"],
+}
 
 
 def correct_inavlid_syntax(
@@ -79,7 +95,7 @@ def infill_data(
     data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
     output_folder: pathlib.Path,
-    config: inputs.DLitConfig,
+    gfa_method: inputs.GFAInfillMethod,
 ) -> global_classes.DLogData:
     """Infills data for which assumptions are required
 
@@ -91,6 +107,10 @@ def infill_data(
         data to infill
     auxiliary_data : global_classes.AuxiliaryData
         auxiliary data from parser
+    output_folder : pathlib.Path
+        Folder to save summary graphs and parameters in.
+    gfa_method : GFAInfillMethod
+        Method for infilling the GFA and site area columns.
 
     Returns
     -------
@@ -98,56 +118,85 @@ def infill_data(
         infilled data
     """
     LOG.info("performing automatic infilling fixes")
+    if gfa_method == inputs.GFAInfillMethod.MEAN:
+        infilled_area = _average_area_infill(data, output_folder)
+    elif gfa_method == inputs.GFAInfillMethod.REGRESSION:
+        infilled_area = _regression_area_infill(data)
+    else:
+        raise ValueError(f"invalid GFA infill method: {gfa_method}")
+
+    corrected_format = {
+        "residential": infilled_area.residential_data,
+        "employment": infilled_area.employment_data,
+        "mixed": infilled_area.mixed_data,
+    }
+
+    corrected_format = old_incomplete_known_luc(
+        corrected_format, _LAND_USE_COLUMNS, auxiliary_data
+    )
+
+    corrected_format = fix_missing_lucs(
+        corrected_format,
+        _LAND_USE_COLUMNS,
+        ["unknown", "mixed"],
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+    )
+
+    corrected_format = fix_undefined_invalid_luc(
+        corrected_format,
+        _LAND_USE_COLUMNS,
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+        auxiliary_data,
+        {
+            "existing_land_use": "other_issues_existing_land_use_code",
+            "proposed_land_use": "other_issues_proposed_land_use_code",
+        },
+    )
+
+    corrected_format = infill_missing_tag(corrected_format)
+    corrected_format = infill_missing_years(corrected_format, data.lookup.webtag)
+
+    return global_classes.DLogData(
+        None,
+        corrected_format["residential"],
+        corrected_format["employment"],
+        corrected_format["mixed"],
+        data.lookup,
+    )
+
+
+def _average_area_infill(
+    data: global_classes.DLogData, output_folder: pathlib.Path
+) -> global_classes.DLogData:
+    """Infill the site area and units columns using mean areas.
+
+    Saves KDE plots of the areas to `output_folder`.
+    """
+    LOG.info("Infilling site area, total area and floorspaces using MEAN")
     data_dict = {
         "residential": data.residential_data,
         "employment": data.employment_data,
         "mixed": data.mixed_data,
     }
 
-    # define columns
-    area_columns_list = {
-        "residential": ["total_site_area_size_hectares"],
-        "employment": ["site_area_ha"],
-        "mixed": ["total_area_ha"],
-    }
-
-    area_columns = {
-        "residential": "total_site_area_size_hectares",
-        "employment": "site_area_ha",
-        "mixed": "total_area_ha",
-    }
-
-    land_use_columns = {
-        "residential": ["existing_land_use"],
-        "employment": ["existing_land_use", "proposed_land_use"],
-        "mixed": ["existing_land_use", "proposed_land_use"],
-    }
-
-    units_columnns = {
-        "residential": ["units_(dwellings)", "total_units"],
-        "employment": ["total_area_sqm", "units_(floorspace)"],
-        "mixed": ["floorspace_sqm", "units_(floorspace)"],
-    }
-
-    # calculate ratios
-    distribution_path = config.output_folder / "distribution_plots"
+    distribution_path = output_folder / "distribution_plots"
     distribution_path.mkdir(exist_ok=True)
 
     dwelling_area_ratio = unit_area_ratio(
         dict((k, data_dict[k]) for k in (["residential", "mixed"])),
         {"residential": "total_units", "mixed": "dwellings"},
-        dict((k, area_columns[k]) for k in (["residential", "mixed"])),
+        dict((k, _AREA_COLUMNS[k]) for k in (["residential", "mixed"])),
         distribution_path / "dwelling_site_area_ratio_dist.png",
     )
 
     floorspace_area_ratio = unit_area_ratio(
         dict((k, data_dict[k]) for k in (["employment", "mixed"])),
         {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
-        dict((k, area_columns[k]) for k in (["employment", "mixed"])),
+        dict((k, _AREA_COLUMNS[k]) for k in (["employment", "mixed"])),
         distribution_path / "GFA_site_area_ratio_dist.png",
     )
 
-    average_area = calculate_average(data_dict, area_columns_list, distribution_path)
+    average_area = calculate_average(data_dict, _AREA_COLUMNS_LIST, distribution_path)
 
     inputs.InfillingAverages(
         average_res_area=average_area["residential"],
@@ -158,12 +207,12 @@ def infill_data(
     ).save_yaml(output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE)
     # infill values
     corrected_format = infill_missing_site_area(
-        data_dict, area_columns_list, [0, "-"], average_area
+        data_dict, _AREA_COLUMNS_LIST, [0, "-"], average_area
     )
     corrected_format = infill_units(
         corrected_format,
-        units_columnns,
-        area_columns,
+        _UNITS_COLUMNS,
+        _AREA_COLUMNS,
         ["-", 0],
         {
             "residential": dwelling_area_ratio,
@@ -180,39 +229,17 @@ def infill_data(
         {"mixed": dwelling_area_ratio},
     )["mixed"]
 
-    corrected_format = old_incomplete_known_luc(
-        corrected_format, land_use_columns, auxiliary_data
-    )
-
-    corrected_format = fix_missing_lucs(
-        corrected_format,
-        land_use_columns,
-        ["unknown", "mixed"],
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
-    )
-
-    corrected_format = fix_undefined_invalid_luc(
-        corrected_format,
-        land_use_columns,
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
-        auxiliary_data,
-        {
-            "existing_land_use": "other_issues_existing_land_use_code",
-            "proposed_land_use": "other_issues_proposed_land_use_code",
-        },
-    )
-
-    corrected_format = infill_missing_tag(corrected_format)
-
-    corrected_format = infill_missing_years(corrected_format, data.lookup.webtag)
-
     return global_classes.DLogData(
-        None,
-        corrected_format["residential"],
-        corrected_format["employment"],
-        corrected_format["mixed"],
-        data.lookup,
+        combined_data=None,
+        residential_data=corrected_format["residential"],
+        employment_data=corrected_format["employment"],
+        mixed_data=corrected_format["mixed"],
+        lookup=data.lookup,
     )
+
+
+def _regression_area_infill(data: global_classes.DLogData) -> global_classes.DLogData:
+    raise NotImplementedError("WIP!")
 
 
 def incorrect_luc_formatting(
