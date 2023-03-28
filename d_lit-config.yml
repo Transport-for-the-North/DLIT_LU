@@ -27,7 +27,7 @@ infill:
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
   user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
-  gfa_infill_method: mean
+  gfa_infill_method: regression_no_negatives
 
 land_use:
   land_use_input: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\03_post_fixes\post_fix_data.xlsx

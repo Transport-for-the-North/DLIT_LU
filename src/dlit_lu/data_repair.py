@@ -4,19 +4,21 @@
 """
 # standard imports
 from __future__ import annotations
+import dataclasses
 
 import logging
 from typing import Optional
 import pathlib
 
 # third party imports
-import pandas as pd
-import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn import preprocessing, ensemble
 
 # local imports
-from dlit_lu import global_classes, utilities, analyse, inputs
+from dlit_lu import global_classes, analyse, inputs
 
 # constants
 LOG = logging.getLogger(__name__)
@@ -29,13 +31,19 @@ _AREA_COLUMNS = {k: v[0] for k, v in _AREA_COLUMNS_LIST.items()}
 _UNITS_COLUMNS = {
     "residential": ["units_(dwellings)", "total_units"],
     "employment": ["total_area_sqm", "units_(floorspace)"],
-    "mixed": ["floorspace_sqm", "units_(floorspace)"],
+    "mixed": ["floorspace_sqm", "units_(floorspace)", "dwellings", "units_(dwellings)"],
 }
 _LAND_USE_COLUMNS = {
     "residential": ["existing_land_use"],
     "employment": ["existing_land_use", "proposed_land_use"],
     "mixed": ["existing_land_use", "proposed_land_use"],
 }
+
+
+@dataclasses.dataclass
+class _RegressionInfillIndices:
+    infill: pd.Series
+    training: pd.Series
 
 
 def correct_inavlid_syntax(
@@ -59,36 +67,44 @@ def correct_inavlid_syntax(
         data with syntax issues fixed
     """
     LOG.info("performing automatic syntax fixes")
-    data_dict = {
-        "residential": data.residential_data,
-        "employment": data.employment_data,
-        "mixed": data.mixed_data,
-    }
-
-    # define columns
-
-    land_use_columns = {
-        "residential": ["existing_land_use"],
-        "employment": ["existing_land_use", "proposed_land_use"],
-        "mixed": ["existing_land_use", "proposed_land_use"],
-    }
-
     # TODO does not include dwelling units for mixed, currently fixed manually
-    data_dict = utilities.to_dict(data)
-
-    corrected_format = fix_site_ref_id(data_dict)
+    corrected_format = fix_site_ref_id(data.data_dict())
 
     corrected_format = incorrect_luc_formatting(
-        corrected_format, land_use_columns, auxiliary_data
+        corrected_format, _LAND_USE_COLUMNS, auxiliary_data
     )
 
-    return global_classes.DLogData(
-        None,
-        corrected_format["residential"],
-        corrected_format["employment"],
-        corrected_format["mixed"],
-        data.lookup,
+    return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
+
+
+def infill_landuse_codes(
+    data: global_classes.DLogData, auxiliary_data: global_classes.AuxiliaryData
+) -> global_classes.DLogData:
+    luc_infilling = old_incomplete_known_luc(
+        {k: getattr(data, f"{k}_data") for k in _LAND_USE_COLUMNS},
+        _LAND_USE_COLUMNS,
+        auxiliary_data,
     )
+
+    luc_infilling = fix_missing_lucs(
+        luc_infilling,
+        _LAND_USE_COLUMNS,
+        ["unknown", "mixed"],
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+    )
+
+    luc_infilling = fix_undefined_invalid_luc(
+        luc_infilling,
+        _LAND_USE_COLUMNS,
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+        auxiliary_data,
+        {
+            "existing_land_use": "other_issues_existing_land_use_code",
+            "proposed_land_use": "other_issues_proposed_land_use_code",
+        },
+    )
+
+    return global_classes.DLogData.from_data_dict(luc_infilling, data.lookup)
 
 
 def infill_data(
@@ -118,96 +134,111 @@ def infill_data(
         infilled data
     """
     LOG.info("performing automatic infilling fixes")
+    # Infilling land use codes before areas as they're
+    # required for regression area infill
+    luc_infilled = infill_landuse_codes(data, auxiliary_data)
+
+    distribution_path = output_folder / "distribution_plots/before_infilling"
+    distribution_path.mkdir(exist_ok=True, parents=True)
+
+    # Convert units / area columns to float
+    for key, area_col in _AREA_COLUMNS.items():
+        df: pd.DataFrame = getattr(luc_infilled, f"{key}_data")
+        df.loc[:, area_col] = pd.to_numeric(df[area_col], errors="coerce")
+
+        for units_col in _UNITS_COLUMNS[key]:
+            df.loc[:, units_col] = pd.to_numeric(df[units_col], errors="coerce")
+
+    infill_averages = _average_factors(
+        luc_infilled,
+        distribution_path,
+        output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE,
+    )
+
     if gfa_method == inputs.GFAInfillMethod.MEAN:
-        infilled_area = _average_area_infill(data, output_folder)
-    elif gfa_method == inputs.GFAInfillMethod.REGRESSION:
-        infilled_area = _regression_area_infill(data)
+        infilled_area = _average_area_infill(luc_infilled, infill_averages)
+    elif gfa_method in inputs.GFAInfillMethod.regression_methods():
+        infilled_area = _regression_area_infill(
+            luc_infilled, gfa_method == inputs.GFAInfillMethod.REGRESSION
+        )
     else:
         raise ValueError(f"invalid GFA infill method: {gfa_method}")
 
-    corrected_format = {
-        "residential": infilled_area.residential_data,
-        "employment": infilled_area.employment_data,
-        "mixed": infilled_area.mixed_data,
-    }
-
-    corrected_format = old_incomplete_known_luc(
-        corrected_format, _LAND_USE_COLUMNS, auxiliary_data
+    distribution_path = output_folder / "distribution_plots/after_infilling"
+    distribution_path.mkdir(exist_ok=True, parents=True)
+    _average_factors(
+        infilled_area,
+        distribution_path,
+        output_folder / ("after_" + inputs.AVERAGE_INFILLING_VALUES_FILE),
     )
 
-    corrected_format = fix_missing_lucs(
-        corrected_format,
-        _LAND_USE_COLUMNS,
-        ["unknown", "mixed"],
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+    infilled_data = infill_missing_tag(
+        {k: getattr(infilled_area, f"{k}_data") for k in _LAND_USE_COLUMNS}
+    )
+    infilled_data = infill_missing_years(infilled_data, data.lookup.webtag)
+
+    return global_classes.DLogData.from_data_dict(infilled_data, data.lookup)
+
+
+def _average_factors(
+    data: global_classes.DLogData,
+    distribution_path: pathlib.Path,
+    averages_path: pathlib.Path,
+) -> inputs.InfillingAverages:
+    def get_data(key: str) -> pd.DataFrame:
+        return getattr(data, f"{key}_data")
+
+    dwelling_datatypes = ["residential", "mixed"]
+
+    dwelling_area_ratio = unit_area_ratio(
+        dict((k, get_data(k)) for k in dwelling_datatypes),
+        {"residential": "total_units", "mixed": "dwellings"},
+        dict((k, _AREA_COLUMNS[k]) for k in dwelling_datatypes),
+        distribution_path / "dwelling_site_area_ratio_dist.png",
     )
 
-    corrected_format = fix_undefined_invalid_luc(
-        corrected_format,
-        _LAND_USE_COLUMNS,
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
-        auxiliary_data,
-        {
-            "existing_land_use": "other_issues_existing_land_use_code",
-            "proposed_land_use": "other_issues_proposed_land_use_code",
-        },
+    fs_datatypes = ["employment", "mixed"]
+    floorspace_area_ratio = unit_area_ratio(
+        dict((k, get_data(k)) for k in fs_datatypes),
+        {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
+        dict((k, _AREA_COLUMNS[k]) for k in fs_datatypes),
+        distribution_path / "GFA_site_area_ratio_dist.png",
     )
 
-    corrected_format = infill_missing_tag(corrected_format)
-    corrected_format = infill_missing_years(corrected_format, data.lookup.webtag)
+    average_area = calculate_average(data, _AREA_COLUMNS_LIST, distribution_path)
 
-    return global_classes.DLogData(
-        None,
-        corrected_format["residential"],
-        corrected_format["employment"],
-        corrected_format["mixed"],
-        data.lookup,
+    infill_averages = inputs.InfillingAverages(
+        average_res_area=average_area["residential"],
+        average_emp_area=average_area["employment"],
+        average_mix_area=average_area["mixed"],
+        average_gfa_site_area_ratio=floorspace_area_ratio,
+        average_dwelling_site_area_ratio=dwelling_area_ratio,
     )
+
+    infill_averages.save_yaml(averages_path)
+    return infill_averages
 
 
 def _average_area_infill(
-    data: global_classes.DLogData, output_folder: pathlib.Path
+    data: global_classes.DLogData, infill_averages: inputs.InfillingAverages
 ) -> global_classes.DLogData:
     """Infill the site area and units columns using mean areas.
 
     Saves KDE plots of the areas to `output_folder`.
     """
     LOG.info("Infilling site area, total area and floorspaces using MEAN")
-    data_dict = {
-        "residential": data.residential_data,
-        "employment": data.employment_data,
-        "mixed": data.mixed_data,
-    }
+    data_dict = data.data_dict()
 
-    distribution_path = output_folder / "distribution_plots"
-    distribution_path.mkdir(exist_ok=True)
-
-    dwelling_area_ratio = unit_area_ratio(
-        dict((k, data_dict[k]) for k in (["residential", "mixed"])),
-        {"residential": "total_units", "mixed": "dwellings"},
-        dict((k, _AREA_COLUMNS[k]) for k in (["residential", "mixed"])),
-        distribution_path / "dwelling_site_area_ratio_dist.png",
-    )
-
-    floorspace_area_ratio = unit_area_ratio(
-        dict((k, data_dict[k]) for k in (["employment", "mixed"])),
-        {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
-        dict((k, _AREA_COLUMNS[k]) for k in (["employment", "mixed"])),
-        distribution_path / "GFA_site_area_ratio_dist.png",
-    )
-
-    average_area = calculate_average(data_dict, _AREA_COLUMNS_LIST, distribution_path)
-
-    inputs.InfillingAverages(
-        average_res_area=average_area["residential"],
-        average_emp_area=average_area["employment"],
-        average_mix_area=average_area["mixed"],
-        average_gfa_site_area_ratio=floorspace_area_ratio,
-        average_dwelling_site_area_ratio=dwelling_area_ratio,
-    ).save_yaml(output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE)
     # infill values
     corrected_format = infill_missing_site_area(
-        data_dict, _AREA_COLUMNS_LIST, [0, "-"], average_area
+        data_dict,
+        _AREA_COLUMNS_LIST,
+        [0, "-"],
+        {
+            "residential": infill_averages.average_res_area,
+            "employment": infill_averages.average_emp_area,
+            "mixed": infill_averages.average_mix_area,
+        },
     )
     corrected_format = infill_units(
         corrected_format,
@@ -215,9 +246,9 @@ def _average_area_infill(
         _AREA_COLUMNS,
         ["-", 0],
         {
-            "residential": dwelling_area_ratio,
-            "employment": floorspace_area_ratio,
-            "mixed": floorspace_area_ratio,
+            "residential": infill_averages.average_dwelling_site_area_ratio,
+            "employment": infill_averages.average_gfa_site_area_ratio,
+            "mixed": infill_averages.average_gfa_site_area_ratio,
         },
     )
 
@@ -226,20 +257,149 @@ def _average_area_infill(
         {"mixed": ["dwellings", "units_(dwellings)"]},
         {"mixed": "total_area_ha"},
         ["-", 0],
-        {"mixed": dwelling_area_ratio},
+        {"mixed": infill_averages.average_dwelling_site_area_ratio},
     )["mixed"]
 
-    return global_classes.DLogData(
-        combined_data=None,
-        residential_data=corrected_format["residential"],
-        employment_data=corrected_format["employment"],
-        mixed_data=corrected_format["mixed"],
-        lookup=data.lookup,
+    return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
+
+
+def _regression_preprocessing(
+    data: pd.DataFrame, landuse_column: str, area_column: str
+) -> tuple[pd.DataFrame, list[str], str]:
+    mlb = preprocessing.MultiLabelBinarizer()
+    landuse_binary = pd.DataFrame(
+        mlb.fit_transform(data[landuse_column]), columns=mlb.classes_, index=data.index
+    )
+    landuse_columns = mlb.classes_
+
+    regression_data = pd.concat([landuse_binary, data[area_column]], axis=1)
+    return regression_data, landuse_columns, area_column
+
+
+def _hist_gradient_boosting(
+    current_data: pd.Series,
+    regression_inputs: pd.DataFrame,
+    categorical_columns: list[str],
+    infill_indices: _RegressionInfillIndices,
+) -> pd.Series:
+    gradient_boosting = ensemble.HistGradientBoostingRegressor(
+        categorical_features=categorical_columns
+    )
+    gradient_boosting.fit(
+        regression_inputs.loc[infill_indices.training],
+        current_data.loc[infill_indices.training],
     )
 
+    return gradient_boosting.predict(regression_inputs.loc[infill_indices.infill])
 
-def _regression_area_infill(data: global_classes.DLogData) -> global_classes.DLogData:
-    raise NotImplementedError("WIP!")
+
+def _check_infill_column(
+    data: pd.DataFrame,
+    infill_column: str,
+    data_columns: list[str],
+    include_negatives: bool,
+) -> Optional[_RegressionInfillIndices]:
+    negatives = data[infill_column] < 0
+    if negatives.sum() > 0:
+        LOG.warning(
+            "%s negative values found in column '%s'", negatives.sum(), infill_column
+        )
+    else:
+        LOG.debug("No negative values found in column '%s'", infill_column)
+
+    infill_nan = data[infill_column].isna()
+    if infill_nan.sum() == 0:
+        LOG.info("No infilling needed for column '%s'", infill_column)
+        return None
+
+    LOG.info(
+        "Infilling %s missing values in '%s' column using columns: %s",
+        infill_nan.sum(),
+        infill_column,
+        ", ".join(f"'{i}'" for i in data_columns),
+    )
+
+    if include_negatives:
+        training_mask = ~infill_nan
+    else:
+        LOG.info("Negative values excluded from regression training data")
+        training_mask = (~infill_nan) & (~negatives)
+
+    return _RegressionInfillIndices(infill=infill_nan, training=training_mask)
+
+
+def _add_infill_mask_column(
+    data: pd.DataFrame, infilled_column: str, mask: pd.Series, mask_columns: list[str]
+) -> pd.DataFrame:
+    infill_mask_column = f"{infilled_column}_regression_infilled"
+    data.insert(data.columns.tolist().index(infilled_column), infill_mask_column, mask)
+    mask_columns.append(infill_mask_column)
+    return data
+
+
+def _regression_area_infill(
+    dlog_data: global_classes.DLogData, include_negatives: bool
+) -> global_classes.DLogData:
+    infilled_data: dict[str, pd.DataFrame] = {}
+
+    for dtype, area_col in _AREA_COLUMNS.items():
+        LOG.info(
+            "Performing regression area infilling for %s data",
+            dtype,
+        )
+        infilled_df: pd.DataFrame = dlog_data.data_dict()[dtype]
+        infilled_df.loc[:, area_col] = pd.to_numeric(
+            infilled_df[area_col], errors="coerce"
+        )
+        infill_mask_columns: list[str] = []
+
+        # Get the proposed land use column if available
+        landuse_col = _LAND_USE_COLUMNS[dtype][-1]
+
+        regression_data, landuse_columns, _ = _regression_preprocessing(
+            infilled_df, landuse_col, area_col
+        )
+
+        for units_col in _UNITS_COLUMNS[dtype]:
+            infilled_df.loc[:, units_col] = pd.to_numeric(
+                infilled_df[units_col], errors="coerce"
+            )
+
+            infill_indices = _check_infill_column(
+                infilled_df, units_col, [area_col, landuse_col], include_negatives
+            )
+            if infill_indices is None:
+                continue
+
+            # Infill floorspace using LUC and site area (missing site areas can still be infilled)
+            infilled_df.loc[infill_indices.infill, units_col] = _hist_gradient_boosting(
+                infilled_df[units_col], regression_data, landuse_columns, infill_indices
+            )
+            infilled_df = _add_infill_mask_column(
+                infilled_df, units_col, infill_indices.infill, infill_mask_columns
+            )
+
+        # Infill site area after floorspace so the infilled site areas
+        # don't affect the floorspace infilling process
+        infill_indices = _check_infill_column(
+            infilled_df, area_col, [landuse_col], include_negatives
+        )
+        if infill_indices is not None:
+            infilled_df.loc[infill_indices.infill, area_col] = _hist_gradient_boosting(
+                infilled_df[area_col],
+                regression_data.loc[:, landuse_columns],
+                landuse_columns,
+                infill_indices,
+            )
+            infilled_df = _add_infill_mask_column(
+                infilled_df, area_col, infill_indices.infill, infill_mask_columns
+            )
+
+        infilled_data[dtype] = infilled_df.drop(columns=infill_mask_columns)
+        # TODO(MB) Save this in an output folder
+        infilled_df.to_csv(f".temp/infill_regression_tests/{dtype}_infilled.csv")
+
+    return global_classes.DLogData.from_data_dict(infilled_data, dlog_data.lookup)
 
 
 def incorrect_luc_formatting(
@@ -638,6 +798,9 @@ def infill_units(
             index=filtered_data_missing_area[key].index
         )
 
+        if filtered_data_with_area.empty:
+            continue  # No need to infill if they're is no missing data
+
         fixed_data[key].loc[filtered_data_with_area.index, unit_columns[key]] = (
             fixed_data[key].loc[filtered_data_with_area.index, area_columns[key]]
             * unit_to_area_ratio[key]
@@ -687,7 +850,7 @@ def infill_missing_site_area(
 
 
 def calculate_average(
-    data: dict[str, pd.DataFrame],
+    data: global_classes.DLogData,
     columns: dict[str, list[str]],
     output_path: pathlib.Path,
 ) -> dict[str, float]:
@@ -697,7 +860,7 @@ def calculate_average(
 
     Parameters
     ----------
-    data : dict[str, pd.DataFrame]
+    data : global_classes.DLogData
         data to analyse
     columns : dict[str, list[str]]
         columns to include within the average
@@ -708,12 +871,17 @@ def calculate_average(
         mean values
     """
     mean_values = {}
-    for key, value in data.items():
+    for key, df in data.data_dict().items():
+        if key not in columns or df is None:
+            continue
+
         for column in columns[key]:
-            mean_values[key] = value.loc[value["missing_area"] == False, column].mean()
+            na_filter = ~df[column].isna()
+
+            mean_values[key] = df.loc[na_filter, column].mean()
             distribution_plots(
-                value.loc[value["missing_area"] == False, column].to_numpy(),
-                key + " Site Area Distribution",
+                df.loc[na_filter, column].to_numpy(),
+                f"{key.title()} Site Area Distribution",
                 output_path / (key + "_site_area_dist.png"),
             )
     return mean_values
@@ -907,16 +1075,24 @@ def unit_area_ratio(
     """
     all_ratios = np.array([])
     for key, value in data.items():
-        data_subset = value.loc[value["missing_area"] == False, :]
-        data_subset = data_subset.loc[
-            data_subset["missing_gfa_or_dwellings_with_site_area"] == False,
-            :,
-        ]
+        units_col = unit_columns[key]
+        area_col = area_columns[key]
+
         # data subset only contains entries with site area and dwelling/floorspace
+        data_subset = value.loc[
+            (~value[units_col].isna()) & (~value[area_col].isna()), :
+        ]
         all_ratios = np.append(
             all_ratios,
-            (data_subset[unit_columns[key]] / data_subset[area_columns[key]]),
+            np.divide(
+                data_subset[units_col],
+                data_subset[area_col],
+                where=data_subset[area_col] != 0,
+                out=np.full_like(data_subset[units_col], np.nan),
+            ),
         )
+
+    all_ratios = all_ratios[np.isfinite(all_ratios)]
     distribution_plots(all_ratios, "Unit-Site Area Ratio Plot", plot_path)
     return all_ratios.mean()
 

@@ -1,6 +1,8 @@
 """contains NamedTuple subclasses and other classes used globally
 """  # docstring
 # standard imports
+from __future__ import annotations
+
 from typing import NamedTuple, Optional
 
 # third party imports
@@ -81,6 +83,47 @@ class DLogData(NamedTuple):
     lookup: DLogValueLookup
     proposed_land_use_split: Optional[pd.DataFrame] = None
     existing_land_use_split: Optional[pd.DataFrame] = None
+
+    def data_dict(self) -> dict[str, pd.DataFrame]:
+        """Convert to D-Log data dictionary.
+        
+        Dictionary contains keys "residential", "employment"
+        and "mixed".
+        """
+        return {
+            "residential": self.residential_data,
+            "employment": self.employment_data,
+            "mixed": self.mixed_data,
+        }
+
+    @staticmethod
+    def from_data_dict(
+        data: dict[str, pd.DataFrame],
+        lookup: DLogValueLookup,
+        combined_data: Optional[pd.DataFrame] = None,
+    ) -> DLogData:
+        """Create DLogData from data dictionary.
+
+        Parameters
+        ----------
+        data : dict[str, pd.DataFrame]
+            D-Log data with keys "residential", "employment"
+            and "mixed".
+        lookup : DLogValueLookup
+            D-Log lookup data.
+        combined_data : pd.DataFrame, optional
+            Combined D-Log data.
+
+        Returns
+        -------
+        DLogData
+            New instance of DLogData with `data`.
+        """
+        return DLogData(
+            combined_data=combined_data,
+            **{f"{k}_data": v for k, v in data.items()},
+            lookup=lookup,
+        )
 
 
 class AuxiliaryData(NamedTuple):

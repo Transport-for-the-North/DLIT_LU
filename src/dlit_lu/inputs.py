@@ -1,6 +1,8 @@
 """handles reading config file
 """
 # standard imports
+from __future__ import annotations
+
 import enum
 import pathlib
 from typing import Optional
@@ -19,6 +21,12 @@ class GFAInfillMethod(enum.Enum):
 
     MEAN = "mean"
     REGRESSION = "regression"
+    REGRESSION_NO_NEGATIVES = "regression_no_negatives"
+
+    @classmethod
+    def regression_methods(cls) -> list[GFAInfillMethod]:
+        """List of methods which use HistGradientBoostingRegressor."""
+        return [cls.REGRESSION, cls.REGRESSION_NO_NEGATIVES]
 
 
 @dataclasses.dataclass
