@@ -86,7 +86,7 @@ class DLogData(NamedTuple):
 
     def data_dict(self) -> dict[str, pd.DataFrame]:
         """Convert to D-Log data dictionary.
-        
+
         Dictionary contains keys "residential", "employment"
         and "mixed".
         """
@@ -123,6 +123,27 @@ class DLogData(NamedTuple):
             combined_data=combined_data,
             **{f"{k}_data": v for k, v in data.items()},
             lookup=lookup,
+        )
+
+    def copy(self) -> DLogData:
+        """Shallow copy of the attributes within the data.
+
+        Copies dataframes but uses the same `lookup`.
+        """
+
+        def optional_copy(data: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+            if data is None:
+                return None
+            return data.copy()
+
+        return DLogData(
+            combined_data=optional_copy(self.combined_data),
+            residential_data=self.residential_data.copy(),
+            employment_data=self.employment_data.copy(),
+            mixed_data=self.mixed_data.copy(),
+            lookup=self.lookup,
+            proposed_land_use_split=optional_copy(self.proposed_land_use_split),
+            existing_land_use_split=optional_copy(self.existing_land_use_split),
         )
 
 

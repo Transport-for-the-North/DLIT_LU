@@ -12,6 +12,7 @@ import pathlib
 
 # third party imports
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -42,6 +43,8 @@ _LAND_USE_COLUMNS = {
 
 @dataclasses.dataclass
 class _RegressionInfillIndices:
+    """Indices for row to train the regression model and rows to infill."""
+
     infill: pd.Series
     training: pd.Series
 
@@ -134,20 +137,21 @@ def infill_data(
         infilled data
     """
     LOG.info("performing automatic infilling fixes")
+    data = data.copy()
+    # Convert units / area columns to float
+    for key, area_col in _AREA_COLUMNS.items():
+        df: pd.DataFrame = getattr(data, f"{key}_data")
+        df.loc[:, area_col] = pd.to_numeric(df[area_col], errors="coerce")
+
+        for units_col in _UNITS_COLUMNS[key]:
+            df.loc[:, units_col] = pd.to_numeric(df[units_col], errors="coerce")
+
     # Infilling land use codes before areas as they're
     # required for regression area infill
     luc_infilled = infill_landuse_codes(data, auxiliary_data)
 
     distribution_path = output_folder / "distribution_plots/before_infilling"
     distribution_path.mkdir(exist_ok=True, parents=True)
-
-    # Convert units / area columns to float
-    for key, area_col in _AREA_COLUMNS.items():
-        df: pd.DataFrame = getattr(luc_infilled, f"{key}_data")
-        df.loc[:, area_col] = pd.to_numeric(df[area_col], errors="coerce")
-
-        for units_col in _UNITS_COLUMNS[key]:
-            df.loc[:, units_col] = pd.to_numeric(df[units_col], errors="coerce")
 
     infill_averages = _average_factors(
         luc_infilled,
@@ -164,8 +168,8 @@ def infill_data(
     else:
         raise ValueError(f"invalid GFA infill method: {gfa_method}")
 
-    distribution_path = output_folder / "distribution_plots/after_infilling"
-    distribution_path.mkdir(exist_ok=True, parents=True)
+    distribution_path = distribution_path.with_name("after_infilling")
+    distribution_path.mkdir(exist_ok=True)
     _average_factors(
         infilled_area,
         distribution_path,
@@ -177,7 +181,13 @@ def infill_data(
     )
     infilled_data = infill_missing_years(infilled_data, data.lookup.webtag)
 
-    return global_classes.DLogData.from_data_dict(infilled_data, data.lookup)
+    infilled_data = global_classes.DLogData.from_data_dict(infilled_data, data.lookup)
+
+    distribution_path = distribution_path.with_name("comparison")
+    distribution_path.mkdir(exist_ok=True)
+    _infilling_comparison_plots(data, infilled_data, distribution_path)
+
+    return infilled_data
 
 
 def _average_factors(
@@ -1127,6 +1137,100 @@ def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> N
     ax.legend()
     fig.savefig(save_as)
     plt.close()
+
+
+def _infilling_comparison_plots(
+    data: global_classes.DLogData,
+    infilled: global_classes.DLogData,
+    output_folder: pathlib.Path,
+) -> None:
+
+    LOG.info("Creating infilling comparison plots in %s", output_folder)
+    for lu_type, before in data.data_dict().items():
+        after = infilled.data_dict()[lu_type]
+
+        LOG.info("Creating %s plot", lu_type)
+        plot_columns = _UNITS_COLUMNS[lu_type] + _AREA_COLUMNS_LIST[lu_type]
+
+        _infill_comparison_figure(
+            before,
+            after,
+            plot_columns,
+            f"{lu_type.title()} Infilling Comparison KDE Plots",
+            output_folder / f"{lu_type}_infilling_comparison-kde.png",
+            "kde",
+        )
+        _infill_comparison_figure(
+            before,
+            after,
+            plot_columns,
+            f"{lu_type.title()} Infilling Comparison Histogram",
+            output_folder / f"{lu_type}_infilling_comparison-hist.png",
+            "hist",
+        )
+
+
+def _infill_comparison_figure(
+    before: pd.DataFrame,
+    after: pd.DataFrame,
+    plot_columns: list[str],
+    title: str,
+    output_file: pathlib.Path,
+    plot_type: str,
+):
+    def tidy_name(name: str) -> str:
+        return " ".join(name.split("_")).title()
+
+    plot_type = plot_type.lower().strip()
+
+    fig, axes = plt.subplots(
+        len(plot_columns), layout="constrained", figsize=(10, 7 * len(plot_columns))
+    )
+    fig.suptitle(title, fontsize="x-large")
+
+    data = {"before": before, "after": after}
+
+    for ax, column in zip(axes, plot_columns):
+        if plot_type == "kde":
+            for nm, df in data.items():
+                sns.kdeplot(
+                    df[column],
+                    ax=ax,
+                    fill=True,
+                    hatch="/" if nm == "before" else "\\",
+                    label=f"{nm.title()} Infilling",
+                )
+
+        elif plot_type in ("hist", "histogram"):
+            # Calculate bins across all data so the same are used for both plots
+            combined = np.concatenate([before[column].values, after[column].values])
+            combined = combined[np.isfinite(combined)]
+            bins = np.histogram_bin_edges(combined, bins=50)
+
+            for i, (nm, df) in enumerate(data.items()):
+                color = colors.to_rgb(f"C{i}")
+
+                ax.hist(
+                    df[column],
+                    bins=bins,
+                    histtype="stepfilled",
+                    hatch="/" if nm == "before" else "\\",
+                    ec=color + (1,),
+                    fc=color + (0.2,),
+                    density=True,
+                    label=f"{nm.title()} Infilling",
+                )
+
+        else:
+            raise ValueError(f"invalid plot type: {plot_type}")
+
+        ax.legend()
+        ax.set_title(tidy_name(column))
+        ax.set_ylabel("Density")
+        ax.set_xlabel(tidy_name(column))
+
+    fig.savefig(output_file)
+    LOG.info("Written: %s", output_file)
 
 
 def find_and_replace_luc(
