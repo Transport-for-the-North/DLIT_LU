@@ -7,10 +7,10 @@ import enum
 import pathlib
 from typing import Optional
 import os
-import dataclasses
 
 # third party imports
 import pydantic
+from pydantic import dataclasses
 import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
@@ -124,9 +124,18 @@ class InfillConfig:
 
 
 @dataclasses.dataclass
+class SummaryInputs:
+    """Lookup file and shapefile for creating output summaries."""
+
+    summary_zone_name: str
+    lookup_file: pydantic.FilePath
+    shapefile: pydantic.FilePath
+    shapefile_id_column: str
+
+
+@dataclasses.dataclass
 class LandUseConfig:
     """Manages reading / writing the tool's config file.
-
 
     Parameters
     ----------
@@ -148,6 +157,9 @@ class LandUseConfig:
         Factor to apply when calculating number of demolitions,
         0 would mean no demolitions and 1 would mean maximum
         demolitions.
+    summary_data: SummaryData, optional
+        Lookup file and shapefile for creating output summaries
+        at a different zone system.
     """
 
     land_use_input: Optional[pathlib.Path]
@@ -158,6 +170,7 @@ class LandUseConfig:
     employment_density_matrix_path: pathlib.Path
     luc_sic_conversion_path: pathlib.Path
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
+    summary_data: SummaryInputs | None = None
 
     def check_params(self) -> None:
         """performs checks as to whether values exist

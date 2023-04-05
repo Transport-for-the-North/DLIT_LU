@@ -19,7 +19,7 @@ import geopandas as gpd
 import numpy as np
 
 # local imports
-from dlit_lu import utilities, global_classes, parser, inputs, data_repair
+from dlit_lu import summary, utilities, global_classes, parser, inputs, data_repair
 
 # constants
 LOG = logging.getLogger(__name__)
@@ -265,6 +265,14 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     utilities.write_to_csv(config.output_folder / res_file_name, res_msoa_base)
     utilities.write_to_csv(config.output_folder / emp_file_name, emp_msoa_base)
+
+    if config.land_use.summary_data is not None:
+        summary.summarise_landuse(
+            res_msoa_base,
+            emp_msoa_base,
+            config.land_use.summary_data,
+            config.output_folder / "land_use_summaries",
+        )
 
     LOG.info("Ending Land Use Module")
 
