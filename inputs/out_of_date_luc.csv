@@ -1,0 +1,14 @@
+out_of_date_land_use_codes,replacement_codes
+A1,E(a)
+A2,E(b)
+A3,"E(c)(i), E(c)(ii), E(c)(iii)"
+A4,SG
+A5,SG
+B1(a),E(g)(i)
+B1(b),E(g)(ii)
+B1(c),E(g)(iII)
+D1,"E(e), E(f), F1(a), F1(b), F1(c), F1(e), F1(f), F1(g) "
+D2,"E(d), F2(c), F2(d) "
+B3,B2
+B4,B2
+B9,B2
