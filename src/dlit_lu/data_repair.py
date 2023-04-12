@@ -131,14 +131,14 @@ def infill_data(data: global_classes.DLogData,
     distribution_path.mkdir(exist_ok=True)
 
     dwelling_area_ratio = unit_area_ratio(
-        dict((k, data_dict[k]) for k in (["residential", "mixed"])),
+        dict((key, data_dict[key]) for key in (["residential", "mixed"])),
         {"residential": "total_units", "mixed": "dwellings"},
         dict((k, area_columns[k]) for k in (["residential", "mixed"])),
         distribution_path / "dwelling_site_area_ratio_dist.png"
     )
 
     floorspace_area_ratio = unit_area_ratio(
-        dict((k, data_dict[k]) for k in (["employment", "mixed"])),
+        dict((key, data_dict[key]) for key in (["employment", "mixed"])),
         {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
         dict((k, area_columns[k]) for k in (["employment", "mixed"])),
         distribution_path / "GFA_site_area_ratio_dist.png"
