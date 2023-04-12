@@ -104,9 +104,9 @@ def data_report(
         "all_invalid_proposed_land_use_code",
         "missing_gfa_or_dwellings_with_site_area",
         "missing_dist",
-        "missing_years_with_webtag",
+        "missing_years_with_tag",
         "missing_gfa_or_dwellings_no_site_area",
-        "missing_years_no_webtag",
+        "missing_years_no_tag",
     ]
 
     # filter for only entries with issues
@@ -295,8 +295,9 @@ def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_cla
     )
     results_report.append_analysis_results(
         missing_years_no_webtag,
-        "missing_years_no_webtag",
-        "Entries with missing years and no WEBTAG certainity status, infilling not possible",
+        "missing_years_no_tag",
+        "Entries with missing years and no TAG certainity status, infilling "
+            "must occur after TAG infilling",
     )
     missing_years_with_webtag = {}
     for key, value in missing_years.items():
@@ -306,8 +307,8 @@ def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_cla
 
     results_report.append_analysis_results(
         missing_years_with_webtag,
-        "missing_years_with_webtag",
-        "Entries with missing years that do have WEBTAG certainity status, infilling possible",
+        "missing_years_with_tag",
+        "Entries with missing years that do have TAG certainity status",
     )
     # ---------------------find missing areas--------------------------------------
 
@@ -327,7 +328,7 @@ def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_cla
     results_report.append_analysis_results(
         missing_area,
         "missing_area",
-        "NON FATAL: Entries where site area have not been provided."
+        "Entries where site area have not been provided."
         " Only becomes critical error if dwellings/floorspace have not been provided.",
     )
 
@@ -336,7 +337,7 @@ def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_cla
     all_missing_d_a = find_multiple_missing_values(
         data,
         {
-            "residential": ["total_units", ],
+            "residential": ["total_units"],
             "employment": ["total_area_sqm"],
             "mixed": ["floorspace_sqm", "dwellings"],
         },
@@ -350,7 +351,7 @@ def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_cla
     missing_d_a_no_sa = find_multiple_missing_values(
         all_missing_d_a,
         {
-            "residential": ["total_site_area_size_hectares", ],
+            "residential": ["total_site_area_size_hectares"],
             "employment": ["site_area_ha"],
             "mixed": ["total_area_ha"],
         },
@@ -375,14 +376,14 @@ def create_data_report(data: dict[str, pd.DataFrame], auxiliary_data: global_cla
     results_report.append_analysis_results(
         missing_d_a_no_sa,
         "missing_gfa_or_dwellings_no_site_area",
-        "Entries where areas (employment/mixed) or dwellings (residential/mixed) are"
-        " not provided or are 0 where no site area is provided. User intervention required.",
+        "Entries where GFA (employment/mixed) or dwellings (residential/mixed) are"
+        " not provided or are 0 where no site area is provided.",
     )
     results_report.append_analysis_results(
         missing_d_a_with_sa,
         "missing_gfa_or_dwellings_with_site_area",
-        "Entries where areas (employment/mixed) or dwellings (residential/mixed) are not provided"
-        " or are 0 where site area is provided. Assumptions can be made",
+        "Entries where GFA (employment/mixed) or dwellings (residential/mixed) are not provided"
+        " or are 0 where site area is provided.",
     )
 
     # --------------------------find missing coords-----------------------------
@@ -895,8 +896,7 @@ def invalid_land_use_report(
     results_report.append_analysis_results(
         eluc_analysis["other_issues"],
         "other_issues_existing_land_use_code",
-        "Entries which have a invalid existing land use code not defined above,"
-        " These will require infilling",
+        "Entries which have a invalid existing land use code not defined above",
     )
     # ------------------------------parse pluc-----------------------
     results_report.append_analysis_results(
@@ -921,7 +921,7 @@ def invalid_land_use_report(
         pluc_analysis["other_issues"],
         "other_issues_proposed_land_use_code",
         "Entries which have a invalid proposed land use code not defined"
-        " above, These will require infilling",
+        " above",
     )
 
     return results_report

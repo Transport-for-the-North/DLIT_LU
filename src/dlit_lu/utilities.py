@@ -1,4 +1,5 @@
-# TODO header
+"""General functions and classes used by tool. 
+"""
 # standard imports
 import logging
 import pathlib
@@ -7,7 +8,8 @@ import os
 
 # third party imports
 import pandas as pd
-import openpyxl
+import geopandas as gpd
+
 
 # local imports
 from dlit_lu import global_classes
@@ -117,12 +119,26 @@ def output_file_checks(output_function):
         # Do something after the function.
     return wrapper_func
 
+@output_file_checks
+def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
+    """wirtes file to csv
+
+    used so wrapper with logging and permission error checks can be applied
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        path to write csv to
+    output : pd.DataFrame
+        data to write
+    """
+    output.to_csv(file_path)
 
 @output_file_checks
 def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) -> None:
     """write a dict of pandas DF to a excel spreadsheet
 
-    the keys will become the sheet names 
+    the keys will become the sheet names
 
     Parameters
     ----------
@@ -135,7 +151,7 @@ def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) ->
         for key, value in outputs.items():
             LOG.info(f"Writing {key}")
             value.to_excel(writer, sheet_name=key)
-    
+
 
 def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
     """converts dlog_data to a dictionary
@@ -156,9 +172,29 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
         "residential": dlog_data.residential_data,
         "employment": dlog_data.employment_data,
         "mixed": dlog_data.mixed_data,
-        }
+    }
 
-def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.DLogValueLookup)->global_classes.DLogData:
+
+def to_dlog_data(
+    dlog_data: dict[str, pd.DataFrame],
+    lookup: global_classes.DLogValueLookup
+    ) -> global_classes.DLogData:
+    """converts dictionary to DLOG data type
+
+    will deal with combined not being present by using None in its place
+
+    Parameters
+    ----------
+    dlog_data : dict[str, pd.DataFrame]
+        _description_
+    lookup : global_classes.Lookup
+        _description_
+
+    Returns
+    -------
+    global_classes.DLogData
+        _description_
+    """
     try:
         return global_classes.DLogData(
             dlog_data["combined"],
@@ -166,7 +202,7 @@ def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.DLog
             dlog_data["employment"],
             dlog_data["mixed"],
             lookup,
-            )
+        )
     except KeyError:
         return global_classes.DLogData(
             None,
@@ -174,59 +210,6 @@ def to_dlog_data(dlog_data: dict[str, pd.DataFrame], lookup: global_classes.DLog
             dlog_data["employment"],
             dlog_data["mixed"],
             lookup,
-            )
-def y_n_user_input(message: str)->bool:
-    
-    """takes user input of y/n
-
-    will loop until valid answer is given
-    
-    Parameters
-    ----------
-    message : str
-        message to give to the user 
-
-    Returns
-    -------
-    bool
-        true if y false if n
-    """ 
-    while True:
-        answer = input(message)
-        answer_lower = answer.lower()
-        if answer_lower == "y" or answer_lower =="yes":
-            return True
-        elif answer_lower == "n" or answer_lower =="no":
-            return False
-        else:
-            LOG.warning(f"{answer_lower} does not look like \"y\" or \"n\" to me...")
-
-def disagg_mixed(data: dict[str, pd.DataFrame])->dict[str, pd.DataFrame]:
-    """disaggregates the mixed data set into residential and employment
-
-    assumes the columns in mixed relevent to each sheet will have identical
-    column names to the those in the sheet
-
-    Parameters
-    ----------
-    data : dict[str, pd.DataFrame]
-        data set to disagg mixed
-
-    Returns
-    -------
-    dict[str, pd.DataFrame]
-        data set with just residential and employment
-    """    
-    
-    mix = data["mixed"]
-    res = data["residential"].reset_index(drop=True)
-    emp = data["employment"].reset_index(drop=True)
-    
-    mix_res = mix.loc[:,res.columns.unique()].reset_index(drop=True)
-    mix_emp = mix.loc[:, emp.columns.unique()].reset_index(drop=True)
+        )
 
 
-    res_new = pd.concat([res, mix_res],  ignore_index= True)
-    emp_new = pd.concat([emp, mix_emp], ignore_index= True)
-
-    return {"residential":res_new, "employment":emp_new}

@@ -1,4 +1,4 @@
-"""handles the user inputted fixes 
+"""handles the user inputted fixes
 
 takes user preference, generates file for user to input fixes and
 integrates fixes with the existing data
@@ -20,9 +20,10 @@ LOG = logging.getLogger(__name__)
 
 
 def user_input_file_builder(
-    path: pathlib.Path, input_data: global_classes.DLogData
-) -> None:
-    """builds file for user to edit 
+    path: pathlib.Path,
+    input_data: global_classes.DLogData,
+    do_not_include_col: dict[str, list[str]]) -> None:
+    """builds file for user to edit
 
     file can then be read and edits integrated into data
 
@@ -34,7 +35,10 @@ def user_input_file_builder(
         data to save
     """
     data = utilities.to_dict(input_data)
-    utilities.write_to_excel(path, data)
+    output_data = {}
+    for key, value in data.items():
+        output_data[key] = value.drop(columns=do_not_include_col[key])
+    utilities.write_to_excel(path, output_data)
 
 
 def infill_user_inputs(
@@ -46,7 +50,7 @@ def infill_user_inputs(
 
     will fail if user edits column names or indices
     should work if modified path contains a subset of data as
-    long as indices are consistent 
+    long as indices are consistent
 
     Parameters
     ----------
@@ -67,7 +71,7 @@ def infill_user_inputs(
     FileNotFoundError
         if inputted file path does not exist
     ValueError
-        if columns listed in uneditable have been modified 
+        if columns listed in uneditable have been modified
     """
     # Read in the Excel file containing the subset of the data
     infilled_data = {}
@@ -110,8 +114,8 @@ def infill_user_inputs(
                 infilled_data[key].update(data_subset)
             else:
                 raise ValueError(
-                    f"values in {uneditable_columns[key]} within {modified_path} have been modified, these values must remain constant"
-                )
+                    f"values in {uneditable_columns[key]} within {modified_path}"
+                    " have been modified, these values must remain constant")
     return infilled_data
 
 
@@ -119,13 +123,14 @@ def implement_user_fixes(
     config: inputs.DLitConfig,
     dlog_data: global_classes.DLogData,
     auxiliary_data: global_classes.AuxiliaryData,
+    do_not_edit_cols:dict[str, list[str]],
     plot_graphs: bool,
 ) -> Optional[global_classes.DLogData]:
     """intergrates user fixes into data
 
     handles user preferences writes the file for the user to edit,
     reads in user fixes and outputs the data with the user fixes
-    integrated. outputs None if user wishes to end program 
+    integrated. outputs None if user wishes to end program
 
     Parameters
     ----------
@@ -145,30 +150,25 @@ def implement_user_fixes(
     """
 
     # determines if user wishes to infill using exisiting file
-    if os.path.exists(config.user_input_path):
-        modification_file_ready = utilities.y_n_user_input(
-            f"A file already exists at {config.user_input_path}."
-            " Does this contain the fixes you wish to implement? (Y/N)\n"
-        )
-    else:
-        modification_file_ready = False
-
-    # adds filter columns without producing report
-
-    if modification_file_ready:
-        user_changes = True
+    if os.path.exists(config.infill.user_input_path):
         LOG.info(
-            f"Existing file {config.user_input_path} set as user infill input."
-        )
+            f"Existing file {config.infill.user_input_path} set as user infill input.")
+        LOG.info("Implementing user fixes")
+        infilled_data = infill_user_inputs(
+            dict((k, utilities.to_dict(dlog_data)[k]) for k in (
+                ["residential", "employment", "mixed"])),
+            config.infill.user_input_path)
+        converted_infilled_data = utilities.to_dlog_data(infilled_data, dlog_data.lookup)
+        return converted_infilled_data
+        
     else:
-
         pre_user_fix_path = config.output_folder / "01_pre_user_fix"
         pre_user_fix_path.mkdir(exist_ok=True)
 
         analyse.data_report(
             dlog_data,
-            pre_user_fix_path / "pre_user_fix_data_report.xlsx",
-            config.output_folder,
+            pre_user_fix_path/"pre_user_fix_data_report.xlsx",
+            pre_user_fix_path,
             auxiliary_data,
             plot_graphs,
             True,
@@ -178,51 +178,18 @@ def implement_user_fixes(
             f"Intial data quality report saved as {pre_user_fix_path}"
         )
 
-        # checks if user wishes to infill data
-        user_changes = utilities.y_n_user_input(
-            "Do you wish to "
-            "manually fix data before it is infilled? (Y/N)\n"
-        )
+        LOG.info(f"Creating file for user {config.infill.user_input_path} to edit.")
 
-        if user_changes:
-            if os.path.exists(config.user_input_path):
-                LOG.info("Creating file for user to edit.")
-                # pauses to allow user to save existing file
-                input(
-                    f"Overwriting {config.user_input_path}, if you wish to store any changes made"
-                    ", please make a copy with a different name and press enter, otherwise press"
-                    " enter."
-                )
+        user_input_file_builder(
+            config.infill.user_input_path, dlog_data, do_not_edit_cols)
+        LOG.info("Edit file with required changes and rerun the program. Do not change"
+            f"the name or location of {config.infill.user_input_path}.")
+        #end program 
+        return None
 
-            user_input_file_builder(config.user_input_path, dlog_data)
 
-            # allows user to end program to to edit data
-            end_program = utilities.y_n_user_input(
-                f"A file has been created at "
-                f"{config.user_input_path} for you to manually infill data. Would "
-                "you like to end the program and rerun when you have finished? Y "
-                "(end the program, modify the data then rerun) or N (data has been"
-                " modified)\n"
-            )
 
-            if end_program:
-                LOG.info("Ending program")
-                return None
 
-    if user_changes:
-        LOG.info("Implementing user fixes")
-        infilled_data = infill_user_inputs(
-            dict(
-                (k, utilities.to_dict(dlog_data)[k])
-                for k in (["residential", "employment", "mixed"])
-            ),
-            config.user_input_path,
-        )
-        converted_infilled_data = utilities.to_dlog_data(
-            infilled_data, dlog_data.lookup
-        )
-        return converted_infilled_data
-    return dlog_data
 
 
 def create_user_changes_audit(
@@ -232,7 +199,7 @@ def create_user_changes_audit(
 ) -> None:
     """create user audit of changes implemented by the user
 
-    produces an excel spreadsheet of the changed rows of 
+    produces an excel spreadsheet of the changed rows of
     input_modified when compared to input original, with the changed
     values highlighted in red.
 
@@ -322,10 +289,9 @@ def create_user_changes_audit(
     utilities.write_to_excel(file_path, modified_colour_coded)
 
 
-def color_different_red(
-    _: pd.DataFrame, differences: pd.DataFrame
-) -> pd.DataFrame:
-    """used to highlight values in red based on a array of bools 
+def color_different_red(_:pd.DataFrame,
+    differences:pd.DataFrame)->pd.DataFrame:
+    """used to highlight values in red based on a array of bools
 
     used when formatting an excel spread sheet
 
@@ -335,11 +301,11 @@ def color_different_red(
         not used
     differences : pd.DataFrame
         bool array with same dimensions as the dataframe for which this
-        is applied 
+        is applied
 
     Returns
     -------
-    
+
     pd.DataFrame
         array of colours used to apply formatting in an excel spread sheet
     """
@@ -355,13 +321,13 @@ def convert_list_to_string(value: list[str]) -> str:
     Parameters
     ----------
     value : list[str]
-        
 
     Returns
     -------
     str
         list converted to string
     """
+    
     if isinstance(value, list):
         return ", ".join(value)
     return value
