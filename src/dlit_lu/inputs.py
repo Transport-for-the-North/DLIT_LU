@@ -131,6 +131,7 @@ class SummaryInputs:
     lookup_file: pydantic.FilePath
     shapefile: pydantic.FilePath
     shapefile_id_column: str
+    geometry_simplify_tolerance: int | None = None
 
 
 @dataclasses.dataclass
@@ -228,9 +229,9 @@ class DLitConfig(caf.toolkit.BaseConfig):
         path to D-log file
     lookups_sheet_name: str
         name of lookup sheet in D-Log
-    infill: Optional[InfillConfig]
+    infill: InfillConfig, optional
         infilling config parameters
-    land_use: Optional[LandUseConfig]
+    land_use: LandUseConfig, optional
         land use config parameters
 
     Raises
@@ -254,8 +255,6 @@ class DLitConfig(caf.toolkit.BaseConfig):
     infill: Optional[InfillConfig]
 
     land_use: Optional[LandUseConfig]
-
-    # required for land use
 
     @pydantic.validator(
         "dlog_input_file",
@@ -285,6 +284,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
 
 class InfillingAverages(caf.toolkit.BaseConfig):
+    """Averages calculated for use in MEAN infill method."""
+
     average_res_area: float
     average_emp_area: float
     average_mix_area: float
