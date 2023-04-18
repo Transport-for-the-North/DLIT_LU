@@ -1,7 +1,4 @@
-"""Automatically fixes and infills data where possible
-
-    IN PROGRESS
-"""
+"""Automatically fixes and infills data where possible"""
 # standard imports
 from __future__ import annotations
 import dataclasses
@@ -83,6 +80,16 @@ def correct_inavlid_syntax(
 def infill_landuse_codes(
     data: global_classes.DLogData, auxiliary_data: global_classes.AuxiliaryData
 ) -> global_classes.DLogData:
+    """Infill landuse codes in `data` using known land use lookups.
+
+    Infills with full list of valid land use codes if no
+    known lookups are found.
+
+    Returns
+    -------
+    global_classes.DLogData
+        A new instance of DLogData with land use codes infilled.
+    """
     luc_infilling = old_incomplete_known_luc(
         {k: getattr(data, f"{k}_data") for k in _LAND_USE_COLUMNS},
         _LAND_USE_COLUMNS,
@@ -163,7 +170,9 @@ def infill_data(
         infilled_area = _average_area_infill(luc_infilled, infill_averages)
     elif gfa_method in inputs.GFAInfillMethod.regression_methods():
         infilled_area = _regression_area_infill(
-            luc_infilled, gfa_method == inputs.GFAInfillMethod.REGRESSION
+            luc_infilled,
+            gfa_method == inputs.GFAInfillMethod.REGRESSION,
+            output_folder / "infilling_checks",
         )
     else:
         raise ValueError(f"invalid GFA infill method: {gfa_method}")
@@ -195,6 +204,23 @@ def _average_factors(
     distribution_path: pathlib.Path,
     averages_path: pathlib.Path,
 ) -> inputs.InfillingAverages:
+    """Calculate InfillingAverages for `data` and save to YAML file.
+
+    Parameters
+    ----------
+    data : global_classes.DLogData
+        Data to calculate averages for.
+    distribution_path : pathlib.Path
+        Path to folder to save distribution plots to.
+    averages_path : pathlib.Path
+        Path to YAML file to save averages to.
+
+    Returns
+    -------
+    inputs.InfillingAverages
+        Calculated averages and ratios.
+    """
+
     def get_data(key: str) -> pd.DataFrame:
         return getattr(data, f"{key}_data")
 
@@ -276,6 +302,7 @@ def _average_area_infill(
 def _regression_preprocessing(
     data: pd.DataFrame, landuse_column: str, area_column: str
 ) -> tuple[pd.DataFrame, list[str], str]:
+    """Convert `landuse_column` to multiple binary columns."""
     mlb = preprocessing.MultiLabelBinarizer()
     landuse_binary = pd.DataFrame(
         mlb.fit_transform(data[landuse_column]), columns=mlb.classes_, index=data.index
@@ -292,6 +319,7 @@ def _hist_gradient_boosting(
     categorical_columns: list[str],
     infill_indices: _RegressionInfillIndices,
 ) -> pd.Series:
+    """Train then infill using scikit-learn HistGradientBoostingRegressor."""
     gradient_boosting = ensemble.HistGradientBoostingRegressor(
         categorical_features=categorical_columns
     )
@@ -309,6 +337,7 @@ def _check_infill_column(
     data_columns: list[str],
     include_negatives: bool,
 ) -> Optional[_RegressionInfillIndices]:
+    """Find indices that should be infilled and that can be used for training."""
     negatives = data[infill_column] < 0
     if negatives.sum() > 0:
         LOG.warning(
@@ -341,6 +370,7 @@ def _check_infill_column(
 def _add_infill_mask_column(
     data: pd.DataFrame, infilled_column: str, mask: pd.Series, mask_columns: list[str]
 ) -> pd.DataFrame:
+    """Add `mask` as column to `data` and append name to `mask_columns`."""
     infill_mask_column = f"{infilled_column}_regression_infilled"
     data.insert(data.columns.tolist().index(infilled_column), infill_mask_column, mask)
     mask_columns.append(infill_mask_column)
@@ -348,8 +378,31 @@ def _add_infill_mask_column(
 
 
 def _regression_area_infill(
-    dlog_data: global_classes.DLogData, include_negatives: bool
+    dlog_data: global_classes.DLogData,
+    include_negatives: bool,
+    checks_folder: pathlib.Path,
 ) -> global_classes.DLogData:
+    """Infill `dlog_data` using scikit-learn HistGradientBoostingRegressor.
+
+    Infills the site area and GFA columns.
+
+    Parameters
+    ----------
+    dlog_data : global_classes.DLogData
+        Data used for training and for infilling.
+    include_negatives : bool
+        Whether or not to include negative values in the
+        training set, if False no negative values will
+        be infilled.
+    checks_folder : pathlib.Path
+        Folder to save infilled data to for checking.
+
+    Returns
+    -------
+    global_classes.DLogData
+        New instance of DLogData with site area and GFA infilled.
+    """
+    checks_folder.mkdir(exist_ok=True)
     infilled_data: dict[str, pd.DataFrame] = {}
 
     for dtype, area_col in _AREA_COLUMNS.items():
@@ -406,8 +459,10 @@ def _regression_area_infill(
             )
 
         infilled_data[dtype] = infilled_df.drop(columns=infill_mask_columns)
-        # TODO(MB) Save this in an output folder
-        infilled_df.to_csv(f".temp/infill_regression_tests/{dtype}_infilled.csv")
+
+        out_file = checks_folder / f"{dtype}_infilled.csv"
+        infilled_df.to_csv(out_file, index=False)
+        LOG.info("Written: %s", out_file)
 
     return global_classes.DLogData.from_data_dict(infilled_data, dlog_data.lookup)
 
@@ -512,9 +567,11 @@ def calc_average_years_webtag_certainty(
 
         if mode_start_year > mode_end_year:
             LOG.warning(
-                f"infilled years for TAG status {webtag_lookup[id_]} have end years"
+                "infilled years for TAG status %s have end years"
                 " that are before start years, setting end"
-                " year equal to start year ({mode_start_year})"
+                " year equal to start year (%s)",
+                webtag_lookup[id_],
+                mode_start_year,
             )
 
             mode_end_year = mode_start_year
@@ -548,7 +605,6 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
     }
 
     for key, value in data.items():
-
         to_be_infilled = value.copy()
         missing_tag = value[value["web_tag_certainty_id"] == 0]
 
@@ -1047,7 +1103,7 @@ def fix_undefined_invalid_luc(
                 if len(not_fixed) == 0:
                     continue
 
-                LOG.warning(
+                LOG.warning(  # pylint: disable=logging-fstring-interpolation
                     f"{len(not_fixed)} undefined invalid land use codes"
                     f" found in {key}, {column}:\n{not_fixed[column].to_list()}\n"
                     "Infilling with average land use split."
@@ -1081,7 +1137,7 @@ def unit_area_ratio(
     Returns
     -------
     float
-        _description_
+        Mean ratio between units column and area column.
     """
     all_ratios = np.array([])
     for key, value in data.items():
@@ -1144,7 +1200,7 @@ def _infilling_comparison_plots(
     infilled: global_classes.DLogData,
     output_folder: pathlib.Path,
 ) -> None:
-
+    """Create KDE and Histograms comparing `data` to `infilled`."""
     LOG.info("Creating infilling comparison plots in %s", output_folder)
     for lu_type, before in data.data_dict().items():
         after = infilled.data_dict()[lu_type]
@@ -1178,6 +1234,8 @@ def _infill_comparison_figure(
     output_file: pathlib.Path,
     plot_type: str,
 ):
+    """Plot a KDE or Histogram comparing the `before` and `after` values."""
+
     def tidy_name(name: str) -> str:
         return " ".join(name.split("_")).title()
 
@@ -1270,8 +1328,8 @@ def find_and_replace_luc(
                     return fill_empty_value
                 else:
                     LOG.warning(
-                        f"fill_empty_value is a {type(fill_empty_value)},"
-                        " that is neither a str or list[str]"
+                        "fill_empty_value is a %s, that is neither a str or list[str]",
+                        type(fill_empty_value),
                     )
             else:
                 return []
@@ -1294,8 +1352,9 @@ def find_and_replace_luc(
                 luc_entry = luc_entry + replacement_code
             else:
                 LOG.warning(
-                    f"{replace_column_name} contians {type(replacement_code)},"
-                    " that is neither a str or list[str]"
+                    "%s contians %s, that is neither a str or list[str]",
+                    replace_column_name,
+                    type(replacement_code),
                 )
     return luc_entry
 
@@ -1712,4 +1771,5 @@ def mid_distribution(
 
 
 def two_to_pow(x: float):
+    """2 to the power `x`."""
     return 2**x

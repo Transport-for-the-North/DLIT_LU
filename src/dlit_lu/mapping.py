@@ -231,7 +231,7 @@ def heatmap_figure(
     ncols = 1 if zoomed_bounds is None else 2
 
     fig, axes = plt.subplots(
-        1, ncols, figsize=(10, 15), frameon=False, constrained_layout=True
+        1, ncols, figsize=(10, 12), frameon=False, constrained_layout=True
     )
     if ncols == 1:
         axes = [axes]
@@ -306,7 +306,7 @@ def heatmap_figure(
     if footnote is not None:
         axes[ncols - 1].annotate(
             footnote,
-            xy=(0.9, 0.01),
+            xy=(0.05, 0.01),
             xycoords="figure fraction",
             bbox=dict(boxstyle="square", fc="white"),
         )

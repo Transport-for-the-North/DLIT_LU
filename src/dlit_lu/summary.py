@@ -21,6 +21,7 @@ from dlit_lu import inputs, mapping
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
 LAND_USE_ZONING = "msoa"
+PLOT_YEAR_GAP = 10
 
 
 ##### CLASSES #####
@@ -287,9 +288,10 @@ def summarise_landuse(
             except ValueError:
                 pass
 
-        plot_columns = [i for i in years if i % 5 == 0]
-        plot_columns.append(max(years))
-        plot_columns = [str(i) for i in plot_columns]
+        plot_columns = {i for i in years if i % PLOT_YEAR_GAP == 0}
+        plot_columns.add(min(years))
+        plot_columns.add(max(years))
+        plot_columns = [str(i) for i in sorted(plot_columns)]
 
         index_columns = summary.index.names
         summary = summary.reset_index().merge(
