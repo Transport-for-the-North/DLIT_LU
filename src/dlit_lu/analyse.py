@@ -861,7 +861,6 @@ def invalid_land_use_report(
     pluc_analysis["other_issues"]["residential"] = pd.DataFrame(
         columns=res_data.columns
     )
-    # TODO put this in for loop
     # ------------------------parse eluc-------------------
     results_report.append_analysis_results(
         eluc_analysis["wrong_format"],
@@ -1792,6 +1791,7 @@ def analyse_invalid_luc(
             exploded_land_use_codes = (
                 value[column].str.join(",").str.split(",", expand=True)
             )
+            #find invalid codes in exploded codes
             out_of_date.append(
                 value.loc[
                     exploded_land_use_codes.isin(out_of_date_luc.tolist()).any(axis=1)
@@ -1804,43 +1804,10 @@ def analyse_invalid_luc(
                 value.loc[exploded_land_use_codes.isin(wrong_format_check).any(axis=1)]
             )
 
-        if len(out_of_date) == 0:
-            raise ValueError("No columns found")
+        out_of_date_output[key] = smart_concat(out_of_date)
+        incomplete_output[key] = smart_concat(incomplete)
+        wrong_format_output[key] = smart_concat(formatting)
 
-        elif len(out_of_date) == 1:
-            out_of_date_output[key] = out_of_date[0]
-
-        else:
-            out_of_date_output[key] = (
-                pd.concat(out_of_date)
-                .drop_duplicates(subset=["site_reference_id", "site_name"])
-                .sort_values("site_reference_id")
-            )
-        if len(incomplete) == 0:
-            raise ValueError("No columns specified")
-
-        elif len(incomplete) == 1:
-            incomplete_output[key] = incomplete[0]
-
-        else:
-            incomplete_output[key] = (
-                pd.concat(incomplete)
-                .drop_duplicates(subset=["site_reference_id"])
-                .sort_values("site_reference_id")
-            )
-
-        if len(formatting) == 0:
-            raise ValueError("No columns specified")
-
-        elif len(formatting) == 1:
-            wrong_format_output[key] = formatting[0]
-
-        else:
-            wrong_format_output[key] = (
-                pd.concat(formatting)
-                .drop_duplicates(subset=["site_reference_id"])
-                .sort_values("site_reference_id")
-            )
         temp = pd.concat(
             [
                 wrong_format_output[key],
@@ -1855,6 +1822,23 @@ def analyse_invalid_luc(
         "incomplete": incomplete_output,
         "other_issues": other_issues_output,
     }
+
+def smart_concat(data: list[pd.DataFrame])->pd.DataFrame:
+    if len(data) == 0:
+        raise ValueError("list to concat is empty found")
+
+    elif len(data) == 1:
+        output = data[0]
+
+    else:
+        output = (
+            pd.concat(data)
+            .drop_duplicates(
+                subset=["site_reference_id", "site_name"]
+            )
+            .sort_values("site_reference_id")
+        )
+    return output
 
 
 def find_missing_ids(ids_l: pd.Series, ids_s: pd.Series) -> Optional[pd.Series]:
