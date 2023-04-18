@@ -43,7 +43,6 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     """
     # load in config file
     config = inputs.DLitConfig.load_yaml(args.config)
-    config.check_inputs()
 
     config.output_folder.mkdir(exist_ok=True)
 
