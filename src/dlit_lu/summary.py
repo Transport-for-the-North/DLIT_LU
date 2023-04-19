@@ -172,10 +172,11 @@ def _plot_all_columns(
                 data,
                 column,
                 title,
+                bins=7,
                 legend_title=f"Year {column}",
                 legend_label_fmt="{:.2g}",
                 footnote=footnote,
-                zoomed_bounds=mapping.Bounds(290000, 300000, 550000, 675000),
+                zoomed_bounds=mapping.Bounds(290000, 345000, 555000, 660000),
             )
             pdf.savefig(fig)
             plt.close(fig)
@@ -210,12 +211,14 @@ def plot_summaries(
     zone_name = zone_column.lower().replace("zone_id", "")
     zone_name = " ".join(zone_name.split("_")).upper()
     footnote = (
-        f"Data from DLIT\nPlotted at {zone_name} zoning"
-        f"\nProduced on {dt.date.today():%Y-%m-%d}"
+        f"Data from DLIT, plotted at {zone_name} zoning. "
+        f"Produced on {dt.date.today():%Y-%m-%d}"
     )
 
     LOG.info("Creating %s total plot", zone_column)
-    aggregation = dict.fromkeys(summary.columns, "sum")
+    aggregation = dict.fromkeys(
+        summary.columns, lambda x: np.nan if x.isna().all() else np.sum(x)
+    )
     aggregation["geometry"] = "first"
 
     grouped = summary.groupby(zone_column).agg(aggregation)
@@ -295,17 +298,24 @@ def summarise_landuse(
         plot_columns = [str(i) for i in sorted(plot_columns)]
 
         index_columns = summary.index.names
+        # Add all combinations of zones and indices so plots contain all zones
+        full_index = pd.MultiIndex.from_product(
+            [shapefile.reset_index()[summary_params.shapefile_id_column].unique()]
+            + [
+                summary.index.get_level_values(i).unique().values
+                for i in index_columns
+                if i != summary_lookup.to_zone_column
+            ],
+            names=index_columns,
+        )
+        summary = summary.reindex(full_index)
+
         summary = summary.reset_index().merge(
             shapefile.reset_index(),
             left_on=summary_lookup.to_zone_column,
             right_on=summary_params.shapefile_id_column,
-            how="outer",
+            how="left",
         )
-
-        nan_zones = summary[summary_lookup.to_zone_column].isna()
-        summary.loc[nan_zones, summary_lookup.to_zone_column] = summary.loc[
-            nan_zones, summary_params.shapefile_id_column
-        ]
 
         summary = gpd.GeoDataFrame(summary, crs=shapefile.crs)
         summary = summary.set_index(index_columns).loc[:, plot_columns + ["geometry"]]

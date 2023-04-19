@@ -232,9 +232,7 @@ def heatmap_figure(
     """
     ncols = 1 if zoomed_bounds is None else 2
 
-    fig, axes = plt.subplots(
-        1, ncols, figsize=(15, 12), frameon=False, layout="compressed"
-    )
+    fig, axes = plt.subplots(1, ncols, figsize=(15, 12), layout="constrained")
     if ncols == 1:
         axes = [axes]
 
@@ -292,7 +290,9 @@ def heatmap_figure(
     cmap.colours = cmap.colours.reindex(geodata.index)
 
     for ax in axes:
-        geodata.plot(ax=ax, color=cmap.colours.values, linewidth=0.1, edgecolor="black")
+        geodata.plot(
+            ax=ax, color=cmap.colours.values, linewidth=0.01, edgecolor="white"
+        )
 
     axes[ncols - 1].legend(
         handles=cmap.legend_elements,
@@ -306,10 +306,10 @@ def heatmap_figure(
         axes[1].set_ylim(zoomed_bounds.min_y, zoomed_bounds.max_y)
 
     if footnote is not None:
-        axes[ncols - 1].annotate(
+        axes[0].annotate(
             footnote,
-            xy=(0.05, 0.01),
-            xycoords="figure fraction",
+            xy=(5, 10),
+            xycoords="axes pixels",
             bbox=dict(boxstyle="square", fc="white"),
         )
 
