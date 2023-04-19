@@ -73,7 +73,7 @@ def load_summary_lookup(
             "Simplifing geometries with tolerance of %s",
             parameters.geometry_simplify_tolerance,
         )
-        shapefile.loc[:, "geometry"] = shapefile["geometry"].simplify(
+        shapefile.loc[:, "geometry"] = shapefile.simplify(
             parameters.geometry_simplify_tolerance, preserve_topology=False
         )
 
@@ -175,6 +175,7 @@ def _plot_all_columns(
                 legend_title=f"Year {column}",
                 legend_label_fmt="{:.2g}",
                 footnote=footnote,
+                zoomed_bounds=mapping.Bounds(290000, 300000, 550000, 675000),
             )
             pdf.savefig(fig)
             plt.close(fig)
@@ -295,18 +296,25 @@ def summarise_landuse(
 
         index_columns = summary.index.names
         summary = summary.reset_index().merge(
-            shapefile,
+            shapefile.reset_index(),
             left_on=summary_lookup.to_zone_column,
             right_on=summary_params.shapefile_id_column,
+            how="outer",
         )
+
+        nan_zones = summary[summary_lookup.to_zone_column].isna()
+        summary.loc[nan_zones, summary_lookup.to_zone_column] = summary.loc[
+            nan_zones, summary_params.shapefile_id_column
+        ]
+
         summary = gpd.GeoDataFrame(summary, crs=shapefile.crs)
         summary = summary.set_index(index_columns).loc[:, plot_columns + ["geometry"]]
 
-        plots_folder = output_folder / "heatmaps"
+        plots_folder = output_folder / f"{name} heatmaps"
         plots_folder.mkdir(exist_ok=True)
         plot_summaries(
             summary,
             summary_lookup.to_zone_column,
-            plots_folder / "summary_heatmaps.pdf",
+            plots_folder / f"{name}_summary_heatmaps.pdf",
             name,
         )

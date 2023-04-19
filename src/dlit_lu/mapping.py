@@ -19,6 +19,8 @@ import pandas as pd
 
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
+MAP_NAN_COLOUR = (0.5, 0.5, 0.5, 1.0)
+
 
 ##### CLASSES #####
 @dataclasses.dataclass
@@ -231,7 +233,7 @@ def heatmap_figure(
     ncols = 1 if zoomed_bounds is None else 2
 
     fig, axes = plt.subplots(
-        1, ncols, figsize=(10, 12), frameon=False, constrained_layout=True
+        1, ncols, figsize=(15, 12), frameon=False, layout="compressed"
     )
     if ncols == 1:
         axes = [axes]
@@ -280,7 +282,7 @@ def heatmap_figure(
             "YlGn",
             positive_bins,
             label_fmt=legend_label_fmt,
-            nan_colour=(1.0, 0.0, 0.0, 1.0),
+            nan_colour=MAP_NAN_COLOUR,
         )
 
     if cmap.empty:
