@@ -1,16 +1,32 @@
 """handles reading config file
 """
 # standard imports
-import json
+from __future__ import annotations
+
+import enum
 import pathlib
-from typing import Optional
-import os
-import dataclasses
+from typing import Any, Optional
+
 # third party imports
 import pydantic
+from pydantic import dataclasses
 import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
+
+
+class GFAInfillMethod(enum.Enum):
+    """Method for infilling the GFA from the site area."""
+
+    MEAN = "mean"
+    REGRESSION = "regression"
+    REGRESSION_NO_NEGATIVES = "regression_no_negatives"
+
+    @classmethod
+    def regression_methods(cls) -> list[GFAInfillMethod]:
+        """List of methods which use HistGradientBoostingRegressor."""
+        return [cls.REGRESSION, cls.REGRESSION_NO_NEGATIVES]
+
 
 @dataclasses.dataclass
 class InfillConfig:
@@ -44,74 +60,46 @@ class InfillConfig:
         path to known invalid land use codes and their replacements
     regions_shapefiles_path: pathlib.Path
         path to LPA regions shapefile
-
+    gfa_infill_method : GFAInfillMethod
+        Method to use when infilling the site area and GFA columns.
     """
+
     user_infill: bool
     combined_sheet_name: str
     residential_sheet_name: str
     employment_sheet_name: str
     mixed_sheet_name: str
-    dlog_column_names_path: pathlib.Path
+    dlog_column_names_path: pydantic.FilePath
     user_input_path: pathlib.Path
-    valid_luc_path: pathlib.Path
-    out_of_date_luc_path: pathlib.Path
-    incomplete_luc_path: pathlib.Path
-    known_invalid_luc_path: pathlib.Path
-    regions_shapefiles_path: pathlib.Path
+    valid_luc_path: pydantic.FilePath
+    out_of_date_luc_path: pydantic.FilePath
+    incomplete_luc_path: pydantic.FilePath
+    known_invalid_luc_path: pydantic.FilePath
+    regions_shapefiles_path: pydantic.FilePath
+    gfa_infill_method: GFAInfillMethod
 
-    def check_params(self) -> None:
-        """performs checks as to whether values exist
 
-        if path is a read file will also check if path is valid
+@dataclasses.dataclass
+class SummaryInputs:
+    """Lookup file and shapefile for creating output summaries."""
 
-        Raises
-        ------
-        ValueError
-            if parameters are incomplete
-        ValueError
-            if read paths are invalid
-        """        
-        str_params = [
-            self.combined_sheet_name,
-            self.residential_sheet_name,
-            self.employment_sheet_name,
-            self.mixed_sheet_name,
-        ]
-        read_path_params = [
-            self.dlog_column_names_path,
-            self.valid_luc_path,
-            self.out_of_date_luc_path,
-            self.incomplete_luc_path,
-            self.known_invalid_luc_path,
-            self.regions_shapefiles_path,
-        ]
-        write_path_params = [
-            self.user_input_path,
-        ]
-        for param in write_path_params + read_path_params + str_params:
-            if param is None:
-                raise ValueError("Infill Parameters incomplete, please"
-                    " complete these within the config file before continuing. Cheers!")
-
-        for param in read_path_params:
-            if not os.path.exists(param):
-                raise ValueError("Infill parameters contains write file paths"
-                    " that do not exist. Please update the config file before continuing. Cheers!")
+    summary_zone_name: str
+    lookup_file: pydantic.FilePath
+    shapefile: pydantic.FilePath
+    shapefile_id_column: str
+    geometry_simplify_tolerance: int | None = None
 
 
 @dataclasses.dataclass
 class LandUseConfig:
     """Manages reading / writing the tool's config file.
 
-
     Parameters
     ----------
-    land_use_input: pathlib.Path
-        path to land use input (output of infill)
     msoa_shapefile_path: pathlib.Path
         path to msoa shape file
     msoa_dwelling_pop_path: pathlib.Path
-        path to msoa dwelling population file 
+        path to msoa dwelling population file
     msoa_traveller_type_path: pathlib.Path
         path to msoa split of traveller type
     msoa_jobs_path: pathlib.Path
@@ -120,47 +108,28 @@ class LandUseConfig:
         path to employment density matrix
     luc_sic_conversion_path: pathlib.Path
         path to land use code to SIC code conversion matrix
+    land_use_input: pathlib.Path, optional
+        path to land use input (output of infill),
+        not required if running infilling module.
+    demolition_dampener: float, default 1.0
+        Factor to apply when calculating number of demolitions,
+        0 would mean no demolitions and 1 would mean maximum
+        demolitions.
+    summary_data: SummaryData, optional
+        Lookup file and shapefile for creating output summaries
+        at a different zone system.
     """
-    land_use_input: Optional[pathlib.Path]
-    msoa_shapefile_path: pathlib.Path
-    msoa_dwelling_pop_path: pathlib.Path
-    msoa_traveller_type_path: pathlib.Path
-    msoa_jobs_path: pathlib.Path
-    employment_density_matrix_path: pathlib.Path
-    luc_sic_conversion_path: pathlib.Path
 
-    def check_params(self) -> None:
-        """performs checks as to whether values exist
+    msoa_shapefile_path: pydantic.FilePath
+    msoa_dwelling_pop_path: pydantic.FilePath
+    msoa_traveller_type_path: pydantic.FilePath
+    msoa_jobs_path: pydantic.FilePath
+    employment_density_matrix_path: pydantic.FilePath
+    luc_sic_conversion_path: pydantic.FilePath
 
-        if path is a read file will also check if path is valid
-
-        Raises
-        ------
-        ValueError
-            if parameters are incomplete
-        ValueError
-            if read paths are invalid
-        """        
-
-        read_path_params = [
-            self.msoa_shapefile_path,
-            self.msoa_dwelling_pop_path,
-            self.msoa_traveller_type_path,
-            self.msoa_jobs_path,
-            self.employment_density_matrix_path,
-            self.luc_sic_conversion_path,
-        ]
-        write_path_params = [
-
-        ]
-        for param in read_path_params + write_path_params:
-            if param is None:
-                raise ValueError("Land use parameters incomplete, please"
-                                 " complete these within the config file before continuing. Cheers!")
-        for param in read_path_params:
-            if not os.path.exists(param) or param == pathlib.Path("."):
-                raise ValueError("Land use parameters contains write file paths"
-                                 " that do not exist. Please update the config file before continuing. Cheers!")
+    land_use_input: Optional[pydantic.FilePath] = None
+    demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
+    summary_data: SummaryInputs | None = None
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -178,65 +147,79 @@ class DLitConfig(caf.toolkit.BaseConfig):
     proposed_luc_split_path: pathlib.Path
         path to proposed land use split (output from infill)
     existing_luc_split_path: pathlib.Path
-        path to existing land use split (output from infill) 
+        path to existing land use split (output from infill)
     dlog_input_file: pathlib.Path
         path to D-log file
     lookups_sheet_name: str
         name of lookup sheet in D-Log
-    infill: Optional[InfillConfig]
-        infilling config parameters
-    land_use: Optional[LandUseConfig]
-        land use config parameters
+    infill: InfillConfig, optional
+        infilling config parameters, required for running infilling.
+    land_use: LandUseConfig, optional
+        land use config parameters, required for land use processing.
 
     Raises
     ------
-    ValueError
-        file doesn't exisit
+    ValidationError
+        If any required parameters aren't given or are invalid.
     """
-    # set up
+
     run_infill: bool
     run_land_use: bool
 
-    # mandatory
     output_folder: pathlib.Path
     proposed_luc_split_path: pathlib.Path
     existing_luc_split_path: pathlib.Path
-    dlog_input_file: pathlib.Path
+    dlog_input_file: pydantic.FilePath
     lookups_sheet_name: str
 
-    # required for infill
-    infill: Optional[InfillConfig]
+    infill: Optional[InfillConfig] = None
+    land_use: Optional[LandUseConfig] = None
 
-    land_use: Optional[LandUseConfig]
+    @pydantic.validator("infill")
+    def check_running_infill(  # pylint: disable=no-self-argument
+        cls, value: InfillConfig | None, values: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Check infill parameters are given if running module."""
+        if not values["run_infill"] and value is None:
+            raise ValueError("infill is required if run_infill is true")
 
-    # required for land use
-
-    @pydantic.validator(
-        "dlog_input_file",
-    )
-    def _file_exists(  # Validator is class method pylint: disable=no-self-argument
-        cls, value: pathlib.Path
-    ) -> pathlib.Path:
-        if not value.is_file():
-            raise ValueError(f"file doesn't exist: {value}")
         return value
 
-    def check_inputs(self) -> None:
-        if self.run_land_use:
-            self.land_use.check_params()
-        if self.run_infill:
-            self.infill.check_params()
+    @pydantic.validator("land_use")
+    def land_use_input_check(  # pylint: disable=no-self-argument
+        cls, value: LandUseConfig | None, values: dict[str, Any]
+    ) -> LandUseConfig:
+        """Check land use is given if running module."""
+        if not values["run_land_use"]:
+            # Don't need to check if we aren't running land use module
+            return value
 
-        if (not self.run_infill) and self.run_land_use:
-            if self.land_use.land_use_input is None:
-                raise ValueError(
-                    "Land use input path is required when not running infilling module")
-            if not os.path.exists(self.land_use.land_use_input
-                    ) or self.land_use.land_use_input == pathlib.Path("."):
-                raise ValueError("Land use input path is not valid")
+        if value is None:
+            raise ValueError("land_use required if run_land_use is true")
+
+        if not values["run_infill"] and value.land_use_input is None:
+            # Need land use input path if not running infill module
+            raise ValueError("land_use_input value required if not running infilling")
+
+        return value
+
+    @pydantic.root_validator
+    def check_running(  # pylint: disable=no-self-argument
+        cls, values: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Raise error if neither module has running set to True."""
+        if not values["run_infill"] and not values["run_land_use"]:
+            raise ValueError(
+                "run_infill and run_land_use cannot both be "
+                "false because there is nothing to run"
+            )
+
+        return values
 
 
 class InfillingAverages(caf.toolkit.BaseConfig):
+    """Averages calculated for use in MEAN infill method."""
+
     average_res_area: float
     average_emp_area: float
     average_mix_area: float

@@ -13,6 +13,7 @@ import geopandas as gpd
 
 # local imports
 from dlit_lu import global_classes
+
 # constants
 LOG = logging.getLogger(__name__)
 
@@ -87,8 +88,7 @@ class DLitLog:
         """
         # Write exception to logfile
         if excepType is not None or excepVal is not None or traceback is not None:
-            self.logger.critical(
-                "Oh no a critical error occurred", exc_info=True)
+            self.logger.critical("Oh no a critical error occurred", exc_info=True)
         else:
             self.logger.info("Program completed without any fatal errors")
 
@@ -107,6 +107,7 @@ def output_file_checks(output_function):
     output_function : function
         output function, the first input must be the output file path
     """
+
     def wrapper_func(file_path, *args, **kwargs):
         if os.path.exists(file_path):
             LOG.warning(f"overwriting {file_path}")
@@ -117,10 +118,12 @@ def output_file_checks(output_function):
             except PermissionError:
                 input(f"Please close {file_path}, then press enter. Cheers!")
         # Do something after the function.
+
     return wrapper_func
 
+
 @output_file_checks
-def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
+def write_to_csv(file_path: pathlib.Path, output: pd.DataFrame) -> None:
     """wirtes file to csv
 
     used so wrapper with logging and permission error checks can be applied
@@ -133,6 +136,7 @@ def write_to_csv(file_path:pathlib.Path, output: pd.DataFrame)-> None:
         data to write
     """
     output.to_csv(file_path)
+
 
 @output_file_checks
 def write_to_excel(file_path: pathlib.Path, outputs: dict[str, pd.DataFrame]) -> None:
@@ -176,9 +180,8 @@ def to_dict(dlog_data: global_classes.DLogData) -> dict[str, pd.DataFrame]:
 
 
 def to_dlog_data(
-    dlog_data: dict[str, pd.DataFrame],
-    lookup: global_classes.DLogValueLookup
-    ) -> global_classes.DLogData:
+    dlog_data: dict[str, pd.DataFrame], lookup: global_classes.DLogValueLookup
+) -> global_classes.DLogData:
     """converts dictionary to DLOG data type
 
     will deal with combined not being present by using None in its place
@@ -211,5 +214,3 @@ def to_dlog_data(
             dlog_data["mixed"],
             lookup,
         )
-
-

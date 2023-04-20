@@ -1,24 +1,49 @@
-"""Automatically fixes and infills data where possible
-
-    IN PROGRESS
-"""
+"""Automatically fixes and infills data where possible"""
 # standard imports
 from __future__ import annotations
+import dataclasses
 
 import logging
 from typing import Optional
 import pathlib
+
 # third party imports
-import pandas as pd
-import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib import colors
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn import preprocessing, ensemble
 
 # local imports
-from dlit_lu import global_classes, utilities, analyse, inputs
+from dlit_lu import global_classes, analyse, inputs
 
 # constants
 LOG = logging.getLogger(__name__)
+_AREA_COLUMNS_LIST = {
+    "residential": ["total_site_area_size_hectares"],
+    "employment": ["site_area_ha"],
+    "mixed": ["total_area_ha"],
+}
+_AREA_COLUMNS = {k: v[0] for k, v in _AREA_COLUMNS_LIST.items()}
+_UNITS_COLUMNS = {
+    "residential": ["units_(dwellings)", "total_units"],
+    "employment": ["total_area_sqm", "units_(floorspace)"],
+    "mixed": ["floorspace_sqm", "units_(floorspace)", "dwellings", "units_(dwellings)"],
+}
+_LAND_USE_COLUMNS = {
+    "residential": ["existing_land_use"],
+    "employment": ["existing_land_use", "proposed_land_use"],
+    "mixed": ["existing_land_use", "proposed_land_use"],
+}
+
+
+@dataclasses.dataclass
+class _RegressionInfillIndices:
+    """Indices for row to train the regression model and rows to infill."""
+
+    infill: pd.Series
+    training: pd.Series
 
 
 def correct_inavlid_syntax(
@@ -42,42 +67,62 @@ def correct_inavlid_syntax(
         data with syntax issues fixed
     """
     LOG.info("performing automatic syntax fixes")
-    data_dict = {
-        "residential": data.residential_data,
-        "employment": data.employment_data,
-        "mixed": data.mixed_data,
-    }
-
-    # define columns
-
-    land_use_columns = {
-        "residential": ["existing_land_use"],
-        "employment": ["existing_land_use", "proposed_land_use"],
-        "mixed": ["existing_land_use", "proposed_land_use"],
-    }
-
     # TODO does not include dwelling units for mixed, currently fixed manually
-    data_dict = utilities.to_dict(data)
-
-    corrected_format = fix_site_ref_id(data_dict)
+    corrected_format = fix_site_ref_id(data.data_dict())
 
     corrected_format = incorrect_luc_formatting(
-        corrected_format, land_use_columns, auxiliary_data
+        corrected_format, _LAND_USE_COLUMNS, auxiliary_data
     )
 
-    return global_classes.DLogData(
-        None,
-        corrected_format["residential"],
-        corrected_format["employment"],
-        corrected_format["mixed"],
-        data.lookup,
+    return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
+
+
+def infill_landuse_codes(
+    data: global_classes.DLogData, auxiliary_data: global_classes.AuxiliaryData
+) -> global_classes.DLogData:
+    """Infill landuse codes in `data` using known land use lookups.
+
+    Infills with full list of valid land use codes if no
+    known lookups are found.
+
+    Returns
+    -------
+    global_classes.DLogData
+        A new instance of DLogData with land use codes infilled.
+    """
+    luc_infilling = old_incomplete_known_luc(
+        {k: getattr(data, f"{k}_data") for k in _LAND_USE_COLUMNS},
+        _LAND_USE_COLUMNS,
+        auxiliary_data,
     )
 
+    luc_infilling = fix_missing_lucs(
+        luc_infilling,
+        _LAND_USE_COLUMNS,
+        ["unknown", "mixed"],
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+    )
 
-def infill_data(data: global_classes.DLogData,
-                auxiliary_data: global_classes.AuxiliaryData,
-                output_folder: pathlib.Path,
-                config: inputs.DLitConfig) -> global_classes.DLogData:
+    luc_infilling = fix_undefined_invalid_luc(
+        luc_infilling,
+        _LAND_USE_COLUMNS,
+        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+        auxiliary_data,
+        {
+            "existing_land_use": "other_issues_existing_land_use_code",
+            "proposed_land_use": "other_issues_proposed_land_use_code",
+        },
+    )
+
+    return global_classes.DLogData.from_data_dict(luc_infilling, data.lookup)
+
+
+def infill_data(
+    data: global_classes.DLogData,
+    auxiliary_data: global_classes.AuxiliaryData,
+    output_folder: pathlib.Path,
+    gfa_method: inputs.GFAInfillMethod,
+) -> global_classes.DLogData:
     """Infills data for which assumptions are required
 
     infills missing areas, units, land use codes with multiple possible values
@@ -88,6 +133,10 @@ def infill_data(data: global_classes.DLogData,
         data to infill
     auxiliary_data : global_classes.AuxiliaryData
         auxiliary data from parser
+    output_folder : pathlib.Path
+        Folder to save summary graphs and parameters in.
+    gfa_method : GFAInfillMethod
+        Method for infilling the GFA and site area columns.
 
     Returns
     -------
@@ -95,110 +144,327 @@ def infill_data(data: global_classes.DLogData,
         infilled data
     """
     LOG.info("performing automatic infilling fixes")
-    data_dict = {
-        "residential": data.residential_data,
-        "employment": data.employment_data,
-        "mixed": data.mixed_data,
-    }
+    data = data.copy()
+    # Convert units / area columns to float
+    for key, area_col in _AREA_COLUMNS.items():
+        df: pd.DataFrame = getattr(data, f"{key}_data")
+        df.loc[:, area_col] = pd.to_numeric(df[area_col], errors="coerce")
 
-    # define columns
-    area_columns_list = {
-        "residential": ["total_site_area_size_hectares"],
-        "employment": ["site_area_ha"],
-        "mixed": ["total_area_ha"],
-    }
+        for units_col in _UNITS_COLUMNS[key]:
+            df.loc[:, units_col] = pd.to_numeric(df[units_col], errors="coerce")
 
-    area_columns = {
-        "residential": "total_site_area_size_hectares",
-        "employment": "site_area_ha",
-        "mixed": "total_area_ha",
-    }
+    # Infilling land use codes before areas as they're
+    # required for regression area infill
+    luc_infilled = infill_landuse_codes(data, auxiliary_data)
 
-    land_use_columns = {
-        "residential": ["existing_land_use"],
-        "employment": ["existing_land_use", "proposed_land_use"],
-        "mixed": ["existing_land_use", "proposed_land_use"],
-    }
+    distribution_path = output_folder / "distribution_plots/before_infilling"
+    distribution_path.mkdir(exist_ok=True, parents=True)
 
-    units_columnns = {
-        "residential": ["units_(dwellings)", "total_units"],
-        "employment": ["total_area_sqm", "units_(floorspace)"],
-        "mixed": ["floorspace_sqm", "units_(floorspace)"],
-    }
+    infill_averages = _average_factors(
+        luc_infilled,
+        distribution_path,
+        output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE,
+    )
 
-    # calculate ratios
-    distribution_path = config.output_folder/"distribution_plots"
+    if gfa_method == inputs.GFAInfillMethod.MEAN:
+        infilled_area = _average_area_infill(luc_infilled, infill_averages)
+    elif gfa_method in inputs.GFAInfillMethod.regression_methods():
+        infilled_area = _regression_area_infill(
+            luc_infilled,
+            gfa_method == inputs.GFAInfillMethod.REGRESSION,
+            output_folder / "infilling_checks",
+        )
+    else:
+        raise ValueError(f"invalid GFA infill method: {gfa_method}")
+
+    distribution_path = distribution_path.with_name("after_infilling")
     distribution_path.mkdir(exist_ok=True)
+    _average_factors(
+        infilled_area,
+        distribution_path,
+        output_folder / ("after_" + inputs.AVERAGE_INFILLING_VALUES_FILE),
+    )
+
+    infilled_data = infill_missing_tag(
+        {k: getattr(infilled_area, f"{k}_data") for k in _LAND_USE_COLUMNS}
+    )
+    infilled_data = infill_missing_years(infilled_data, data.lookup.webtag)
+
+    infilled_data = global_classes.DLogData.from_data_dict(infilled_data, data.lookup)
+
+    distribution_path = distribution_path.with_name("comparison")
+    distribution_path.mkdir(exist_ok=True)
+    _infilling_comparison_plots(data, infilled_data, distribution_path)
+
+    return infilled_data
+
+
+def _average_factors(
+    data: global_classes.DLogData,
+    distribution_path: pathlib.Path,
+    averages_path: pathlib.Path,
+) -> inputs.InfillingAverages:
+    """Calculate InfillingAverages for `data` and save to YAML file.
+
+    Parameters
+    ----------
+    data : global_classes.DLogData
+        Data to calculate averages for.
+    distribution_path : pathlib.Path
+        Path to folder to save distribution plots to.
+    averages_path : pathlib.Path
+        Path to YAML file to save averages to.
+
+    Returns
+    -------
+    inputs.InfillingAverages
+        Calculated averages and ratios.
+    """
+
+    def get_data(key: str) -> pd.DataFrame:
+        return getattr(data, f"{key}_data")
+
+    dwelling_datatypes = ["residential", "mixed"]
 
     dwelling_area_ratio = unit_area_ratio(
-        dict((key, data_dict[key]) for key in (["residential", "mixed"])),
+        dict((k, get_data(k)) for k in dwelling_datatypes),
         {"residential": "total_units", "mixed": "dwellings"},
-        dict((k, area_columns[k]) for k in (["residential", "mixed"])),
-        distribution_path / "dwelling_site_area_ratio_dist.png"
+        dict((k, _AREA_COLUMNS[k]) for k in dwelling_datatypes),
+        distribution_path / "dwelling_site_area_ratio_dist.png",
     )
 
+    fs_datatypes = ["employment", "mixed"]
     floorspace_area_ratio = unit_area_ratio(
-        dict((key, data_dict[key]) for key in (["employment", "mixed"])),
+        dict((k, get_data(k)) for k in fs_datatypes),
         {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
-        dict((k, area_columns[k]) for k in (["employment", "mixed"])),
-        distribution_path / "GFA_site_area_ratio_dist.png"
+        dict((k, _AREA_COLUMNS[k]) for k in fs_datatypes),
+        distribution_path / "GFA_site_area_ratio_dist.png",
     )
 
-    average_area = calculate_average(
-        data_dict, area_columns_list, distribution_path)
+    average_area = calculate_average(data, _AREA_COLUMNS_LIST, distribution_path)
 
-    inputs.InfillingAverages(
+    infill_averages = inputs.InfillingAverages(
         average_res_area=average_area["residential"],
         average_emp_area=average_area["employment"],
         average_mix_area=average_area["mixed"],
         average_gfa_site_area_ratio=floorspace_area_ratio,
         average_dwelling_site_area_ratio=dwelling_area_ratio,
-    ).save_yaml(output_folder/inputs.AVERAGE_INFILLING_VALUES_FILE)
+    )
+
+    infill_averages.save_yaml(averages_path)
+    return infill_averages
+
+
+def _average_area_infill(
+    data: global_classes.DLogData, infill_averages: inputs.InfillingAverages
+) -> global_classes.DLogData:
+    """Infill the site area and units columns using mean areas.
+
+    Saves KDE plots of the areas to `output_folder`.
+    """
+    LOG.info("Infilling site area, total area and floorspaces using MEAN")
+    data_dict = data.data_dict()
+
     # infill values
-    corrected_format = infill_missing_site_area(data_dict, area_columns_list,
-                                                [0, "-"], average_area)
-    corrected_format = infill_units(corrected_format, units_columnns,
-                                    area_columns, ["-", 0],
-                                    {"residential": dwelling_area_ratio,
-                                     "employment": floorspace_area_ratio,
-                                     "mixed": floorspace_area_ratio})
-
-    corrected_format["mixed"] = infill_units({"mixed": corrected_format["mixed"]},
-                                             {"mixed": ["dwellings", "units_(dwellings)"]}, {
-        "mixed": "total_area_ha"}, ["-", 0],
-        {"mixed": dwelling_area_ratio})["mixed"]
-
-    corrected_format = old_incomplete_known_luc(
-        corrected_format, land_use_columns, auxiliary_data
+    corrected_format = infill_missing_site_area(
+        data_dict,
+        _AREA_COLUMNS_LIST,
+        [0, "-"],
+        {
+            "residential": infill_averages.average_res_area,
+            "employment": infill_averages.average_emp_area,
+            "mixed": infill_averages.average_mix_area,
+        },
     )
-
-    corrected_format = fix_missing_lucs(
+    corrected_format = infill_units(
         corrected_format,
-        land_use_columns,
-        ["unknown", "mixed"],
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(),
+        _UNITS_COLUMNS,
+        _AREA_COLUMNS,
+        ["-", 0],
+        {
+            "residential": infill_averages.average_dwelling_site_area_ratio,
+            "employment": infill_averages.average_gfa_site_area_ratio,
+            "mixed": infill_averages.average_gfa_site_area_ratio,
+        },
     )
 
-    corrected_format = fix_undefined_invalid_luc(corrected_format, land_use_columns,
-        auxiliary_data.allowed_codes["land_use_codes"].to_list(
-        ),
-        auxiliary_data,
-        {"existing_land_use": "other_issues_existing_land_use_code",
-        "proposed_land_use": "other_issues_proposed_land_use_code"})
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["dwellings", "units_(dwellings)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_averages.average_dwelling_site_area_ratio},
+    )["mixed"]
 
-    corrected_format = infill_missing_tag(corrected_format)
+    return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
 
-    corrected_format = infill_missing_years(
-        corrected_format, data.lookup.webtag
+
+def _regression_preprocessing(
+    data: pd.DataFrame, landuse_column: str, area_column: str
+) -> tuple[pd.DataFrame, list[str], str]:
+    """Convert `landuse_column` to multiple binary columns."""
+    mlb = preprocessing.MultiLabelBinarizer()
+    landuse_binary = pd.DataFrame(
+        mlb.fit_transform(data[landuse_column]), columns=mlb.classes_, index=data.index
+    )
+    landuse_columns = mlb.classes_
+
+    regression_data = pd.concat([landuse_binary, data[area_column]], axis=1)
+    return regression_data, landuse_columns, area_column
+
+
+def _hist_gradient_boosting(
+    current_data: pd.Series,
+    regression_inputs: pd.DataFrame,
+    categorical_columns: list[str],
+    infill_indices: _RegressionInfillIndices,
+) -> pd.Series:
+    """Train then infill using scikit-learn HistGradientBoostingRegressor."""
+    gradient_boosting = ensemble.HistGradientBoostingRegressor(
+        categorical_features=categorical_columns
+    )
+    gradient_boosting.fit(
+        regression_inputs.loc[infill_indices.training],
+        current_data.loc[infill_indices.training],
     )
 
-    return global_classes.DLogData(
-        None,
-        corrected_format["residential"],
-        corrected_format["employment"],
-        corrected_format["mixed"],
-        data.lookup,
+    return gradient_boosting.predict(regression_inputs.loc[infill_indices.infill])
+
+
+def _check_infill_column(
+    data: pd.DataFrame,
+    infill_column: str,
+    data_columns: list[str],
+    include_negatives: bool,
+) -> Optional[_RegressionInfillIndices]:
+    """Find indices that should be infilled and that can be used for training."""
+    negatives = data[infill_column] < 0
+    if negatives.sum() > 0:
+        LOG.warning(
+            "%s negative values found in column '%s'", negatives.sum(), infill_column
+        )
+    else:
+        LOG.debug("No negative values found in column '%s'", infill_column)
+
+    infill_nan = data[infill_column].isna()
+    if infill_nan.sum() == 0:
+        LOG.info("No infilling needed for column '%s'", infill_column)
+        return None
+
+    LOG.info(
+        "Infilling %s missing values in '%s' column using columns: %s",
+        infill_nan.sum(),
+        infill_column,
+        ", ".join(f"'{i}'" for i in data_columns),
     )
+
+    if include_negatives:
+        training_mask = ~infill_nan
+    else:
+        LOG.info("Negative values excluded from regression training data")
+        training_mask = (~infill_nan) & (~negatives)
+
+    return _RegressionInfillIndices(infill=infill_nan, training=training_mask)
+
+
+def _add_infill_mask_column(
+    data: pd.DataFrame, infilled_column: str, mask: pd.Series, mask_columns: list[str]
+) -> pd.DataFrame:
+    """Add `mask` as column to `data` and append name to `mask_columns`."""
+    infill_mask_column = f"{infilled_column}_regression_infilled"
+    data.insert(data.columns.tolist().index(infilled_column), infill_mask_column, mask)
+    mask_columns.append(infill_mask_column)
+    return data
+
+
+def _regression_area_infill(
+    dlog_data: global_classes.DLogData,
+    include_negatives: bool,
+    checks_folder: pathlib.Path,
+) -> global_classes.DLogData:
+    """Infill `dlog_data` using scikit-learn HistGradientBoostingRegressor.
+
+    Infills the site area and GFA columns.
+
+    Parameters
+    ----------
+    dlog_data : global_classes.DLogData
+        Data used for training and for infilling.
+    include_negatives : bool
+        Whether or not to include negative values in the
+        training set, if False no negative values will
+        be infilled.
+    checks_folder : pathlib.Path
+        Folder to save infilled data to for checking.
+
+    Returns
+    -------
+    global_classes.DLogData
+        New instance of DLogData with site area and GFA infilled.
+    """
+    checks_folder.mkdir(exist_ok=True)
+    infilled_data: dict[str, pd.DataFrame] = {}
+
+    for dtype, area_col in _AREA_COLUMNS.items():
+        LOG.info(
+            "Performing regression area infilling for %s data",
+            dtype,
+        )
+        infilled_df: pd.DataFrame = dlog_data.data_dict()[dtype]
+        infilled_df.loc[:, area_col] = pd.to_numeric(
+            infilled_df[area_col], errors="coerce"
+        )
+        infill_mask_columns: list[str] = []
+
+        # Get the proposed land use column if available
+        landuse_col = _LAND_USE_COLUMNS[dtype][-1]
+
+        regression_data, landuse_columns, _ = _regression_preprocessing(
+            infilled_df, landuse_col, area_col
+        )
+
+        for units_col in _UNITS_COLUMNS[dtype]:
+            infilled_df.loc[:, units_col] = pd.to_numeric(
+                infilled_df[units_col], errors="coerce"
+            )
+
+            infill_indices = _check_infill_column(
+                infilled_df, units_col, [area_col, landuse_col], include_negatives
+            )
+            if infill_indices is None:
+                continue
+
+            # Infill floorspace using LUC and site area (missing site areas can still be infilled)
+            infilled_df.loc[infill_indices.infill, units_col] = _hist_gradient_boosting(
+                infilled_df[units_col], regression_data, landuse_columns, infill_indices
+            )
+            infilled_df = _add_infill_mask_column(
+                infilled_df, units_col, infill_indices.infill, infill_mask_columns
+            )
+
+        # Infill site area after floorspace so the infilled site areas
+        # don't affect the floorspace infilling process
+        infill_indices = _check_infill_column(
+            infilled_df, area_col, [landuse_col], include_negatives
+        )
+        if infill_indices is not None:
+            infilled_df.loc[infill_indices.infill, area_col] = _hist_gradient_boosting(
+                infilled_df[area_col],
+                regression_data.loc[:, landuse_columns],
+                landuse_columns,
+                infill_indices,
+            )
+            infilled_df = _add_infill_mask_column(
+                infilled_df, area_col, infill_indices.infill, infill_mask_columns
+            )
+
+        infilled_data[dtype] = infilled_df.drop(columns=infill_mask_columns)
+
+        out_file = checks_folder / f"{dtype}_infilled.csv"
+        infilled_df.to_csv(out_file, index=False)
+        LOG.info("Written: %s", out_file)
+
+    return global_classes.DLogData.from_data_dict(infilled_data, dlog_data.lookup)
 
 
 def incorrect_luc_formatting(
@@ -229,12 +495,9 @@ def incorrect_luc_formatting(
         if "(" in s or ")" in s
     ]
     wrong_format_check = [
-        s.replace("(", "").replace(")", "")
-        for s in possible_error_codes
+        s.replace("(", "").replace(")", "") for s in possible_error_codes
     ]
-    format_lookup = pd.DataFrame(
-        [possible_error_codes, wrong_format_check]
-    ).transpose()
+    format_lookup = pd.DataFrame([possible_error_codes, wrong_format_check]).transpose()
     format_lookup.columns = ["land_use_code", "incorrect_format"]
     format_lookup = format_lookup.append(
         {"land_use_code": "sg", "incorrect_format": "suigeneris"},
@@ -259,7 +522,8 @@ def incorrect_luc_formatting(
 
 
 def calc_average_years_webtag_certainty(
-    data: dict[str, pd.DataFrame], webtag_lookup: pd.DataFrame,
+    data: dict[str, pd.DataFrame],
+    webtag_lookup: pd.DataFrame,
 ) -> dict[int, list[int]]:
     """calculates the mode start and end year for each catergory of webtag certainty
 
@@ -290,9 +554,7 @@ def calc_average_years_webtag_certainty(
         for _, value in data.items():
             # filter df for each webtag status without missing years
             filtered_value = value[value["missing_years"] == False]
-            filtered_value = filtered_value[
-                value["web_tag_certainty_id"] == id_
-            ]
+            filtered_value = filtered_value[value["web_tag_certainty_id"] == id_]
 
             all_start_years = all_start_years.append(
                 filtered_value["start_year_id"], ignore_index=True
@@ -305,9 +567,11 @@ def calc_average_years_webtag_certainty(
 
         if mode_start_year > mode_end_year:
             LOG.warning(
-                f"infilled years for TAG status {webtag_lookup[id_]} have end years"
+                "infilled years for TAG status %s have end years"
                 " that are before start years, setting end"
-                " year equal to start year ({mode_start_year})"
+                " year equal to start year (%s)",
+                webtag_lookup[id_],
+                mode_start_year,
             )
 
             mode_end_year = mode_start_year
@@ -316,9 +580,7 @@ def calc_average_years_webtag_certainty(
     return average_years
 
 
-def infill_missing_tag(
-    data: dict[str, pd.DataFrame]
-) -> dict[str, pd.DataFrame]:
+def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """infills TAG certainty where it is not specified
 
     the infill value is determined from the planning and/or construction status
@@ -343,7 +605,6 @@ def infill_missing_tag(
     }
 
     for key, value in data.items():
-
         to_be_infilled = value.copy()
         missing_tag = value[value["web_tag_certainty_id"] == 0]
 
@@ -352,9 +613,9 @@ def infill_missing_tag(
             missing_tag["planning_status_id"] == 2, :
         ]
 
-        missing_tag_permissioned.loc[
-            :, "web_tag_certainty_id"
-        ] = infill_lookup["permissioned"]
+        missing_tag_permissioned.loc[:, "web_tag_certainty_id"] = infill_lookup[
+            "permissioned"
+        ]
 
         # not permissioned
         missing_tag_not_permissioned = missing_tag[
@@ -362,12 +623,16 @@ def infill_missing_tag(
         ]
 
         # without_years
-        missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
-            True, "web_tag_certainty_id"] = infill_lookup["not_permissioned_no_years"]
+        missing_tag_not_permissioned.loc[
+            missing_tag_not_permissioned["missing_years"] == True,
+            "web_tag_certainty_id",
+        ] = infill_lookup["not_permissioned_no_years"]
 
         # with_years
-        missing_tag_not_permissioned.loc[missing_tag_not_permissioned["missing_years"] ==
-                False, "web_tag_certainty_id"] = infill_lookup["not_permissioned_with_years"]
+        missing_tag_not_permissioned.loc[
+            missing_tag_not_permissioned["missing_years"] == False,
+            "web_tag_certainty_id",
+        ] = infill_lookup["not_permissioned_with_years"]
 
         # not specified
         missing_tag_not_spec = missing_tag.loc[
@@ -386,23 +651,21 @@ def infill_missing_tag(
             .any(axis=1)
         )
 
-        missing_tag_not_spec.loc[completed_undergoing_constr,
-            "web_tag_certainty_id"] = infill_lookup["not_specified_in_construction"]
+        missing_tag_not_spec.loc[
+            completed_undergoing_constr, "web_tag_certainty_id"
+        ] = infill_lookup["not_specified_in_construction"]
 
         # not started/not specified
-        missing_tag_not_spec.loc[~completed_undergoing_constr,
-            "web_tag_certainty_id"] = infill_lookup["not_specified_not_started_specified"]
+        missing_tag_not_spec.loc[
+            ~completed_undergoing_constr, "web_tag_certainty_id"
+        ] = infill_lookup["not_specified_not_started_specified"]
 
         # infill
-        to_be_infilled.loc[
-            missing_tag_permissioned.index, :
-        ] = missing_tag_permissioned
+        to_be_infilled.loc[missing_tag_permissioned.index, :] = missing_tag_permissioned
         to_be_infilled.loc[
             missing_tag_not_permissioned.index, :
         ] = missing_tag_not_permissioned
-        to_be_infilled.loc[
-            missing_tag_not_spec.index, :
-        ] = missing_tag_not_spec
+        to_be_infilled.loc[missing_tag_not_spec.index, :] = missing_tag_not_spec
 
         infilled_data[key] = to_be_infilled
 
@@ -431,78 +694,80 @@ def infill_one_missing_year(
         infilled years
     """
 
-    missing_start_id = analyse.find_multiple_missing_values(data,
-        dict((k, ["start_year_id"])
-                for k in data.keys()),
-        dict((k, [14, ""]) for k in data.keys()))
+    missing_start_id = analyse.find_multiple_missing_values(
+        data,
+        dict((k, ["start_year_id"]) for k in data.keys()),
+        dict((k, [14, ""]) for k in data.keys()),
+    )
 
-    missing_end_id = analyse.find_multiple_missing_values(data,
-        dict((k, ["end_year_id"])
-            for k in data.keys()),
-        dict((k, [14, ""]) for k in data.keys()))
+    missing_end_id = analyse.find_multiple_missing_values(
+        data,
+        dict((k, ["end_year_id"]) for k in data.keys()),
+        dict((k, [14, ""]) for k in data.keys()),
+    )
 
     fixed = {}
 
     for key, value in data.items():
         fixed_data = value.copy()
         for id_, average_year in average_years.items():
-            #loop through average year for each webtag status
-            to_be_fixed = fixed_data[
-                fixed_data["web_tag_certainty_id"] == id_
-            ].copy()
-            #period is start year - end year
-            period = average_year[1] - average_year[0] 
-            #gets all entries with no start year
+            # loop through average year for each webtag status
+            to_be_fixed = fixed_data[fixed_data["web_tag_certainty_id"] == id_].copy()
+            # period is start year - end year
+            period = average_year[1] - average_year[0]
+            # gets all entries with no start year
             no_start_index = missing_start_id[key][
                 missing_start_id[key]["web_tag_certainty_id"] == id_
             ].index
-            #gets all entries with no end year
+            # gets all entries with no end year
             no_end_index = missing_end_id[key][
                 missing_end_id[key]["web_tag_certainty_id"] == id_
             ].index
-            #get all values that have only end year
-            end_no_start = no_start_index[
-                ~no_start_index.isin(no_end_index)
-            ]
+            # get all values that have only end year
+            end_no_start = no_start_index[~no_start_index.isin(no_end_index)]
             end_no_start_values = to_be_fixed.loc[end_no_start]
-            #get all values that have only start year
-            start_no_end = no_end_index[
-                ~no_end_index.isin(no_start_index)
-            ]
+            # get all values that have only start year
+            start_no_end = no_end_index[~no_end_index.isin(no_start_index)]
             start_no_end_values = to_be_fixed.loc[start_no_end]
 
-            #set start to end if applying period will set value out of bounds
+            # set start to end if applying period will set value out of bounds
             mask_end = end_no_start_values["end_year_id"] <= period
-            end_no_start_values.loc[mask_end, "start_year_id"
-                ] = end_no_start_values.loc[mask_end, "end_year_id"]
-            #set start to end - period if result in bounds
-            end_no_start_values.loc[~mask_end,"start_year_id"] = (
+            end_no_start_values.loc[
+                mask_end, "start_year_id"
+            ] = end_no_start_values.loc[mask_end, "end_year_id"]
+            # set start to end - period if result in bounds
+            end_no_start_values.loc[~mask_end, "start_year_id"] = (
                 end_no_start_values.loc[~mask_end, "end_year_id"] - period
             )
 
             mask_start = start_no_end_values["start_year_id"] + period >= 14
-            #set end to start if result is out of bounds
-            start_no_end_values.loc[mask_start, "end_year_id",
-                ] = start_no_end_values.loc[mask_start, "start_year_id",]
-            #set end to start + period if result is in bounds
-            start_no_end_values.loc[~mask_start,"end_year_id"] = (
-                start_no_end_values.loc[~mask_start,"start_year_id"]+ period)
+            # set end to start if result is out of bounds
+            start_no_end_values.loc[
+                mask_start,
+                "end_year_id",
+            ] = start_no_end_values.loc[
+                mask_start,
+                "start_year_id",
+            ]
+            # set end to start + period if result is in bounds
+            start_no_end_values.loc[~mask_start, "end_year_id"] = (
+                start_no_end_values.loc[~mask_start, "start_year_id"] + period
+            )
 
-            #integrate results in to data set
-            to_be_fixed.loc[
-                end_no_start, "start_year_id"
-            ] = end_no_start_values["end_year_id"]
-            to_be_fixed.loc[
-                start_no_end, "end_year_id"
-            ] = start_no_end_values["start_year_id"]
+            # integrate results in to data set
+            to_be_fixed.loc[end_no_start, "start_year_id"] = end_no_start_values[
+                "end_year_id"
+            ]
+            to_be_fixed.loc[start_no_end, "end_year_id"] = start_no_end_values[
+                "start_year_id"
+            ]
             fixed_data.loc[to_be_fixed.index] = to_be_fixed
         fixed[key] = fixed_data
     return fixed
 
 
 def infill_missing_years(
-    data: dict[str, pd.DataFrame],
-    tag_lookup: pd.DataFrame
+    data: dict[str, pd.DataFrame], tag_lookup: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
     """infills missing years
 
@@ -520,9 +785,7 @@ def infill_missing_years(
     dict[str, pd.DataFrame]
         infilled data
     """
-    average_years = calc_average_years_webtag_certainty(
-        data, tag_lookup
-    )
+    average_years = calc_average_years_webtag_certainty(data, tag_lookup)
 
     data = infill_one_missing_year(data, average_years)
 
@@ -530,9 +793,7 @@ def infill_missing_years(
 
     missing_year_id = analyse.find_multiple_missing_values(
         data,
-        dict(
-            (k, ["start_year_id", "end_year_id"]) for k in data.keys()
-        ),
+        dict((k, ["start_year_id", "end_year_id"]) for k in data.keys()),
         dict((k, [14, ""]) for k in data.keys()),
     )
 
@@ -544,10 +805,12 @@ def infill_missing_years(
         ]
         for id_ in average_years.keys():
             id_ = int(id_)
-            filtered_data.loc[filtered_data["web_tag_certainty_id"]
-                              == id_, "start_year_id"] = average_years[id_][0]
-            filtered_data.loc[filtered_data["web_tag_certainty_id"]
-                              == id_, "end_year_id"] = average_years[id_][1]
+            filtered_data.loc[
+                filtered_data["web_tag_certainty_id"] == id_, "start_year_id"
+            ] = average_years[id_][0]
+            filtered_data.loc[
+                filtered_data["web_tag_certainty_id"] == id_, "end_year_id"
+            ] = average_years[id_][1]
         fixed_data[key].loc[filtered_data.index, :] = filtered_data
     return fixed_data
 
@@ -587,9 +850,7 @@ def infill_units(
         unit_columns,
         dict((k, missing_values) for k in data.keys()),
     )
-    area_columns_list = dict(
-        (k, [area_columns[k]]) for k in area_columns.keys()
-    )
+    area_columns_list = dict((k, [area_columns[k]]) for k in area_columns.keys())
     filtered_data_missing_area = analyse.find_multiple_missing_values(
         filtered_data,
         area_columns_list,
@@ -603,12 +864,11 @@ def infill_units(
             index=filtered_data_missing_area[key].index
         )
 
-        fixed_data[key].loc[
-            filtered_data_with_area.index, unit_columns[key]
-        ] = (
-            fixed_data[key].loc[
-                filtered_data_with_area.index, area_columns[key]
-            ]
+        if filtered_data_with_area.empty:
+            continue  # No need to infill if they're is no missing data
+
+        fixed_data[key].loc[filtered_data_with_area.index, unit_columns[key]] = (
+            fixed_data[key].loc[filtered_data_with_area.index, area_columns[key]]
             * unit_to_area_ratio[key]
         )
 
@@ -648,25 +908,25 @@ def infill_missing_site_area(
     fixed_data = {}
     for key, value in data.items():
         fixed_data[key] = value.copy()
-        fixed_data[key].loc[
-            missing_area[key].index, area_columns[key]
-        ] = infill_area[key]
+        fixed_data[key].loc[missing_area[key].index, area_columns[key]] = infill_area[
+            key
+        ]
 
     return fixed_data
 
 
 def calculate_average(
-    data: dict[str, pd.DataFrame],
+    data: global_classes.DLogData,
     columns: dict[str, list[str]],
     output_path: pathlib.Path,
-    ) -> dict[str, float]:
+) -> dict[str, float]:
     """calculate the mean value
 
     will calculate the total average across all the columns
 
     Parameters
     ----------
-    data : dict[str, pd.DataFrame]
+    data : global_classes.DLogData
         data to analyse
     columns : dict[str, list[str]]
         columns to include within the average
@@ -677,12 +937,19 @@ def calculate_average(
         mean values
     """
     mean_values = {}
-    for key, value in data.items():
+    for key, df in data.data_dict().items():
+        if key not in columns or df is None:
+            continue
+
         for column in columns[key]:
-            mean_values[key] = value.loc[value["missing_area"]
-                                         == False, column].mean()
-            distribution_plots(value.loc[value["missing_area"] == False, column].to_numpy(
-            ), key + " Site Area Distribution", output_path / (key+"_site_area_dist.png"))
+            na_filter = ~df[column].isna()
+
+            mean_values[key] = df.loc[na_filter, column].mean()
+            distribution_plots(
+                df.loc[na_filter, column].to_numpy(),
+                f"{key.title()} Site Area Distribution",
+                output_path / (key + "_site_area_dist.png"),
+            )
     return mean_values
 
 
@@ -821,12 +1088,11 @@ def fix_undefined_invalid_luc(
         fixed_codes[key] = value.copy()
         for column in columns[key]:
             # finds values that have not been defined as empty, infills and gives a warning
-            existing_entries_other_issues = fixed_codes[key][fixed_codes[key
-                ][filter_column_lookup[column]] == True]
+            existing_entries_other_issues = fixed_codes[key][
+                fixed_codes[key][filter_column_lookup[column]] == True
+            ]
             not_fixed = existing_entries_other_issues.loc[
-                existing_entries_other_issues[column].apply(
-                    lambda x: x != fill_value
-                ),
+                existing_entries_other_issues[column].apply(lambda x: x != fill_value),
                 :,
             ]
 
@@ -837,14 +1103,14 @@ def fix_undefined_invalid_luc(
                 if len(not_fixed) == 0:
                     continue
 
-                LOG.warning(f"{len(not_fixed)} undefined invalid land use codes"
-                            f" found in {key}, {column}:\n{not_fixed[column].to_list()}\n"
-                            "Infilling with average land use split.")
+                LOG.warning(  # pylint: disable=logging-fstring-interpolation
+                    f"{len(not_fixed)} undefined invalid land use codes"
+                    f" found in {key}, {column}:\n{not_fixed[column].to_list()}\n"
+                    "Infilling with average land use split."
+                )
                 replacement = pd.Series([fill_value]).repeat(len(not_fixed))
                 replacement.index = not_fixed.index
-                fixed_codes[key].loc[
-                    not_fixed.index, column
-                ] = replacement
+                fixed_codes[key].loc[not_fixed.index, column] = replacement
     return fixed_codes
 
 
@@ -871,24 +1137,28 @@ def unit_area_ratio(
     Returns
     -------
     float
-        _description_
+        Mean ratio between units column and area column.
     """
     all_ratios = np.array([])
     for key, value in data.items():
-        data_subset = value.loc[value["missing_area"] == False, :]
-        data_subset = data_subset.loc[
-            data_subset["missing_gfa_or_dwellings_with_site_area"]
-            == False,
-            :,
-        ]
+        units_col = unit_columns[key]
+        area_col = area_columns[key]
+
         # data subset only contains entries with site area and dwelling/floorspace
+        data_subset = value.loc[
+            (~value[units_col].isna()) & (~value[area_col].isna()), :
+        ]
         all_ratios = np.append(
             all_ratios,
-            (
-                data_subset[unit_columns[key]]
-                / data_subset[area_columns[key]]
+            np.divide(
+                data_subset[units_col],
+                data_subset[area_col],
+                where=data_subset[area_col] != 0,
+                out=np.full_like(data_subset[units_col], np.nan),
             ),
         )
+
+    all_ratios = all_ratios[np.isfinite(all_ratios)]
     distribution_plots(all_ratios, "Unit-Site Area Ratio Plot", plot_path)
     return all_ratios.mean()
 
@@ -910,9 +1180,9 @@ def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> N
 
     fig, ax = plt.subplots()
     ax.set_title(title)
-    #KDE plot
+    # KDE plot
     sns.kdeplot(data, ax=ax, label="Kerbel Distribution Estimation")
-    #calculate and ploy mean
+    # calculate and ploy mean
     kdeline = ax.lines[0]
     xs = kdeline.get_xdata()
     ys = kdeline.get_ydata()
@@ -923,6 +1193,102 @@ def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> N
     ax.legend()
     fig.savefig(save_as)
     plt.close()
+
+
+def _infilling_comparison_plots(
+    data: global_classes.DLogData,
+    infilled: global_classes.DLogData,
+    output_folder: pathlib.Path,
+) -> None:
+    """Create KDE and Histograms comparing `data` to `infilled`."""
+    LOG.info("Creating infilling comparison plots in %s", output_folder)
+    for lu_type, before in data.data_dict().items():
+        after = infilled.data_dict()[lu_type]
+
+        LOG.info("Creating %s plot", lu_type)
+        plot_columns = _UNITS_COLUMNS[lu_type] + _AREA_COLUMNS_LIST[lu_type]
+
+        _infill_comparison_figure(
+            before,
+            after,
+            plot_columns,
+            f"{lu_type.title()} Infilling Comparison KDE Plots",
+            output_folder / f"{lu_type}_infilling_comparison-kde.png",
+            "kde",
+        )
+        _infill_comparison_figure(
+            before,
+            after,
+            plot_columns,
+            f"{lu_type.title()} Infilling Comparison Histogram",
+            output_folder / f"{lu_type}_infilling_comparison-hist.png",
+            "hist",
+        )
+
+
+def _infill_comparison_figure(
+    before: pd.DataFrame,
+    after: pd.DataFrame,
+    plot_columns: list[str],
+    title: str,
+    output_file: pathlib.Path,
+    plot_type: str,
+):
+    """Plot a KDE or Histogram comparing the `before` and `after` values."""
+
+    def tidy_name(name: str) -> str:
+        return " ".join(name.split("_")).title()
+
+    plot_type = plot_type.lower().strip()
+
+    fig, axes = plt.subplots(
+        len(plot_columns), layout="constrained", figsize=(10, 7 * len(plot_columns))
+    )
+    fig.suptitle(title, fontsize="x-large")
+
+    data = {"before": before, "after": after}
+
+    for ax, column in zip(axes, plot_columns):
+        if plot_type == "kde":
+            for nm, df in data.items():
+                sns.kdeplot(
+                    df[column],
+                    ax=ax,
+                    fill=True,
+                    hatch="/" if nm == "before" else "\\",
+                    label=f"{nm.title()} Infilling",
+                )
+
+        elif plot_type in ("hist", "histogram"):
+            # Calculate bins across all data so the same are used for both plots
+            combined = np.concatenate([before[column].values, after[column].values])
+            combined = combined[np.isfinite(combined)]
+            bins = np.histogram_bin_edges(combined, bins=50)
+
+            for i, (nm, df) in enumerate(data.items()):
+                color = colors.to_rgb(f"C{i}")
+
+                ax.hist(
+                    df[column],
+                    bins=bins,
+                    histtype="stepfilled",
+                    hatch="/" if nm == "before" else "\\",
+                    ec=color + (1,),
+                    fc=color + (0.2,),
+                    density=True,
+                    label=f"{nm.title()} Infilling",
+                )
+
+        else:
+            raise ValueError(f"invalid plot type: {plot_type}")
+
+        ax.legend()
+        ax.set_title(tidy_name(column))
+        ax.set_ylabel("Density")
+        ax.set_xlabel(tidy_name(column))
+
+    fig.savefig(output_file)
+    LOG.info("Written: %s", output_file)
 
 
 def find_and_replace_luc(
@@ -962,8 +1328,8 @@ def find_and_replace_luc(
                     return fill_empty_value
                 else:
                     LOG.warning(
-                        f"fill_empty_value is a {type(fill_empty_value)},"
-                        " that is neither a str or list[str]"
+                        "fill_empty_value is a %s, that is neither a str or list[str]",
+                        type(fill_empty_value),
                     )
             else:
                 return []
@@ -986,15 +1352,14 @@ def find_and_replace_luc(
                 luc_entry = luc_entry + replacement_code
             else:
                 LOG.warning(
-                    f"{replace_column_name} contians {type(replacement_code)},"
-                    " that is neither a str or list[str]"
+                    "%s contians %s, that is neither a str or list[str]",
+                    replace_column_name,
+                    type(replacement_code),
                 )
     return luc_entry
 
 
-def fix_site_ref_id(
-    data: dict[str, pd.DataFrame]
-) -> dict[str, pd.DataFrame]:
+def fix_site_ref_id(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """creates a sit reference id for entries that do not have one
 
     Parameters
@@ -1024,9 +1389,7 @@ def fix_site_ref_id(
         if len(missing_ids) == 0:
             continue
         # calculate new ids & reset max id value
-        new_ids = overall_max_id_value + np.arange(
-            1, len(missing_ids) + 1, dtype=int
-        )
+        new_ids = overall_max_id_value + np.arange(1, len(missing_ids) + 1, dtype=int)
         overall_max_id_value = new_ids.max()
 
         fixed_ids[key].loc[
@@ -1078,33 +1441,48 @@ def infill_year_units(
     years_defined = data[data[distribution_column] == 1]
 
     if len(not_specified) != 0 or len(years_defined) != 0:
-        raise ValueError(
-            "distrubtion contains not specified or defined years values")
+        raise ValueError("distrubtion contains not specified or defined years values")
 
     flat = data[data[distribution_column] == 2]
-    flat_years = strip_year(
-        flat["start_year_id"], flat["end_year_id"], years_lookup)
+    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], years_lookup)
     early = data[data[distribution_column] == 3]
-    early_years = strip_year(
-        early["start_year_id"], early["end_year_id"], years_lookup)
+    early_years = strip_year(early["start_year_id"], early["end_year_id"], years_lookup)
     late = data[data[distribution_column] == 4]
-    late_years = strip_year(
-        late["start_year_id"], late["end_year_id"], years_lookup)
+    late_years = strip_year(late["start_year_id"], late["end_year_id"], years_lookup)
     mid = data[data[distribution_column] == 5]
-    mid_years = strip_year(mid["start_year_id"],
-                           mid["end_year_id"], years_lookup)
+    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], years_lookup)
 
     for column in unit_year_column:
         year = int(column.split("_")[2])
 
         flat.loc[:, column] = flat_distribution(
-            flat[unit_column], flat_years["start_year"], flat_years["end_year"], year, period)
+            flat[unit_column],
+            flat_years["start_year"],
+            flat_years["end_year"],
+            year,
+            period,
+        )
         early.loc[:, column] = early_distribution(
-            early[unit_column], early_years["start_year"], early_years["end_year"], year, period)
+            early[unit_column],
+            early_years["start_year"],
+            early_years["end_year"],
+            year,
+            period,
+        )
         late.loc[:, column] = late_distribution(
-            late[unit_column], late_years["start_year"], late_years["end_year"], year, period)
+            late[unit_column],
+            late_years["start_year"],
+            late_years["end_year"],
+            year,
+            period,
+        )
         mid.loc[:, column] = mid_distribution(
-            mid[unit_column], mid_years["start_year"], mid_years["end_year"], year, period)
+            mid[unit_column],
+            mid_years["start_year"],
+            mid_years["end_year"],
+            year,
+            period,
+        )
 
     data.update(flat)
     data.update(early)
@@ -1117,7 +1495,7 @@ def strip_year(
     start_year_id: pd.Series,
     end_year_id: pd.Series,
     years_lookup: pd.DataFrame,
-    ) -> pd.DataFrame:
+) -> pd.DataFrame:
     """strips the integer years from the string
 
     returns a data frame returning either the start or end year
@@ -1138,12 +1516,31 @@ def strip_year(
     """
     years_lookup = years_lookup["years"].str.split("-", expand=True)
     years_lookup.columns = ["start_year", "end_year"]
-    start_year = start_year_id.to_frame().merge(years_lookup, how="left", left_on="start_year_id",
-        right_index=True, suffixes=["", "_"]).drop(columns=["end_year"])
-    end_year = end_year_id.to_frame().merge(years_lookup, how="left", left_on="end_year_id",
-        right_index=True, suffixes=["", "_"]).drop(columns=["start_year"])
-    years = pd.DataFrame([start_year["start_year"].astype(
-        int), end_year["end_year"].astype(int)]).transpose()
+    start_year = (
+        start_year_id.to_frame()
+        .merge(
+            years_lookup,
+            how="left",
+            left_on="start_year_id",
+            right_index=True,
+            suffixes=["", "_"],
+        )
+        .drop(columns=["end_year"])
+    )
+    end_year = (
+        end_year_id.to_frame()
+        .merge(
+            years_lookup,
+            how="left",
+            left_on="end_year_id",
+            right_index=True,
+            suffixes=["", "_"],
+        )
+        .drop(columns=["start_year"])
+    )
+    years = pd.DataFrame(
+        [start_year["start_year"].astype(int), end_year["end_year"].astype(int)]
+    ).transpose()
     years.columns = ["start_year", "end_year"]
     return years
 
@@ -1172,7 +1569,7 @@ def flat_distribution(
         year to calculate build out profile for
     period : int
         time step (in years) between years in build out profile
-        e.g. build out profile for 2001,2006,2011... would have 
+        e.g. build out profile for 2001,2006,2011... would have
         a period = 5
 
     Returns
@@ -1182,11 +1579,10 @@ def flat_distribution(
     """
     after_start = year >= start_year
     before_end = year <= end_year
-    within_years = pd.DataFrame(
-        [after_start, before_end]).transpose().all(axis=1)
+    within_years = pd.DataFrame([after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
-    periods = (end_year - start_year+1)/period
-    unit_years[within_years] = unit[within_years]/periods[within_years]
+    periods = (end_year - start_year + 1) / period
+    unit_years[within_years] = unit[within_years] / periods[within_years]
     return unit_years
 
 
@@ -1214,7 +1610,7 @@ def early_distribution(
         year to calculate build out profile for
     period : int
         time step (in years) between years in build out profile
-        e.g. build out profile for 2001,2006,2011... would have 
+        e.g. build out profile for 2001,2006,2011... would have
         a period = 5
 
     Returns
@@ -1225,15 +1621,17 @@ def early_distribution(
 
     after_start = year >= start_year
     before_end = year <= end_year
-    within_years = pd.DataFrame(
-        [after_start, before_end]).transpose().all(axis=1)
+    within_years = pd.DataFrame([after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
-    periods = (end_year - start_year+1)/period
+    periods = (end_year - start_year + 1) / period
 
-    unit_years[within_years] = unit[within_years]*((periods[within_years]-(
-        ((year-start_year[within_years])/period)+1)).apply(two_to_pow
-        )/(periods[within_years].apply(two_to_pow)-1))
+    unit_years[within_years] = unit[within_years] * (
+        (
+            periods[within_years] - (((year - start_year[within_years]) / period) + 1)
+        ).apply(two_to_pow)
+        / (periods[within_years].apply(two_to_pow) - 1)
+    )
     return unit_years
 
 
@@ -1272,15 +1670,21 @@ def late_distribution(
 
     after_start = year >= start_year
     before_end = year <= end_year
-    within_years = pd.DataFrame(
-        [after_start, before_end]).transpose().all(axis=1)
+    within_years = pd.DataFrame([after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
-    periods = (end_year - start_year+1)/period
+    periods = (end_year - start_year + 1) / period
 
-    unit_years[within_years] = unit[within_years]*((periods[within_years]-(
-        ((end_year[within_years]-(year+(period-1)))/period)+1))).apply(two_to_pow
-        )/(periods[within_years].apply(two_to_pow)-1)
+    unit_years[within_years] = (
+        unit[within_years]
+        * (
+            (
+                periods[within_years]
+                - (((end_year[within_years] - (year + (period - 1))) / period) + 1)
+            )
+        ).apply(two_to_pow)
+        / (periods[within_years].apply(two_to_pow) - 1)
+    )
     return unit_years
 
 
@@ -1319,34 +1723,53 @@ def mid_distribution(
 
     after_start = year >= start_year
     before_end = year <= end_year
-    within_years = pd.DataFrame(
-        [after_start, before_end]).transpose().all(axis=1)
+    within_years = pd.DataFrame([after_start, before_end]).transpose().all(axis=1)
     unit_years = pd.Series(np.zeros(len(unit)), index=unit.index)
 
-    periods = (end_year - start_year+1)/period
+    periods = (end_year - start_year + 1) / period
 
-    determinator = 1 + (year - start_year)/period
-    less_than_bool = determinator <= (periods+1)/2
+    determinator = 1 + (year - start_year) / period
+    less_than_bool = determinator <= (periods + 1) / 2
     more_than_bool = ~less_than_bool
 
-    less_than_bool = pd.DataFrame([less_than_bool.reset_index(
-        drop=True), within_years.reset_index(drop=True)]).transpose().all(axis=1)
-    more_than_bool = pd.DataFrame([more_than_bool.reset_index(
-        drop=True), within_years.reset_index(drop=True)]).transpose().all(axis=1)
+    less_than_bool = (
+        pd.DataFrame(
+            [less_than_bool.reset_index(drop=True), within_years.reset_index(drop=True)]
+        )
+        .transpose()
+        .all(axis=1)
+    )
+    more_than_bool = (
+        pd.DataFrame(
+            [more_than_bool.reset_index(drop=True), within_years.reset_index(drop=True)]
+        )
+        .transpose()
+        .all(axis=1)
+    )
     less_than_bool.index = unit.index
     more_than_bool.index = unit.index
 
-    unit_years[less_than_bool] = unit[
-        less_than_bool]*((year-start_year[less_than_bool])/period).apply(two_to_pow)/(
-            (((periods[less_than_bool]+1)/2).apply(np.floor).apply(two_to_pow)-1)+(
-                ((periods[less_than_bool])/2).apply(np.floor).apply(two_to_pow)-1))
+    unit_years[less_than_bool] = (
+        unit[less_than_bool]
+        * ((year - start_year[less_than_bool]) / period).apply(two_to_pow)
+        / (
+            (((periods[less_than_bool] + 1) / 2).apply(np.floor).apply(two_to_pow) - 1)
+            + (((periods[less_than_bool]) / 2).apply(np.floor).apply(two_to_pow) - 1)
+        )
+    )
 
-    unit_years[more_than_bool] = unit[more_than_bool]*((periods[more_than_bool]-(
-        (year-start_year[more_than_bool])/period+1)).apply(two_to_pow)/(
-            (((periods[more_than_bool]+1)/2).apply(np.floor).apply(two_to_pow)-1)+(
-                ((periods[more_than_bool])/2).apply(np.floor).apply(two_to_pow)-1)))
+    unit_years[more_than_bool] = unit[more_than_bool] * (
+        (
+            periods[more_than_bool] - ((year - start_year[more_than_bool]) / period + 1)
+        ).apply(two_to_pow)
+        / (
+            (((periods[more_than_bool] + 1) / 2).apply(np.floor).apply(two_to_pow) - 1)
+            + (((periods[more_than_bool]) / 2).apply(np.floor).apply(two_to_pow) - 1)
+        )
+    )
     return unit_years
 
 
 def two_to_pow(x: float):
+    """2 to the power `x`."""
     return 2**x

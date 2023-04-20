@@ -1,17 +1,16 @@
 #Set Up Parameters
 run_infill: True
-run_land_use: True 
-
+run_land_use: True
 
 #Mandatory Parameters
 #--str
 lookups_sheet_name: "Lookups"
-#--Read file paths 
-dlog_input_file: C:\Users\UKKXF022\Documents\DLOG\DLog_data\DLog21_v8_issued_v1.xlsx
-#--Write file paths 
-output_folder: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs
-proposed_luc_split_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\proposed_luc_split_path.csv
-existing_luc_split_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\existing_luc_split_path.csv
+#--Read file paths
+dlog_input_file: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\Inputs\DLog21_v8_issued_v1.xlsx
+#--Write file paths
+output_folder: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\20230412 DLit - Mean
+proposed_luc_split_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\20230412 DLit - Mean\proposed_luc_split_path.csv
+existing_luc_split_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\20230412 DLit - Mean\existing_luc_split_path.csv
 
 infill:
   user_infill: False
@@ -19,25 +18,29 @@ infill:
   residential_sheet_name: "2021 Residential"
   employment_sheet_name: "2021 Employment"
   mixed_sheet_name: "2021 Mixed"
-  #--Read file paths 
+  #--Read file paths
   dlog_column_names_path: inputs\DLog_column_names.csv
   valid_luc_path: inputs\valid_luc.csv
   out_of_date_luc_path: inputs\out_of_date_luc.csv
   incomplete_luc_path: inputs\incomplete_luc.csv
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
-  #--write file paths  
-  user_input_path: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\user_input.xlsx
+  #--write file paths
+  user_input_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\20230412 DLit - Mean\user_input.xlsx
+  gfa_infill_method: regression_no_negatives
 
 land_use:
-  land_use_input: C:\Users\UKKXF022\Documents\DLOG\DLIT_outputs\03_post_fixes\post_fix_data.xlsx
-  msoa_shapefile_path:  C:\Users\UKKXF022\Documents\DLOG\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
-  msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\gb_msoa_agg_prt_2018_hh_pop.csv
-  msoa_traveller_type_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_pop.csv
-  msoa_jobs_path: C:\Users\UKKXF022\Documents\DLOG\big_inputs\land_use_2018_emp.csv
+  land_use_input: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\20230412 DLit - Mean\03_post_fixes\post_fix_data.xlsx
+  msoa_shapefile_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
+  msoa_dwelling_pop_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\Inputs\gb_msoa_agg_prt_2018_hh_pop.csv
+  msoa_traveller_type_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\Inputs\land_use_2018_pop.csv
+  msoa_jobs_path: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\Inputs\land_use_2018_emp.csv
   employment_density_matrix_path: inputs\emp_density_matrix.csv
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
-
-
-
-
+  demolition_dampener: 0
+  summary_data:
+    summary_zone_name: lad_2020
+    lookup_file: C:\Users\ukmjb018\OneDrive - WSP O365\WSP_Projects\TfN NorMITs Demand Partner 2022\D-Lit Land Use\Inputs\msoa_to_lad_2020_lookup.csv
+    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_Districts_(December_2020)_UK_BFC\Local_Authority_Districts_(December_2020)_UK_BGC.shp
+    shapefile_id_column: LAD20CD
+    geometry_simplify_tolerance: 100

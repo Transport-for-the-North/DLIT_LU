@@ -54,9 +54,7 @@ def predict_missing_values_tree(df, columns):
     model = RandomForestRegressor(n_estimators=100).fit(X, y)
     loo = LeaveOneOut()
     n = loo.get_n_splits(y)
-    scores = cross_val_score(
-        model, X, y, cv=n, scoring="neg_mean_squared_error"
-    )
+    scores = cross_val_score(model, X, y, cv=n, scoring="neg_mean_squared_error")
     # Get the indices of missing values in the final column
     missing_indices = np.where(np.isnan(array[:, columns]))[0]
 
