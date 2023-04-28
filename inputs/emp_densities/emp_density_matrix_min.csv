@@ -1,0 +1,35 @@
+﻿land_use_code,fte_floorspace,Notes
+B2,31.13657598,GIA
+B8,39.3328317,GEA
+C1,53.96920176,specified per bed (estimated)
+C2,50,not specified (estimated)
+C2A,50,not specified (estimated)
+C3(a),,not specified (assumed to produce no jobs)
+C3(b),,not specified (assumed to produce no jobs)
+C3(c),,not specified (assumed to produce no jobs)
+C4,,not specified (assumed to produce no jobs)
+E(a),32.20808214,NIA needs modifing
+E(b),16.30651195,NIA needs modifing
+E(c)(i),12.29972594,NIA needs modifing
+E(c)(ii),12.29972594,NIA needs modifing
+E(c)(iii),12.29972594,NIA needs modifing
+E(d),44.59556112,NIA needs modifing
+E(e),17.19571819,not specified (estimated)
+E(f),16.66666667,not specified (estimated)
+E(g)(i),12.29972594,NIA needs modifing
+E(g)(ii),30,NIA needs modifing
+E(g)(iii),31.13657598,NIA needs modifing
+F1(a),41.26658829,not specified (estimated)
+F1(b),47.58333333,not specified (estimated)
+F1(c),47.58333333,not specified (estimated)
+F1(d),39.25116979,not specified (estimated)
+F1(e),150,not specified (estimated)
+F1(f),62.26315789,not specified (estimated)
+F1(g),25,not specified (estimated)
+F2(a),13,not specified (estimated)
+F2(b),40,not specified (estimated)
+F2(c),44,not specified (estimated)
+F2(d),50,not specified (estimated)
+SG,50,gia
+brownfield,,not specified (assumed to produce no jobs)
+greenfield,,not specified (assumed to produce no jobs)
