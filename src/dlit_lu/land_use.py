@@ -526,6 +526,9 @@ def convert_luc_to_sic(
 
     """
     conversion = pd.read_csv(conversion_path).loc[:, ["land_use_code", "sic_code"]]
+    count = conversion.groupby('land_use_code')['sic_code'].count().reset_index()
+    count.rename(columns={'sic_code':'sic_count'}, inplace=True)
+    conversion = conversion.merge(count, on='land_use_code')
     conversion["land_use_code"] = conversion["land_use_code"].str.lower()
     data_sic_code = data.reset_index(drop=False).merge(
         conversion,
@@ -535,6 +538,7 @@ def convert_luc_to_sic(
     )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
     data_sic_code.set_index(["msoa_zone_id", "sic_code"], inplace=True)
+    data_sic_code = data_sic_code[data_sic_code.columns[:-1]].div(data_sic_code['sic_count'], axis=0)
     return data_sic_code
 
 
