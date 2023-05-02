@@ -105,6 +105,7 @@ def colormap_classify(
     bins: list[int | float] | int = 5,
     label_fmt: str = "{:.0f}",
     nan_colour: tuple[float, float, float, float] | None = None,
+    nan_label: str = "Missing Values",
 ) -> CustomCmap:
     """Classify `data` into colormap bins based on NaturalBreaks.
 
@@ -121,6 +122,8 @@ def colormap_classify(
         Numeric format to use for the legend.
     nan_colour : tuple[float, float, float, float], default red
         RGBA values (0 - 1) to use for coloring NaN values.
+    nan_label : str, default "Missing Values"
+        Legend label for Nan values.
 
     Returns
     -------
@@ -179,7 +182,7 @@ def colormap_classify(
     ]
 
     if nan_colour is not None:
-        legend.append(patches.Patch(fc=nan_colour, label="Missing Values", ls=""))
+        legend.append(patches.Patch(fc=nan_colour, label=nan_label, ls=""))
 
     return CustomCmap(bin_categories, colours, legend)
 
@@ -193,6 +196,8 @@ def heatmap_figure(
     legend_title: str | None = None,
     zoomed_bounds: Bounds | None = None,
     footnote: str | None = None,
+    nan_colour: tuple[float, float, float, float] = MAP_NAN_COLOUR,
+    nan_label: str = "Missing Values",
 ) -> plt.Figure:
     """Create a heatmap of `geodata`.
 
@@ -216,6 +221,11 @@ def heatmap_figure(
         sub-plot created.
     footnote : str | None, optional
         Footnote to add to the bottom of the plot.
+    nan_colour : tuple[float, float, float, float]
+        RGBA colour (0 - 1) to use for Nan values,
+        default is `MAP_NAN_COLOUR`.
+    nan_label : str, default "Missing Values"
+        Legend label for Nan values.
 
     Returns
     -------
@@ -247,7 +257,7 @@ def heatmap_figure(
     if isinstance(bins, int):
         positive_bins, negative_bins = bins, bins
 
-    elif isinstance(bins, tuple, list):
+    elif isinstance(bins, (tuple, list)):
         if len(bins) == 0:
             raise ValueError("empty list of bins given")
 
@@ -280,7 +290,8 @@ def heatmap_figure(
             "YlGn",
             positive_bins,
             label_fmt=legend_label_fmt,
-            nan_colour=MAP_NAN_COLOUR,
+            nan_colour=nan_colour,
+            nan_label=nan_label,
         )
 
     if cmap.empty:
