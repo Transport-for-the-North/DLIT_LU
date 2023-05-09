@@ -1,11 +1,19 @@
 import argparse
 import os
 import pathlib
-from dlit_lu import main, inputs, parser, infilling, land_use
+import sys
+from distutils.dir_util import copy_tree
+import logging
+
+if "src" not in sys.path:
+    sys.path.append("src")
+
+
+from dlit_lu import main, inputs
 
 configs = pathlib.Path('config')
-
-
+LOG = logging.getLogger(__package__)
+LOG_FILE = "DLIT.log"
 parser = argparse.ArgumentParser(description="No description")
 
 parser.add_argument(
@@ -24,25 +32,19 @@ parser.add_argument(
     default=True,
 )
 
-parser = argparse.ArgumentParser(description="Process some integers.")
 parser.add_argument(
-    "-c", "--config", help="Config file path", default="d_lit-config.yml", type=str
+    "-c", "--config", help="Config file path", default="d_lit-config_infill.yml", type=str
 )
-
 args = parser.parse_args()
 
-config = inputs.DLitConfig.load_yaml(args.config)
-
-
-for meth in ['regression', 'regression_no_negatives']:
-    config.output_folder = config.output_folder / f"{meth}"
-    config.output_folder.mkdir(exist_ok=True)
-    config.infill.gfa_infill_method = meth
-    infilled_data = infilling.run(config, args)
-    for dem in [0, 1]:
-        directory = os.getcwd() / 'inputs' / 'emp_densities'
-        for file in os.listdir(directory):
-            config.land_use.employment_density_matrix = file
-            land_use_data = land_use.run(config, args)
-
-
+if __name__ == "__main__":
+    for meth in ['no_neg', 'neg']:
+        args.config = f'inputs/configs/infill_{meth}.yml'
+        main.run(args)
+        for dem in [1, 0]:
+            for den in ['min','max']:
+                args.config = f'inputs/configs/LU_{dem}_{den}.yml'
+                main.run(args)
+                config = inputs.DLitConfig.load_yaml(args.config)
+                copy_tree(config.output_folder, rf"E:\dlit\bulk_outputs\{meth}\{den}_{dem}")
+                

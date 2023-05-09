@@ -168,19 +168,21 @@ def _plot_all_columns(
     """Create heatmaps for each column in `data`."""
     with backend_pdf.PdfPages(output_file) as pdf:
         for column in data.select_dtypes("number").columns:
-            fig = mapping.heatmap_figure(
-                data,
-                column,
-                title,
-                bins=7,
-                legend_title=f"Year {column}",
-                legend_label_fmt="{:.2g}",
-                footnote=footnote,
-                zoomed_bounds=mapping.Bounds(290000, 345000, 555000, 660000),
-            )
-            pdf.savefig(fig)
-            plt.close(fig)
-
+            try:
+                fig = mapping.heatmap_figure(
+                    data,
+                    column,
+                    title,
+                    bins=7,
+                    legend_title=f"Year {column}",
+                    legend_label_fmt="{:.2g}",
+                    footnote=footnote,
+                    zoomed_bounds=mapping.Bounds(290000, 345000, 555000, 660000),
+                )
+                pdf.savefig(fig)
+                plt.close(fig)
+            except:
+                LOG.warning("Infitite values in pdf, maybe something wrong.")
     LOG.info("Written: %s", output_file)
 
 
@@ -244,14 +246,17 @@ def plot_summaries(
 
         for value in index_values:
             LOG.info("Creating %s plot for value %s", index, value)
-            _plot_all_columns(
-                grouped.loc[:, value, :],
-                output_file.with_name(
-                    output_file.stem + f"-{zone_column}-{index}_{value}.pdf"
-                ),
-                f"{data_name.title()} {index.title()} {value}",
-                footnote,
-            )
+            try:
+                _plot_all_columns(
+                    grouped.loc[:, value, :],
+                    output_file.with_name(
+                        output_file.stem + f"-{zone_column}-{index}_{value}.pdf"
+                    ),
+                    f"{data_name.title()} {index.title()} {value}",
+                    footnote,
+                )
+            except:
+                LOG.warning(f'Error with heatmap plotting for {output_file}.')
 
 
 def summarise_landuse(

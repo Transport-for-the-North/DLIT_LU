@@ -1,6 +1,6 @@
 #Set Up Parameters
-run_infill: True
-run_land_use: False
+run_infill: False
+run_land_use: True
 
 #Mandatory Parameters
 #--str
@@ -8,7 +8,7 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: Y:\D_I-Log\D-Log21\D-Log21_v8\DLog21_v8_issued_v1.xlsx
 #--Write file paths
-output_folder: E:\dlit\DLIT_output\test
+output_folder: E:\dlit\DLIT_output
 proposed_luc_split_path: E:\dlit\DLIT_output\luc_splits\proposed_luc_split_path.csv
 existing_luc_split_path: E:\dlit\DLIT_output\luc_splits\existing_luc_split_path.csv
 
@@ -27,20 +27,19 @@ infill:
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
   user_input_path: E:\dlit\DLIT_output\luc_splits\user_input.xlsx
-  gfa_infill_method: regression_no_negatives
+  gfa_infill_method: regression
 
 land_use:
-  land_use_input: E:\dlit\DLIT_outputs\03_post_fixes\post_fix_data.xlsx
+  land_use_input: E:\dlit\DLIT_output\03_post_fixes\post_fix_data.xlsx
   msoa_shapefile_path: I:\Data\D-Log\DLIT\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
   msoa_dwelling_pop_path: I:\Data\D-Log\DLIT\Inputs\gb_msoa_agg_prt_2018_hh_pop.csv
   msoa_traveller_type_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_pop.csv
   msoa_jobs_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_emp.csv
-  employment_density_matrix_path: inputs\emp_density_matrix.csv
+  employment_density_matrix_path: inputs\emp_densities\emp_density_matrix_max.csv
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
-  demolition_dampener: 0
+  demolition_dampener: 1
   summary_data:
     summary_zone_name: lad_2020
     lookup_file: I:\Data\D-Log\DLIT\Inputs\msoa_to_lad_2020_lookup.csv
-    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_Districts_(December_2020)_UK_BFC\Local_Authority_Districts_(December_2020)_UK_BGC.shp
+    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_Districts_(December_2020)_UK_BFC\Local_Authority_Districts_(December_2020)_UK_BGC-simple_100.shp
     shapefile_id_column: LAD20CD
-    geometry_simplify_tolerance: 100
