@@ -765,6 +765,7 @@ def disagg_land_use_codes(
     luc_column: str,
     unit_columns: list[str],
     land_use_split: pd.DataFrame,
+    identifier: str = "site_reference_id"
 ) -> pd.DataFrame:
     """disaggregates land use into seperate rows
 
@@ -789,7 +790,7 @@ def disagg_land_use_codes(
 
     disagg = data.explode(luc_column).reset_index(drop=True)
 
-    site_luc = disagg.loc[:, ["site_reference_id", luc_column]]
+    site_luc = disagg.loc[:, [identifier, luc_column]]
     site_luc = site_luc.merge(
         land_use_split,
         how="left",
@@ -797,14 +798,14 @@ def disagg_land_use_codes(
         right_on="land_use_codes",
     )
     ratio_demonitator = (
-        site_luc.groupby(["site_reference_id"])["total_floorspace"]
+        site_luc.groupby([identifier])["total_floorspace"]
         .sum()
         .rename({"total_floorspace": "denom"})
     )
     site_luc = site_luc.merge(
         ratio_demonitator,
         how="left",
-        left_on="site_reference_id",
+        left_on=identifier,
         right_index=True,
         suffixes=["", "_denom"],
     )

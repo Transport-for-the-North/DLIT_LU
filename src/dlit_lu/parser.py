@@ -393,3 +393,8 @@ def parse_msoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
     msoa = gpd.read_file(file_path)
     north_msoa = msoa[~msoa["north_msoa"].isna()]
     return north_msoa
+
+def parse_jobs(file_path:pathlib.Path)->pd.DataFrame:
+    jobs = pd.read_csv(file_path)
+    #TODO add validation
+    return jobs

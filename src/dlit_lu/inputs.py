@@ -6,11 +6,13 @@ from __future__ import annotations
 import enum
 import pathlib
 from typing import Any, Optional
+from dataclasses import dataclass
 
 # third party imports
 import pydantic
 from pydantic import dataclasses
 import caf.toolkit
+import pandas as pd
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
 
@@ -215,8 +217,63 @@ class DLitConfig(caf.toolkit.BaseConfig):
             )
 
         return values
+@dataclass
+class JobPopInputs():
+    jobs_input: pd.DataFrame
+    population_input: pd.DataFrame
+    output_folder: pd.DataFrame
+    proposed_luc_split: pd.DataFrame
+    existing_luc_split: pd.DataFrame
+    msoa_dwelling_pop: pd.DataFrame
+    msoa_traveller_type: pd.DataFrame
+    msoa_to_lad_conversion: pd.DataFrame
+    msoa_jobs: pd.DataFrame
+    employment_density_matrix: pd.DataFrame
+    luc_sic_conversion: pd.DataFrame
 
+class JobPopConfig(caf.toolkit.BaseConfig):
+    jobs_input_path: pathlib.Path
+    population_input_path: pathlib.Path
+    output_folder: pathlib.Path
+    proposed_luc_split_path: pathlib.Path
+    existing_luc_split_path: pathlib.Path
+    msoa_dwelling_pop_path: pathlib.Path
+    msoa_traveller_type_path: pathlib.Path
+    msoa_to_lad_conversion_path: pathlib.Path
+    msoa_jobs_path: pathlib.Path
+    employment_density_matrix_path: pathlib.Path
+    luc_sic_conversion_path: pathlib.Path
 
+    def parse(self)->JobPopInputs:
+        #read in
+        jobs_input = pd.read_csv(self.jobs_input_path, index_col=0)
+        pop_input = pd.read_csv(self.population_input_path, index_col=0)
+        proposed_luc_split = pd.read_csv(self.proposed_luc_split_path)
+        existing_luc_split = pd.read_csv(self.existing_luc_split_path)
+        msoa_dwelling_pop = pd.read_csv(self.msoa_dwelling_pop_path)
+        msoa_traveller_type = pd.read_csv(self.msoa_traveller_type_path)
+        msoa_to_lad_conversion = pd.read_csv(self.msoa_to_lad_conversion_path)
+        msoa_jobs = pd.read_csv(self.msoa_jobs_path)
+        employment_density_matrix = pd.read_csv(self.employment_density_matrix_path)
+        
+        luc_sic_conversion = pd.read_csv(self.luc_sic_conversion_path).loc[:, ["land_use_code", "sic_code"]]
+        luc_sic_conversion["land_use_code"] = luc_sic_conversion["land_use_code"].str.lower()
+
+        #TODO add validation
+
+        return JobPopInputs(
+            jobs_input,
+            pop_input,
+            self.output_folder,
+            proposed_luc_split,
+            existing_luc_split,
+            msoa_dwelling_pop,
+            msoa_traveller_type,
+            msoa_to_lad_conversion,
+            msoa_jobs,
+            employment_density_matrix,
+            luc_sic_conversion,
+            )
 class InfillingAverages(caf.toolkit.BaseConfig):
     """Averages calculated for use in MEAN infill method."""
 
