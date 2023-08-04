@@ -351,6 +351,8 @@ def apply_pop_land_use(
     data: pd.DataFrame,
     unit_columns: list[str],
     tt_factors: pd.DataFrame,
+    data_zone_column: str = "msoa11cd",
+    factors_zone_column: str = "msoa_zone_id"
 ) -> pd.DataFrame:
     """applies TfN population land use factors to data
 
@@ -374,10 +376,10 @@ def apply_pop_land_use(
         data.reset_index(drop=False)
         .merge(
             tt_factors.reset_index(drop=False),
-            left_on="msoa11cd",
-            right_on="msoa_zone_id",
+            left_on=data_zone_column,
+            right_on=factors_zone_column,
         )
-        .set_index(["msoa11cd", "dwelling_type", "tfn_traveller_type"])
+        .set_index([data_zone_column, "dwelling_type", "tfn_traveller_type"])
     )
     data_ratios = data_ratios.loc[:, unit_columns].multiply(
         data_ratios["ratios"], axis=0
@@ -671,8 +673,10 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
 def disagg_dwelling(
     data: pd.DataFrame,
-    msoa_ratio: pd.DataFrame,
+    zone_ratio: pd.DataFrame,
     unit_columns: list[str],
+    data_zone_column: str = "msoa11cd",
+    ratio_zone_column:str = "zone_id"
 ) -> pd.DataFrame:
     """_summary_
 
@@ -693,9 +697,9 @@ def disagg_dwelling(
         Path to the population data file
     """
 
-    msoa_ratio.reset_index("dwelling_type", inplace=True)
+    zone_ratio.reset_index("dwelling_type", inplace=True)
 
-    data = data.merge(msoa_ratio, how="left", left_on="msoa11cd", right_on="zone_id")
+    data = data.merge(zone_ratio, how="left", left_on=data_zone_column, right_on=ratio_zone_column)
 
     for column in unit_columns:
         data.loc[:, column] = (

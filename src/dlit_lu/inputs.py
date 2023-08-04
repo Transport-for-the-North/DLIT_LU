@@ -225,11 +225,12 @@ class JobPopInputs():
     proposed_luc_split: pd.DataFrame
     existing_luc_split: pd.DataFrame
     msoa_dwelling_pop: pd.DataFrame
-    msoa_traveller_type: pd.DataFrame
+    msoa_traveller_type: pathlib.Path
     msoa_to_lad_conversion: pd.DataFrame
     msoa_jobs: pd.DataFrame
     employment_density_matrix: pd.DataFrame
     luc_sic_conversion: pd.DataFrame
+    lad_name_lookup: pd.DataFrame
 
 class JobPopConfig(caf.toolkit.BaseConfig):
     jobs_input_path: pathlib.Path
@@ -243,6 +244,7 @@ class JobPopConfig(caf.toolkit.BaseConfig):
     msoa_jobs_path: pathlib.Path
     employment_density_matrix_path: pathlib.Path
     luc_sic_conversion_path: pathlib.Path
+    lad_name_lookup:pathlib.Path
 
     def parse(self)->JobPopInputs:
         #read in
@@ -250,11 +252,10 @@ class JobPopConfig(caf.toolkit.BaseConfig):
         pop_input = pd.read_csv(self.population_input_path, index_col=0)
         proposed_luc_split = pd.read_csv(self.proposed_luc_split_path)
         existing_luc_split = pd.read_csv(self.existing_luc_split_path)
-        msoa_dwelling_pop = pd.read_csv(self.msoa_dwelling_pop_path)
-        msoa_traveller_type = pd.read_csv(self.msoa_traveller_type_path)
         msoa_to_lad_conversion = pd.read_csv(self.msoa_to_lad_conversion_path)
         msoa_jobs = pd.read_csv(self.msoa_jobs_path)
         employment_density_matrix = pd.read_csv(self.employment_density_matrix_path)
+        lad_name_lookup = pd.read_csv(self.lad_name_lookup)
         
         luc_sic_conversion = pd.read_csv(self.luc_sic_conversion_path).loc[:, ["land_use_code", "sic_code"]]
         luc_sic_conversion["land_use_code"] = luc_sic_conversion["land_use_code"].str.lower()
@@ -267,12 +268,13 @@ class JobPopConfig(caf.toolkit.BaseConfig):
             self.output_folder,
             proposed_luc_split,
             existing_luc_split,
-            msoa_dwelling_pop,
-            msoa_traveller_type,
+            self.msoa_dwelling_pop_path,
+            self.msoa_traveller_type_path,
             msoa_to_lad_conversion,
             msoa_jobs,
             employment_density_matrix,
             luc_sic_conversion,
+            lad_name_lookup, 
             )
 class InfillingAverages(caf.toolkit.BaseConfig):
     """Averages calculated for use in MEAN infill method."""
