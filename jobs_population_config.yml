@@ -13,5 +13,9 @@ msoa_to_lad_conversion_path: C:\Users\UKKXF022\Documents\Midlands_connect_freigh
 msoa_jobs_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\land_use_2018_emp.csv
 employment_density_matrix_path: inputs\emp_density_matrix.csv
 luc_sic_conversion_path: inputs\luc_sic_conversion.csv
-
+lad_name_lookup: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\LAD_region_lookup.csv
+base_year_pop_emp_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2018_NTEM_planning_region.csv
+baseline_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2035_NTEM_planning_lad.csv
+additional_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\addtional_growth_region.csv
+forecast_year_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2050_NTEM_planning_region.csv
 

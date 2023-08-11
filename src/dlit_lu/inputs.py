@@ -231,6 +231,10 @@ class JobPopInputs():
     employment_density_matrix: pd.DataFrame
     luc_sic_conversion: pd.DataFrame
     lad_name_lookup: pd.DataFrame
+    base_year_pop_emp: pd.DataFrame
+    baseline_growth: pd.DataFrame
+    additional_growth: pd.DataFrame
+    forecast_year_growth: pd.DataFrame
 
 class JobPopConfig(caf.toolkit.BaseConfig):
     jobs_input_path: pathlib.Path
@@ -245,6 +249,10 @@ class JobPopConfig(caf.toolkit.BaseConfig):
     employment_density_matrix_path: pathlib.Path
     luc_sic_conversion_path: pathlib.Path
     lad_name_lookup:pathlib.Path
+    base_year_pop_emp_path: pathlib.Path
+    baseline_growth_path: pathlib.Path
+    additional_growth_path: pathlib.Path
+    forecast_year_growth_path: pathlib.Path
 
     def parse(self)->JobPopInputs:
         #read in
@@ -256,6 +264,11 @@ class JobPopConfig(caf.toolkit.BaseConfig):
         msoa_jobs = pd.read_csv(self.msoa_jobs_path)
         employment_density_matrix = pd.read_csv(self.employment_density_matrix_path)
         lad_name_lookup = pd.read_csv(self.lad_name_lookup)
+
+        base_year_pop_emp = pd.read_csv(self.base_year_pop_emp_path)
+        baseline_growth = pd.read_csv(self.baseline_growth_path)
+        additional_growth = pd.read_csv(self.additional_growth_path)
+        forecast_year_growth = pd.read_csv(self.forecast_year_growth_path)
         
         luc_sic_conversion = pd.read_csv(self.luc_sic_conversion_path).loc[:, ["land_use_code", "sic_code"]]
         luc_sic_conversion["land_use_code"] = luc_sic_conversion["land_use_code"].str.lower()
@@ -275,6 +288,10 @@ class JobPopConfig(caf.toolkit.BaseConfig):
             employment_density_matrix,
             luc_sic_conversion,
             lad_name_lookup, 
+            base_year_pop_emp,
+            baseline_growth,
+            additional_growth,
+            forecast_year_growth,
             )
 class InfillingAverages(caf.toolkit.BaseConfig):
     """Averages calculated for use in MEAN infill method."""
