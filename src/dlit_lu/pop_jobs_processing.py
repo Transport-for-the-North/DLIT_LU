@@ -77,7 +77,9 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
         "2050",
         "lad_2020_to_msoa",
     ).set_index(["msoa_zone_id", "dwelling_type", "tfn_traveller_type"])
-
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "constrained_population.csv", constrained_pop
+    )
     constrained_jobs.reset_index(inplace=True)
     constrained_jobs = lad_to_msoa(
         constrained_jobs,
@@ -88,8 +90,9 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
         "2050",
         "lad_2020_to_msoa",
     ).set_index(["msoa_zone_id", "sic_code"])
-    print("stop")
-
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "constrained_jobs.csv", constrained_jobs
+    )
 
 def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
     LOG.info("processing jobs data")
@@ -298,9 +301,11 @@ def process_job_data(
     if assigned_sic_jobs is not None and distributed_sic_jobs is not None:
         all_sic_jobs = assigned_sic_jobs.merge(
             distributed_sic_jobs,
+            how="outer",
             on=[LOOKUP_CODE_COLUMN, SIC_COlUMN],
             suffixes=["_assigned", "_distributed"],
         )
+        all_sic_jobs.fillna(0, inplace=True)
         all_sic_jobs["2050"] = (
             all_sic_jobs["2050_assigned"] + all_sic_jobs["2050_distributed"]
         )
@@ -325,7 +330,6 @@ def process_job_data(
         raise IndexError(
             "Jobs input must contained columns name of either/or 'unassigned_jobs' and two digit sic codes"
         )
-
 
 def process_pop_data(
     population_data: pd.DataFrame,
@@ -364,15 +368,13 @@ def process_pop_data(
     dwelling_ratios = population_dwelling_proportion(
         dwelling_split, msoa_pop_column_names
     )
-    dwelling_ratios = aggregate_msoa_to_lad(
-        dwelling_ratios.reset_index(),
-        msoa_to_lad_conversion,
-        "zone_id",
-        "msoa_zone_id",
-        "dwelling_ratio",
-        ["lad_2020_zone_id", "dwelling_type"],
-        "population",
+    dwelling_ratios = dwelling_ratios.reset_index().merge(
+        msoa_to_lad_conversion, left_on="zone_id", right_on="msoa_zone_id"
     )
+    dwelling_ratios = dwelling_ratios.groupby(["lad_2020_zone_id", "dwelling_type"]).sum()
+    dwelling_ratios = (
+        dwelling_ratios["population"] / dwelling_ratios["population"].groupby("lad_2020_zone_id").sum()
+    ).to_frame(name="ratio")
     dwelling_ratios.columns = ["ratio"]
     disagg_dwellings = disagg_dwelling(
         population_data, dwelling_ratios, ["population"], "LAD20CD", "lad_2020_zone_id"
@@ -555,6 +557,7 @@ def distribute_baseline_jobs(
     unassigned_jobs["Jobs"] = unassigned_jobs["Jobs"].apply(
         lambda x: float(x.replace(",", ""))
     )
+
     # distribute jobs by land use code
     distributed_jobs = land_use.disagg_land_use_codes(
         unassigned_jobs,
@@ -562,8 +565,18 @@ def distribute_baseline_jobs(
         "Jobs",
         luc_distribution,
         "LAD20CD",
-    ).set_index(["LAD20CD", "land_use_codes"])
+    )
 
+    distributed_jobs = distributed_jobs.reset_index(drop=False).merge(
+            luc_to_sic,
+            how="left",
+            left_on="land_use_codes",
+            right_on="land_use_code",
+    )
+    distributed_jobs.drop(
+        columns=["land_use_code", "land_use_codes", "index"], inplace=True
+    )
+    distributed_jobs = distributed_jobs.groupby(["LAD20CD", "sic_code"]).sum()
     return distributed_jobs.loc[distributed_jobs["Jobs"] > 0]
 
 
@@ -604,16 +617,14 @@ def distribute_baseline_population(
     dwelling_ratios = population_dwelling_proportion(
         dwelling_split, msoa_pop_column_names
     )
-    dwelling_ratios = aggregate_msoa_to_lad(
-        dwelling_ratios.reset_index(),
-        msoa_to_lad_conversion,
-        "zone_id",
-        "msoa_zone_id",
-        "dwelling_ratio",
-        ["lad_2020_zone_id", "dwelling_type"],
-        "population",
+    dwelling_ratios = dwelling_ratios.reset_index().merge(
+        msoa_to_lad_conversion, left_on="zone_id", right_on="msoa_zone_id"
     )
-    dwelling_ratios.columns = ["ratio"]
+    dwelling_ratios = dwelling_ratios.groupby(["lad_2020_zone_id", "dwelling_type"]).sum()
+    dwelling_ratios = (
+        dwelling_ratios["population"] / dwelling_ratios["population"].groupby("lad_2020_zone_id").sum()
+    ).to_frame(name="ratio")
+
     population_data["Total"] = population_data["Total"].apply(
         lambda x: float(x.replace(",", ""))
     )
