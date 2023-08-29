@@ -235,6 +235,9 @@ class JobPopInputs():
     baseline_growth: pd.DataFrame
     additional_growth: pd.DataFrame
     forecast_year_growth: pd.DataFrame
+    allocated_land_use: pd.DataFrame
+    lad_to_model_zone_pop: pd.DataFrame
+    lad_to_model_zone_jobs: pd.DataFrame
 
 class JobPopConfig(caf.toolkit.BaseConfig):
     jobs_input_path: pathlib.Path
@@ -253,10 +256,14 @@ class JobPopConfig(caf.toolkit.BaseConfig):
     baseline_growth_path: pathlib.Path
     additional_growth_path: pathlib.Path
     forecast_year_growth_path: pathlib.Path
+    allocated_land_use_path: pathlib.Path
+    lad_to_model_zone_pop_path: pathlib.Path
+    lad_to_model_zone_jobs_path: pathlib.Path
 
     def parse(self)->JobPopInputs:
         #read in
         jobs_input = pd.read_csv(self.jobs_input_path, index_col=0)
+        jobs_input.columns = [x.replace(" ", "") for x in jobs_input.columns]
         pop_input = pd.read_csv(self.population_input_path, index_col=0)
         proposed_luc_split = pd.read_csv(self.proposed_luc_split_path)
         existing_luc_split = pd.read_csv(self.existing_luc_split_path)
@@ -269,7 +276,9 @@ class JobPopConfig(caf.toolkit.BaseConfig):
         baseline_growth = pd.read_csv(self.baseline_growth_path)
         additional_growth = pd.read_csv(self.additional_growth_path)
         forecast_year_growth = pd.read_csv(self.forecast_year_growth_path)
-        
+        allocated_land_use = pd.read_csv(self.allocated_land_use_path)
+        lad_to_model_zone_pop = pd.read_csv(self.lad_to_model_zone_pop_path)
+        lad_to_model_zone_jobs = pd.read_csv(self.lad_to_model_zone_jobs_path)
         luc_sic_conversion = pd.read_csv(self.luc_sic_conversion_path).loc[:, ["land_use_code", "sic_code"]]
         luc_sic_conversion["land_use_code"] = luc_sic_conversion["land_use_code"].str.lower()
 
@@ -292,7 +301,12 @@ class JobPopConfig(caf.toolkit.BaseConfig):
             baseline_growth,
             additional_growth,
             forecast_year_growth,
+            allocated_land_use, 
+            lad_to_model_zone_pop, 
+            lad_to_model_zone_jobs, 
             )
+    
+
 class InfillingAverages(caf.toolkit.BaseConfig):
     """Averages calculated for use in MEAN infill method."""
 

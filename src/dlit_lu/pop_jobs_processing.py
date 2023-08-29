@@ -2,6 +2,7 @@
 import argparse
 import logging
 import pathlib
+from typing import Optional
 
 # third party
 import pandas as pd
@@ -22,6 +23,7 @@ SIC_MAX = 99
 SIC_COlUMN = "sic_code"
 LOOKUP_LAD_COLUMN = "LAD20NM"
 LOOKUP_CODE_COLUMN = "LAD20CD"
+MODEL_ZONE_COL = "MRTM_ZoneID"
 
 
 def run(args: argparse.Namespace) -> None:
@@ -49,7 +51,13 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
 
     data = format_data(parsed_inputs)
 
-    # TODO why is Population so high?
+    jobs_check = data["jobs"].groupby("LAD20CD").sum()
+    jobs_check = jobs_check.merge(parsed_inputs.lad_name_lookup, on="LAD20CD")
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "LAD_job_totals.csv", jobs_check
+    )
+
+    LOG.info("Constraining Population")
     constrained_pop = constraint.constrain_to_forecast(
         data["population"],
         forecast,
@@ -58,7 +66,7 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
         LOOKUP_CODE_COLUMN,
         "population",
     )
-
+    LOG.info("Constraining Jobs")
     constrained_jobs = constraint.constrain_to_forecast(
         data["jobs"],
         forecast,
@@ -67,41 +75,86 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
         LOOKUP_CODE_COLUMN,
         "jobs",
     )
-    constrained_pop.reset_index(inplace=True)
-    constrained_pop = lad_to_msoa(
-        constrained_pop,
-        parsed_inputs.msoa_to_lad_conversion,
-        "LAD20CD",
-        "lad_2020_zone_id",
-        "msoa_zone_id",
-        "2050",
-        "lad_2020_to_msoa",
-    ).set_index(["msoa_zone_id", "dwelling_type", "tfn_traveller_type"])
-    utilities.write_to_csv(
-        parsed_inputs.output_folder / "constrained_population.csv", constrained_pop
-    )
-    constrained_jobs.reset_index(inplace=True)
-    constrained_jobs = lad_to_msoa(
-        constrained_jobs,
-        parsed_inputs.msoa_to_lad_conversion,
-        "LAD20CD",
-        "lad_2020_zone_id",
-        "msoa_zone_id",
-        "2050",
-        "lad_2020_to_msoa",
-    ).set_index(["msoa_zone_id", "sic_code"])
     utilities.write_to_csv(
         parsed_inputs.output_folder / "constrained_jobs.csv", constrained_jobs
     )
 
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "constrained_population.csv", constrained_pop
+    )
+    constrained_pop.reset_index(inplace=True)
+    allocated_pop = process_pop_data(
+        parsed_inputs.allocated_land_use,
+        parsed_inputs.msoa_traveller_type,
+        parsed_inputs.msoa_to_lad_conversion,
+        parsed_inputs.msoa_dwelling_pop,
+        parsed_inputs.lad_name_lookup,
+        "LAD20NM",
+        [MODEL_ZONE_COL],
+    )
+    constrained_pop = lad_to_model_zone(
+        constrained_pop,
+        parsed_inputs.lad_to_model_zone_pop,
+        allocated_pop,
+        "LAD20CD",
+        "lad_2020_zone_id",
+        "miham_zone_id",
+        MODEL_ZONE_COL,
+        "2050",
+        "lad_2020_to_miham",
+        ["dwelling_type", "tfn_traveller_type"],
+    ).set_index(["miham_zone_id", "dwelling_type", "tfn_traveller_type"])
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "constrained_population_msoa.csv", constrained_pop
+    )
+    constrained_jobs_check = constrained_jobs.groupby("LAD20CD").sum()
+    constrained_jobs_check = constrained_jobs_check.merge(
+        parsed_inputs.lad_name_lookup, on="LAD20CD"
+    )
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "LAD_job_constrained_totals.csv",
+        constrained_jobs_check,
+    )
+
+    constrained_jobs.reset_index(inplace=True)
+    allocated_jobs = parsed_inputs.allocated_land_use.loc[
+        :, [MODEL_ZONE_COL, "LAD20NM", "jobs"]
+    ]
+    allocated_jobs.rename(columns={"LAD20NM": "LAD", "jobs":UNASSIGNED_JOBS_COLUMN}, inplace = True)
+
+    allocated_jobs = process_job_data(
+        allocated_jobs,
+        parsed_inputs.luc_sic_conversion,
+        parsed_inputs.proposed_luc_split,
+        parsed_inputs.lad_name_lookup,
+        [MODEL_ZONE_COL]
+    )
+    constrained_jobs = lad_to_model_zone(
+        constrained_jobs,
+        parsed_inputs.lad_to_model_zone_jobs,
+        allocated_jobs,
+        "LAD20CD",
+        "lad_2020_zone_id",
+        "miham_zone_id",
+        MODEL_ZONE_COL,
+        "2050",
+        "lad_2020_to_miham",
+        ["sic_code"],
+    ).set_index(["miham_zone_id", "sic_code"])
+    utilities.write_to_csv(
+        parsed_inputs.output_folder / "constrained_jobs_msoa.csv", constrained_jobs
+    )
+
+
 def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
-    LOG.info("processing jobs data")
+    LOG.info("distributing reference growth jobs data")
     dist_baseline_jobs = distribute_baseline_jobs(
         inputs.baseline_growth,
         inputs.proposed_luc_split,
         inputs.luc_sic_conversion,
         inputs.lad_name_lookup,
     )
+    LOG.info("distributing reference growth population data")
     dist_baseline_pop = distribute_baseline_population(
         inputs.baseline_growth,
         inputs.msoa_to_lad_conversion,
@@ -109,6 +162,7 @@ def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
         inputs.msoa_dwelling_pop,
         inputs.lad_name_lookup,
     )
+    LOG.info("processing jobs forecast")
     jobs = process_job_data(
         inputs.jobs_input,
         inputs.luc_sic_conversion,
@@ -120,7 +174,7 @@ def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
         inputs.output_folder / "formatted_distributed_jobs.csv", jobs
     )
 
-    LOG.info("processing jobs")
+    LOG.info("processing population forecast")
     population = process_pop_data(
         inputs.population_input,
         inputs.msoa_traveller_type,
@@ -128,7 +182,7 @@ def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
         inputs.msoa_dwelling_pop,
         inputs.lad_name_lookup,
     )
-
+    LOG.info("combining forecast and reference growth jobs")
     jobs = add_baseline_growth(
         jobs,
         dist_baseline_jobs,
@@ -139,6 +193,7 @@ def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
         LOOKUP_LAD_COLUMN,
         LOOKUP_CODE_COLUMN,
     )
+    LOG.info("combining forecast and reference growth population")
 
     population = add_baseline_growth(
         population,
@@ -150,7 +205,6 @@ def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
         LOOKUP_LAD_COLUMN,
         LOOKUP_CODE_COLUMN,
     )
-    LOG.info("outputting formatted population")
     utilities.write_to_csv(
         inputs.output_folder / "formatted_distributed_population.csv", population
     )
@@ -162,6 +216,7 @@ def process_job_data(
     luc_to_sic: pd.DataFrame,
     luc_distribution: pd.DataFrame,
     lad_name_lookup: pd.DataFrame,
+    additional_indexes: Optional[list[str]]=None,
 ) -> pd.DataFrame:
     """formats and distributes job data
 
@@ -182,9 +237,17 @@ def process_job_data(
     pd.DataFrame
         formatted and distributed jobs
     """
-    columns = jobs.columns
+    columns = jobs.columns.to_list()
+
+    if additional_indexes is None:
+        additional_indexes = []
+
+    if LAD_COLUMN in columns:
+        columns.remove(LAD_COLUMN)
+
 
     jobs.reset_index(inplace=True)
+
     jobs.drop(jobs[jobs[LAD_COLUMN] == "sum"].index, inplace=True)
 
     jobs = name_to_code(
@@ -194,6 +257,9 @@ def process_job_data(
         LOOKUP_LAD_COLUMN,
         LOOKUP_CODE_COLUMN,
     )
+
+    if len(additional_indexes):
+        jobs.set_index(additional_indexes, inplace = True)
 
     # initilise variables to test whether data exists
     # variable for jobs for unassigned jobs column
@@ -230,12 +296,15 @@ def process_job_data(
             lambda x: luc_distribution["land_use_codes"].tolist()
         )
         # distribute jobs by land use code
+        if len(additional_indexes) > 0:
+            unassigned_jobs.reset_index(inplace = True)
         distributed_jobs = land_use.disagg_land_use_codes(
             unassigned_jobs,
             "land_use_codes",
             UNASSIGNED_JOBS_COLUMN,
             luc_distribution,
             LOOKUP_CODE_COLUMN,
+            additional_indexes, 
         )
 
         # remove irrelevnt rows
@@ -250,14 +319,15 @@ def process_job_data(
         )
         # convert to SIC code
         luc_to_sic["land_use_code"] = luc_to_sic["land_use_code"].str.lower()
-        distributed_sic_jobs = distributed_jobs.reset_index(drop=False).merge(
+        distributed_sic_jobs = distributed_jobs.merge(
             luc_to_sic,
             how="left",
             left_on="land_use",
             right_on="land_use_code",
         )
+
         distributed_sic_jobs.drop(
-            columns=["land_use_code", "land_use", "index"], inplace=True
+            columns=["land_use_code", "land_use"], inplace=True
         )
         distributed_sic_jobs = (
             distributed_sic_jobs.groupby([LOOKUP_CODE_COLUMN, SIC_COlUMN])
@@ -266,9 +336,11 @@ def process_job_data(
         )
 
     # restructure assigned jobs
-    assigned_columns = columns.to_list()
-    assigned_columns.remove(UNASSIGNED_JOBS_COLUMN)
-
+    assigned_columns = columns
+    if UNASSIGNED_JOBS_COLUMN in assigned_columns:
+        assigned_columns.remove(UNASSIGNED_JOBS_COLUMN)
+    for col in additional_indexes:
+        assigned_columns.remove(col)
     if len(assigned_columns) > 0:
         # test for invalid SIC codes
         try:
@@ -311,19 +383,19 @@ def process_job_data(
         )
         all_sic_jobs.drop(columns=["2050_assigned", "2050_distributed"], inplace=True)
         all_sic_jobs.set_index(
-            [LOOKUP_CODE_COLUMN, SIC_COlUMN], drop=True, inplace=True
+            [LOOKUP_CODE_COLUMN, SIC_COlUMN]+additional_indexes, drop=True, inplace=True
         )
         all_sic_jobs.sort_index(level=0, inplace=True)
 
         return all_sic_jobs
     elif assigned_sic_jobs is not None:
         assigned_sic_jobs = assigned_sic_jobs.set_index(
-            [LOOKUP_CODE_COLUMN, SIC_COlUMN], drop=True
+            [LOOKUP_CODE_COLUMN, SIC_COlUMN]+additional_indexes, drop=True
         ).sort_index(level=0)
         return assigned_sic_jobs
     elif distributed_sic_jobs is not None:
         distributed_sic_jobs = distributed_sic_jobs.set_index(
-            [LAD_COLUMN, SIC_COlUMN], drop=True
+            [LOOKUP_CODE_COLUMN, SIC_COlUMN]+additional_indexes, drop=True
         ).sort_index(level=0)
         return distributed_sic_jobs
     else:
@@ -331,17 +403,22 @@ def process_job_data(
             "Jobs input must contained columns name of either/or 'unassigned_jobs' and two digit sic codes"
         )
 
+
 def process_pop_data(
     population_data: pd.DataFrame,
     traveller_type_split: pd.DataFrame,
     msoa_to_lad_conversion: pd.DataFrame,
     dwelling_split: pd.DataFrame,
     lad_name_code: pd.DataFrame,
+    data_lad_column: pd.DataFrame = LAD_COLUMN,
+    additonal_indexes: Optional[list[str]] = None,
 ) -> pd.DataFrame:
+    if additonal_indexes is None:
+        additonal_indexes = []
     population_data = name_to_code(
         population_data,
         lad_name_code,
-        LAD_COLUMN,
+        data_lad_column,
         LOOKUP_LAD_COLUMN,
         LOOKUP_CODE_COLUMN,
     )
@@ -371,16 +448,24 @@ def process_pop_data(
     dwelling_ratios = dwelling_ratios.reset_index().merge(
         msoa_to_lad_conversion, left_on="zone_id", right_on="msoa_zone_id"
     )
-    dwelling_ratios = dwelling_ratios.groupby(["lad_2020_zone_id", "dwelling_type"]).sum()
+    dwelling_ratios = dwelling_ratios.groupby(
+        ["lad_2020_zone_id", "dwelling_type"]
+    ).sum()
     dwelling_ratios = (
-        dwelling_ratios["population"] / dwelling_ratios["population"].groupby("lad_2020_zone_id").sum()
+        dwelling_ratios["population"]
+        / dwelling_ratios["population"].groupby("lad_2020_zone_id").sum()
     ).to_frame(name="ratio")
     dwelling_ratios.columns = ["ratio"]
     disagg_dwellings = disagg_dwelling(
         population_data, dwelling_ratios, ["population"], "LAD20CD", "lad_2020_zone_id"
     )
     disagg_pop_data = land_use.apply_pop_land_use(
-        disagg_dwellings, "population", tt_ratios, "LAD20CD", "lad_2020_zone_id"
+        disagg_dwellings,
+        "population",
+        tt_ratios,
+        "LAD20CD",
+        "lad_2020_zone_id",
+        additonal_indexes,
     ).to_frame()
     disagg_pop_data.columns = ["2050"]
     return disagg_pop_data
@@ -568,10 +653,10 @@ def distribute_baseline_jobs(
     )
 
     distributed_jobs = distributed_jobs.reset_index(drop=False).merge(
-            luc_to_sic,
-            how="left",
-            left_on="land_use_codes",
-            right_on="land_use_code",
+        luc_to_sic,
+        how="left",
+        left_on="land_use_codes",
+        right_on="land_use_code",
     )
     distributed_jobs.drop(
         columns=["land_use_code", "land_use_codes", "index"], inplace=True
@@ -620,9 +705,12 @@ def distribute_baseline_population(
     dwelling_ratios = dwelling_ratios.reset_index().merge(
         msoa_to_lad_conversion, left_on="zone_id", right_on="msoa_zone_id"
     )
-    dwelling_ratios = dwelling_ratios.groupby(["lad_2020_zone_id", "dwelling_type"]).sum()
+    dwelling_ratios = dwelling_ratios.groupby(
+        ["lad_2020_zone_id", "dwelling_type"]
+    ).sum()
     dwelling_ratios = (
-        dwelling_ratios["population"] / dwelling_ratios["population"].groupby("lad_2020_zone_id").sum()
+        dwelling_ratios["population"]
+        / dwelling_ratios["population"].groupby("lad_2020_zone_id").sum()
     ).to_frame(name="ratio")
 
     population_data["Total"] = population_data["Total"].apply(
@@ -659,21 +747,45 @@ def add_baseline_growth(
     return merged_growth
 
 
-def lad_to_msoa(
+def lad_to_model_zone(
     lad_data: pd.DataFrame,
-    lad_to_msoa_lookup: pd.DataFrame,
+    lad_to_zone_lookup: pd.DataFrame,
+    allocated_land_use: pd.DataFrame,
     data_lad_col: str,
     lookup_lad_col: str,
-    msoa_col: str,
+    zone_col: str,
+    allocated_zone_col: str,
     value_col: str,
     factor_col: str,
+    groupby: list[str],
 ) -> pd.DataFrame:
-    msoa_data = lad_data.merge(
-        lad_to_msoa_lookup, how="left", left_on=data_lad_col, right_on=lookup_lad_col
+    zone_data = lad_data.merge(
+        lad_to_zone_lookup, how="left", left_on=data_lad_col, right_on=lookup_lad_col
     )
-    msoa_data[value_col] = msoa_data[value_col] * msoa_data[factor_col]
+    allocated_land_use.reset_index(inplace=True)
+    allocated_land_use.rename(columns={allocated_zone_col: zone_col}, inplace=True)
+    allocated_land_use_agg = (
+        allocated_land_use.loc[:, [data_lad_col, value_col] + groupby]
+        .groupby([data_lad_col] + groupby)
+        .sum()
+    )
+
+    zone_data = zone_data.merge(
+        allocated_land_use_agg,
+        how="outer",
+        on=[data_lad_col] + groupby,
+        suffixes=["_unallocated", "_allocated"],
+    )
+    zone_data[value_col + "_allocated"].fillna(0, inplace= True)
+    zone_data[value_col] = (
+        zone_data[value_col + "_unallocated"] - zone_data[value_col + "_allocated"]
+    ) * zone_data[factor_col]
+
     keep_cols = lad_data.columns.to_list()
     keep_cols.remove(data_lad_col)
-    keep_cols.append(msoa_col)
-    msoa_data = msoa_data.loc[:, keep_cols]
-    return msoa_data
+    keep_cols.append(zone_col)
+    zone_data = zone_data.loc[:, keep_cols]
+    zone_data = pd.concat(
+        [zone_data, allocated_land_use.drop(columns=[data_lad_col])], ignore_index=True
+    )
+    return zone_data

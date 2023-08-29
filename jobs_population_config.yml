@@ -1,9 +1,9 @@
 #Mandatory Parameters
 
 #--Read file paths
-jobs_input_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\jobs.csv
+jobs_input_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\jobs_test.csv
 population_input_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\population.csv
-#--Write file paths
+
 output_folder: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_outputs
 proposed_luc_split_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\proposed_luc_split_path.csv
 existing_luc_split_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\existing_luc_split_path.csv
@@ -17,5 +17,7 @@ lad_name_lookup: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_an
 base_year_pop_emp_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2018_NTEM_planning_region.csv
 baseline_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2035_NTEM_planning_lad.csv
 additional_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\addtional_growth_region.csv
-forecast_year_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2050_NTEM_planning_region.csv
-
+forecast_year_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2050_NTEM_LAD_high.csv
+allocated_land_use_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\allocated_land_use_path.csv
+lad_to_model_zone_pop_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\lad_2020_to_miham_population_weight.csv
+lad_to_model_zone_jobs_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\lad_2020_to_miham_employment_weight.csv

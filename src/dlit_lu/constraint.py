@@ -38,7 +38,11 @@ def constrain_to_forecast(
     )
 
     for region, sum in data_region_sums.iterrows():
+        LOG.info(f"Constraining region {region}")
+        
         if sum[0] > forecast_region_sums.loc[region, forecast_unit_col]:
+            LOG.info(f"Constraining forecast above baseline growth")
+
             data.loc[data_region[REGION_COLUMN] == region, data_unit_col] = data_above_forecast(
                 data.loc[data_region[REGION_COLUMN] == region],
                 forecast_region_sums.loc[region, forecast_unit_col],
@@ -46,7 +50,11 @@ def constrain_to_forecast(
                 data_unit_col,
             )
         else:
-            print("do sommat else")
+            LOG.info(f"Constraining forecast below baseline growth")
+            data.loc[data_region[REGION_COLUMN] == region, data_unit_col] = data_below_forecast(
+                data.loc[data_region[REGION_COLUMN] == region, data_unit_col], 
+                forecast_region_sums.loc[region, forecast_unit_col],
+            )
     data.set_index(index_cols, inplace = True)
     return data
 
@@ -65,8 +73,8 @@ def data_above_forecast(
     return displaced_data
 
 def data_below_forecast(
-    data: pd.DataFrame, forecast: float, value_col: str
+    data: pd.Series, forecast: float
 ) -> pd.Series:
-        factor = forecast/data[value_col].sum()
-        displaced_data = data[value_col]*factor
+        factor = forecast/data.sum()
+        displaced_data = data*factor
         return displaced_data

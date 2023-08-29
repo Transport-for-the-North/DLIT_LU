@@ -12,6 +12,7 @@ Conversion process involves disagregating by:
 # standard imports
 import logging
 import pathlib
+from typing import Optional
 
 # third party imports
 import pandas as pd
@@ -352,7 +353,8 @@ def apply_pop_land_use(
     unit_columns: list[str],
     tt_factors: pd.DataFrame,
     data_zone_column: str = "msoa11cd",
-    factors_zone_column: str = "msoa_zone_id"
+    factors_zone_column: str = "msoa_zone_id",
+    additonal_index: Optional[list[str]] = None, 
 ) -> pd.DataFrame:
     """applies TfN population land use factors to data
 
@@ -371,7 +373,8 @@ def apply_pop_land_use(
         dataframe with updated unit values, indexed by msoa11cd,
         dwelling_type, and tfn_traveller_type
     """
-
+    if additonal_index is None:
+        additonal_index = []
     data_ratios = (
         data.reset_index(drop=False)
         .merge(
@@ -379,11 +382,12 @@ def apply_pop_land_use(
             left_on=data_zone_column,
             right_on=factors_zone_column,
         )
-        .set_index([data_zone_column, "dwelling_type", "tfn_traveller_type"])
+        .set_index([data_zone_column, "dwelling_type", "tfn_traveller_type"]+additonal_index)
     )
     data_ratios = data_ratios.loc[:, unit_columns].multiply(
         data_ratios["ratios"], axis=0
     )
+
     return data_ratios
 
 
@@ -769,7 +773,8 @@ def disagg_land_use_codes(
     luc_column: str,
     unit_columns: list[str],
     land_use_split: pd.DataFrame,
-    identifier: str = "site_reference_id"
+    identifier: str = "site_reference_id",
+    keep_cols: Optional[list[str]]=None, 
 ) -> pd.DataFrame:
     """disaggregates land use into seperate rows
 
@@ -792,9 +797,12 @@ def disagg_land_use_codes(
         disaggregated land use
     """
 
+    if keep_cols is None:
+        keep_cols = []
+
     disagg = data.explode(luc_column).reset_index(drop=True)
 
-    site_luc = disagg.loc[:, [identifier, luc_column]]
+    site_luc = disagg.loc[:, [identifier, luc_column]+keep_cols]
     site_luc = site_luc.merge(
         land_use_split,
         how="left",
