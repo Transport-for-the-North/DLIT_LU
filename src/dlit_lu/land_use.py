@@ -821,7 +821,8 @@ def disagg_land_use_codes(
         right_index=True,
         suffixes=["", "_denom"],
     )
-    ratio = site_luc["total_floorspace"] / site_luc["total_floorspace_denom"]
+    site_luc.fillna(0, inplace = True)
+    ratio = site_luc["total_floorspace"].divide(site_luc["total_floorspace_denom"], 0)
     ratio.index = disagg.index
     disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis=0)
     return disagg

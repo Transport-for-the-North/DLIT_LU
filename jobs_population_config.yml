@@ -1,23 +1,28 @@
 #Mandatory Parameters
 
 #--Read file paths
-jobs_input_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\jobs_test.csv
-population_input_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\population.csv
+jobs_input_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\jobs_with_solihull.csv
+population_input_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\pop_with_solihull.csv
 
-output_folder: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_outputs
-proposed_luc_split_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\proposed_luc_split_path.csv
-existing_luc_split_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\existing_luc_split_path.csv
-msoa_dwelling_pop_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\gb_msoa_agg_prt_2018_hh_pop.csv
-msoa_traveller_type_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\land_use_2018_pop.csv
-msoa_to_lad_conversion_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\msoa_to_lad_2020_correspondence.csv
-msoa_jobs_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\land_use_2018_emp.csv
+output_folder: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT outputs v2\difference
+
+proposed_luc_split_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\proposed_luc_split_path.csv
+existing_luc_split_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\existing_luc_split_path.csv
+
+msoa_dwelling_pop_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\gb_msoa_agg_prt_2018_hh_pop.csv
+msoa_traveller_type_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\land_use_2018_pop.csv
+msoa_to_lad_conversion_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\msoa_to_lad_2020_correspondence.csv
+msoa_jobs_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\land_use_2018_emp.csv
+
 employment_density_matrix_path: inputs\emp_density_matrix.csv
-luc_sic_conversion_path: inputs\luc_sic_conversion.csv
-lad_name_lookup: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\LAD_region_lookup.csv
-base_year_pop_emp_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2018_NTEM_planning_region.csv
-baseline_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2035_NTEM_planning_lad.csv
-additional_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\addtional_growth_region.csv
-forecast_year_growth_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\2050_NTEM_LAD_high.csv
-allocated_land_use_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\allocated_land_use_path.csv
-lad_to_model_zone_pop_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\lad_2020_to_miham_population_weight.csv
-lad_to_model_zone_jobs_path: C:\Users\UKKXF022\Documents\Midlands_connect_freight\freight_and_economy_inputs\lad_2020_to_miham_employment_weight.csv
+luc_sic_conversion_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\luc_sic_section_conversion.csv
+lad_name_lookup: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\constraint_area.csv
+
+base_year_pop_emp_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\2023_NTEM_may_2020_regional_GB.csv
+#baseline_growth_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\freight_and_economy_inputs\2035_NTEM_planning_lad.csv
+additional_growth_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\addtional_growth_region.csv
+forecast_year_growth_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\2050_NTEM_LAD_may_2020_regional_GB.csv
+
+allocated_land_use_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\allocated_land_use.csv
+lad_to_model_zone_pop_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\lad_2020_to_mrtm2_population_weight.csv
+lad_to_model_zone_jobs_path: C:\Users\UKKXF022\OneDrive - WSP O365\Midlands_connect_freight\D-LIT inputs v2\lad_2020_to_mrtm2_employment_weight.csv
