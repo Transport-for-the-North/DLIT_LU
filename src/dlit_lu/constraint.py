@@ -57,7 +57,7 @@ def constrain_to_forecast(
     data_constraint[data_unit_col]=data_constraint[data_unit_col]*data_constraint["constraint_factor"]
 
     data_constraint.set_index(index_cols, inplace = True)
-
+    #keep constraint factor to apply to development zones
     return data_constraint
 
 

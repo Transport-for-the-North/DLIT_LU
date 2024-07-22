@@ -43,6 +43,8 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
 
     parsed_inputs = config.parse()
 
+
+    #I dont think these do anything useful --------
     forecast = combine_forecasts(
         parsed_inputs.forecast_year_growth.copy(),
         parsed_inputs.lad_name_lookup.copy(),
@@ -71,7 +73,9 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
         "LAD20NM",
         "LAD20CD"
     )
-    
+    #below actually does something
+
+
     data = format_data(parsed_inputs)
 
     jobs_check = data["jobs"].groupby("LAD20CD").sum()
@@ -112,7 +116,7 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     constrained_pop = constrained_pop.reset_index()
     pop_constraint_ratio = constrained_pop[["LAD20CD", "constraint_factor"]].drop_duplicates()
     pop_constraint_ratio.set_index("LAD20CD")
-
+    #processing population allocated to development zone
     allocated_pop = process_pop_data(
         parsed_inputs.allocated_land_use,
         parsed_inputs.msoa_traveller_type,
@@ -372,7 +376,7 @@ def format_data(inputs: inputs.JobPopInputs) -> dict[str, pd.DataFrame]:
 
     forecast_year_pop.set_index("LAD", inplace=True)
     forecast_year_jobs.set_index("LAD", inplace=True)
-
+    #dropping data we already have in NTEM
     forecast_year_pop.drop(index=inputs.population_input.index, inplace= True)
     forecast_year_jobs.drop(index=inputs.jobs_input.index, inplace= True)
 
