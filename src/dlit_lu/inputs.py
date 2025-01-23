@@ -1,5 +1,6 @@
 """handles reading config file
 """
+
 # standard imports
 from __future__ import annotations
 
@@ -120,6 +121,8 @@ class LandUseConfig:
         at a different zone system.
     """
 
+    zone_shapefile_path: pydantic.FilePath
+    zone_data_path: pydantic.FilePath
     msoa_shapefile_path: pydantic.FilePath
     msoa_dwelling_pop_path: pydantic.FilePath
     msoa_traveller_type_path: pydantic.FilePath

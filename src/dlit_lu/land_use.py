@@ -9,6 +9,7 @@ Conversion process involves disagregating by:
         convert to jobs and SIC codes
 
 """
+
 # standard imports
 import logging
 import pathlib
@@ -49,6 +50,9 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     average_infill_values = inputs.InfillingAverages.load_yaml(
         config.output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE
     )
+
+    zone_data = pd.read_csv(config.land_use.zone_data_path)
+    zone = parser.parse_zone(config.land_use.zone_shapefile_path)
 
     traveller_type_factor = analyse_traveller_type_distribution(
         config.land_use.msoa_traveller_type_path
@@ -164,12 +168,12 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         input_data.existing_land_use_split,
     )
 
-    demolition_land_use_data["residential"].loc[
-        :, build_out_columns
-    ] = -demolition_land_use_data["residential"].loc[:, build_out_columns]
-    demolition_land_use_data["employment"].loc[
-        :, build_out_columns
-    ] = -demolition_land_use_data["employment"].loc[:, build_out_columns]
+    demolition_land_use_data["residential"].loc[:, build_out_columns] = (
+        -demolition_land_use_data["residential"].loc[:, build_out_columns]
+    )
+    demolition_land_use_data["employment"].loc[:, build_out_columns] = (
+        -demolition_land_use_data["employment"].loc[:, build_out_columns]
+    )
 
     demolition_land_use_data["residential"].columns = demolition_land_use_data[
         "employment"
@@ -198,6 +202,66 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     LOG.info("performing MSOA geospatial lookup")
     res_msoa_sites = msoa_site_geospatial_lookup(residential_build_out, msoa)
     emp_msoa_sites = msoa_site_geospatial_lookup(employment_build_out, msoa)
+
+    # Site to zone
+    LOG.info("performing zone geospatial lookup")
+    res_zone_sites = zone_site_geospatial_lookup(residential_build_out, zone)
+    emp_zone_sites = zone_site_geospatial_lookup(employment_build_out, zone)
+
+    res_zone_sites = res_zone_sites.loc[
+        :,
+        ["site_reference_id", "normits_id", "easting", "northing"] + build_out_columns,
+    ]
+
+    emp_zone_sites = emp_zone_sites.loc[
+        :,
+        build_out_columns
+        + ["site_reference_id", "normits_id", "land_use", "easting", "northing"],
+    ]
+    res_sites_file_name = "residential_sites_out.csv"
+
+    utilities.write_to_csv(config.output_folder / res_sites_file_name, res_zone_sites)
+
+    compare_existing_proposed_dwellings_zone(
+        zone_data,
+        res_zone_sites,
+        build_out_columns,
+        comparison_path / "existing_proposed_dwelling_comparison_zone.csv",
+    )
+
+    LOG.info("Convert site development to jobs")
+    emp_zone_sites.set_index(
+        ["site_reference_id", "normits_id", "land_use"], inplace=True
+    )
+    emp_zone_sites = convert_gfa_to_jobs_site(
+        emp_zone_sites,
+        config.land_use.employment_density_matrix_path,
+        build_out_columns,
+    )
+    emp_zone_sites = convert_luc_to_sic_site(
+        emp_zone_sites, config.land_use.luc_sic_conversion_path
+    )
+    emp_site_use_base = emp_zone_sites.groupby(
+        ["site_reference_id", "normits_id", "sic_code"]
+    ).sum()
+    emp_site_base = emp_zone_sites.groupby(
+        ["site_reference_id", "normits_id", "easting", "northing"]
+    ).sum()
+
+    emp_sites_use_file_name = "employment_sites_use_out.csv"
+    emp_sites_file_name = "employment_sites_out.csv"
+
+    utilities.write_to_csv(
+        config.output_folder / emp_sites_use_file_name, emp_site_use_base
+    )
+    utilities.write_to_csv(config.output_folder / emp_sites_file_name, emp_site_base)
+
+    compare_existing_proposed_jobs_zone(
+        zone_data,
+        emp_zone_sites,
+        build_out_columns,
+        comparison_path / "existing_proposed_jobs_comparison_zone.csv",
+    )
 
     LOG.info("Disaggregating dwellings into population by dwelling type")
 
@@ -309,6 +373,44 @@ def compare_existing_proposed_jobs(
     comparison = existing_jobs.merge(
         proposed_jobs, how="outer", left_index=True, right_index=True
     )
+    comparison["ratio (percentage)"] = (
+        100 * comparison["total_proposed_jobs"] / comparison["total_existing_jobs"]
+    )
+    utilities.write_to_csv(file_path, comparison)
+
+
+def compare_existing_proposed_jobs_zone(
+    existing_data: pd.DataFrame,
+    proposed_data: pd.DataFrame,
+    build_out_profile_cols: list[str],
+    file_path: pathlib.Path,
+) -> None:
+    """compares the number of existing jobsto the number of proposed jobs
+
+    outputs a comparion the number of existing jobs from an external input,
+    to the number of proposed jobs infered from the D-Log
+
+    Parameters
+    ----------
+    existing_data : pd.DataFrame
+        data containing the number of existing jobs (TfN land use data)
+    proposed_data : pd.DataFrame
+        data containing the number of proposed jobs (from D-Log)
+    build_out_profile_cols : list[str]
+        build-out profiles columns
+    file_path : pathlib.Path
+        path to save comparison output
+    """
+
+    existing_jobs = existing_data.rename({"emp": "total_existing_jobs"}, axis=1).drop(
+        columns=["pop", "households"]
+    )
+
+    proposed_data["total_proposed_jobs"] = proposed_data[build_out_profile_cols].sum(
+        axis=1
+    )
+    proposed_jobs = proposed_data.groupby("normits_id")["total_proposed_jobs"].sum()
+    comparison = existing_jobs.merge(proposed_jobs, how="outer", on="normits_id")
     comparison["ratio (percentage)"] = (
         100 * comparison["total_proposed_jobs"] / comparison["total_existing_jobs"]
     )
@@ -428,6 +530,52 @@ def compare_existing_proposed_dwellings(
     utilities.write_to_csv(file_path, comparison)
 
 
+# create zonal comparison
+def compare_existing_proposed_dwellings_zone(
+    existing_data: pd.DataFrame,
+    proposed_data: pd.DataFrame,
+    build_out_profile_cols: list[str],
+    file_path: pathlib.Path,
+) -> None:
+    """produces a comparison of existing and proposed dwelling types
+
+    outputs a csvfile at a defined location with the total existing and proposed
+    dwellings by msoa. existing jobs are taken from a defined external data
+    source (TfN landuse)
+
+    Parameters
+    ----------
+    existing_data : pd.DataFrame
+        TfN land use data contain the number of dwellings by msoa
+    proposed_data : pd.DataFrame
+        Dlog data
+    build_out_profile_cols : list[str]
+        build-out profile data in proposed data
+    file_path : pathlib.Path
+        path to save outputted csv
+    """
+    existing_dwellings = existing_data.rename(
+        {"households": "total_existing_dwellings"}, axis=1
+    ).drop(columns=["pop", "emp"])
+
+    proposed_data["total_proposed_dwellings"] = proposed_data[
+        build_out_profile_cols
+    ].sum(axis=1)
+    proposed_dwellings = proposed_data.groupby("normits_id")[
+        "total_proposed_dwellings"
+    ].sum()
+    comparison = existing_dwellings.merge(
+        proposed_dwellings, how="outer", on="normits_id"
+    )
+    comparison["ratio (percentage)"] = (
+        100
+        * comparison["total_proposed_dwellings"]
+        / comparison["total_existing_dwellings"]
+    )
+
+    utilities.write_to_csv(file_path, comparison)
+
+
 def convert_to_gfa(
     data: pd.DataFrame,
     area_col: str,
@@ -507,6 +655,45 @@ def convert_gfa_to_jobs(
     return data_jobs
 
 
+def convert_gfa_to_jobs_site(
+    data: pd.DataFrame, matrix_path: pathlib.Path, unit_cols
+) -> pd.DataFrame:
+    """Converts GFA build-out profile to jobs
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame with GFA build out profiles
+    matrix_path : pathlib.Path
+        Path to the job density matrix
+    unit_cols : list[str]
+        Columns in the data that contain build-out profile data
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing job build-out profiles
+    """
+    matrix = pd.read_csv(matrix_path).loc[:, ["land_use_code", "fte_floorspace"]]
+    matrix.loc[:, "land_use_code"] = matrix["land_use_code"].str.lower()
+    data_jobs = data.reset_index().merge(
+        matrix, how="left", left_on="land_use", right_on="land_use_code"
+    )
+    data_jobs.loc[:, unit_cols] = data_jobs.loc[:, unit_cols].divide(
+        data_jobs.loc[:, "fte_floorspace"], axis=0
+    )
+    data_jobs.loc[data_jobs["fte_floorspace"].isnull(), unit_cols] = 0
+    has_jobs = (
+        ~pd.DataFrame([data_jobs[col] == 0 for col in unit_cols])
+        .transpose()
+        .all(axis=1)
+    )
+    data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
+    data_jobs = data_jobs[has_jobs]
+    data_jobs.set_index(["site_reference_id", "normits_id", "land_use"], inplace=True)
+    return data_jobs
+
+
 def convert_luc_to_sic(
     data: pd.DataFrame, conversion_path: pathlib.Path
 ) -> pd.DataFrame:
@@ -535,6 +722,39 @@ def convert_luc_to_sic(
     )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
     data_sic_code.set_index(["msoa_zone_id", "sic_code"], inplace=True)
+    return data_sic_code
+
+
+def convert_luc_to_sic_site(
+    data: pd.DataFrame, conversion_path: pathlib.Path
+) -> pd.DataFrame:
+    """Convert the land use codes (LUC) to standard industrial classification (SIC) codes.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The DataFrame containing the land use codes.
+    conversion_path : pathlib.Path
+        The path to a csv file that maps the LUC codes to the SIC codes.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with the SIC codes
+
+    """
+    conversion = pd.read_csv(conversion_path).loc[:, ["land_use_code", "sic_code"]]
+    conversion["land_use_code"] = conversion["land_use_code"].str.lower()
+    data_sic_code = data.reset_index(drop=False).merge(
+        conversion,
+        how="left",
+        left_on="land_use",
+        right_on="land_use_code",
+    )
+    data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
+    data_sic_code.set_index(
+        ["site_reference_id", "normits_id", "sic_code"], inplace=True
+    )
     return data_sic_code
 
 
@@ -730,6 +950,33 @@ def msoa_site_geospatial_lookup(
     )
     dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
     return dlog_msoa
+
+
+def zone_site_geospatial_lookup(
+    data: pd.DataFrame,
+    zone: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """spatially joins MSOA shapefile to DLOG sites
+
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        data to join to msoa
+    msoa : gpd.GeoDataFrame
+        msoa data
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        spatially joined data
+    """
+
+    dlog_geom = gpd.GeoDataFrame(
+        data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
+    )
+    dlog_zone = gpd.sjoin(dlog_geom, zone, how="left")
+    return dlog_zone
 
 
 def calc_msoa_proportion(

@@ -1,5 +1,6 @@
 """parses the DLog data and auxiliary data
 """
+
 # standard imports
 import pathlib
 import logging
@@ -393,3 +394,21 @@ def parse_msoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
     msoa = gpd.read_file(file_path)
     north_msoa = msoa[~msoa["north_msoa"].isna()]
     return north_msoa
+
+
+def parse_zone(file_path: pathlib.Path) -> gpd.GeoDataFrame:
+    """parse msoa shape file
+
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        file path for msoa shapefile
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        msoa
+    """
+    zone = gpd.read_file(file_path)
+    return zone
