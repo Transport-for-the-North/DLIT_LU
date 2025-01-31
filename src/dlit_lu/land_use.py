@@ -218,9 +218,11 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         build_out_columns
         + ["site_reference_id", "normits_id", "land_use", "easting", "northing"],
     ]
-    res_sites_file_name = "residential_sites_out.csv"
 
-    utilities.write_to_csv(config.output_folder / res_sites_file_name, res_zone_sites)
+    LOG.info("Compare total units of new dwelling to existing")
+    comparison_path = config.output_folder / "existing_proposed_development_comparison"
+
+    comparison_path.mkdir(exist_ok=True)
 
     compare_existing_proposed_dwellings_zone(
         zone_data,
@@ -228,6 +230,16 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         build_out_columns,
         comparison_path / "existing_proposed_dwelling_comparison_zone.csv",
     )
+
+    LOG.info("Export site level dwelling data")
+    res_zone_sites = res_zone_sites.groupby(
+        ["site_reference_id", "normits_id", "easting", "northing"]
+    ).sum()
+
+    res_sites_file_name = "residential_sites_out.csv"
+
+    utilities.write_to_csv(config.output_folder / res_sites_file_name, res_zone_sites)
+
 
     LOG.info("Convert site development to jobs")
     emp_zone_sites.set_index(
@@ -241,6 +253,16 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     emp_zone_sites = convert_luc_to_sic_site(
         emp_zone_sites, config.land_use.luc_sic_conversion_path
     )
+
+    LOG.info("Compare total new jobs to existing")
+    compare_existing_proposed_jobs_zone(
+        zone_data,
+        emp_zone_sites,
+        build_out_columns,
+        comparison_path / "existing_proposed_jobs_comparison_zone.csv",
+    )
+
+    LOG.info("Export site level job data")
     emp_site_use_base = emp_zone_sites.groupby(
         ["site_reference_id", "normits_id", "sic_code"]
     ).sum()
@@ -256,18 +278,8 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     )
     utilities.write_to_csv(config.output_folder / emp_sites_file_name, emp_site_base)
 
-    compare_existing_proposed_jobs_zone(
-        zone_data,
-        emp_zone_sites,
-        build_out_columns,
-        comparison_path / "existing_proposed_jobs_comparison_zone.csv",
-    )
 
     LOG.info("Disaggregating dwellings into population by dwelling type")
-
-    comparison_path = config.output_folder / "existing_proposed_development_comparison"
-
-    comparison_path.mkdir(exist_ok=True)
 
     compare_existing_proposed_dwellings(
         msoa_dwelling_ratio,
@@ -324,11 +336,11 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Writing Land Use disaggregation and geospatial lookup results")
 
-    res_file_name = "residential_msoa_build_out.csv"
-    emp_file_name = "employment_msoa_build_out.csv"
+    # res_file_name = "residential_msoa_build_out.csv"
+    # emp_file_name = "employment_msoa_build_out.csv"
 
-    utilities.write_to_csv(config.output_folder / res_file_name, res_msoa_base)
-    utilities.write_to_csv(config.output_folder / emp_file_name, emp_msoa_base)
+    # utilities.write_to_csv(config.output_folder / res_file_name, res_msoa_base)
+    # utilities.write_to_csv(config.output_folder / emp_file_name, emp_msoa_base)
 
     if config.land_use.summary_data is not None:
         summary.summarise_landuse(
@@ -882,7 +894,10 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     mix_emp = mix.loc[:, emp.columns.unique()].reset_index(drop=True)
 
     mix_res.loc[:, "total_site_area_size_hectares"] = mix_res["total_area_ha"]
-    mix_emp.loc[:, "total_area_ha"] = mix_emp["site_area_ha"]
+    # this does not feel right, it should be the other way around
+    # mix_emp.loc[:, "total_area_ha"] = mix_emp["site_area_ha"]
+    mix_emp.loc[:, "site_area_ha"] = mix_emp["total_area_ha"]
+
     res_new = pd.concat([res, mix_res], ignore_index=True)
     emp_new = pd.concat([emp, mix_emp], ignore_index=True)
 

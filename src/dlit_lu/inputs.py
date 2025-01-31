@@ -130,7 +130,12 @@ class LandUseConfig:
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
 
-    land_use_input: Optional[pydantic.FilePath] = None
+    # land_use_input: Optional[pydantic.FilePath] = None
+    # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]
+    # as pydantic.FilePath immediately validates whether the file exists when parsing the YAML
+    # while using pathlib.Path (or str), the validation will only happen inside the custom validator, 
+    # which properly checks run_land_use before verifying the file path
+    land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
     summary_data: SummaryInputs | None = None
 
