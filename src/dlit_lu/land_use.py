@@ -52,7 +52,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     )
 
     zone_data = pd.read_csv(config.land_use.zone_data_path)
-    zone = parser.parse_zone(config.land_use.zone_shapefile_path)
+    zone = parser.parse_zone(config.land_use.zone_shapefile_path, north_only=False)
 
     traveller_type_factor = analyse_traveller_type_distribution(
         config.land_use.msoa_traveller_type_path
@@ -76,7 +76,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         config.land_use.msoa_dwelling_pop_path, msoa_pop_column_names
     )
 
-    msoa = parser.parse_msoa(config.land_use.msoa_shapefile_path)
+    msoa = parser.parse_zone(config.land_use.msoa_shapefile_path)
     LOG.info("Disaggregating mixed into residential and employment")
     data = disagg_mixed(utilities.to_dict(input_data))
 
@@ -200,8 +200,8 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     )
 
     LOG.info("performing MSOA geospatial lookup")
-    res_msoa_sites = msoa_site_geospatial_lookup(residential_build_out, msoa)
-    emp_msoa_sites = msoa_site_geospatial_lookup(employment_build_out, msoa)
+    res_msoa_sites = zone_site_geospatial_lookup(residential_build_out, msoa)
+    emp_msoa_sites = zone_site_geospatial_lookup(employment_build_out, msoa)
 
     # Site to zone
     LOG.info("performing zone geospatial lookup")
@@ -940,46 +940,19 @@ def disagg_dwelling(
     return data
 
 
-def msoa_site_geospatial_lookup(
-    data: pd.DataFrame,
-    msoa: gpd.GeoDataFrame,
-) -> gpd.GeoDataFrame:
-    """spatially joins MSOA shapefile to DLOG sites
-
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        data to join to msoa
-    msoa : gpd.GeoDataFrame
-        msoa data
-
-    Returns
-    -------
-    gpd.GeoDataFrame
-        spatially joined data
-    """
-
-    dlog_geom = gpd.GeoDataFrame(
-        data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
-    )
-    dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
-    return dlog_msoa
-
-
 def zone_site_geospatial_lookup(
     data: pd.DataFrame,
     zone: gpd.GeoDataFrame,
 ) -> gpd.GeoDataFrame:
-    """spatially joins MSOA shapefile to DLOG sites
+    """spatially joins zone shapefile to DLOG sites
 
 
     Parameters
     ----------
     data : pd.DataFrame
-        data to join to msoa
-    msoa : gpd.GeoDataFrame
-        msoa data
+        data to join to zone
+    zone : gpd.GeoDataFrame
+        zone data
 
     Returns
     -------
