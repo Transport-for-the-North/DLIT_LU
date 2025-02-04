@@ -97,6 +97,10 @@ class LandUseConfig:
 
     Parameters
     ----------
+    zone_shapefile_path: pathlib.Path
+        path to zone shape file
+    zone_data_path: pathlib.Path
+        path to pop,household,emp by zone
     msoa_shapefile_path: pathlib.Path
         path to msoa shape file
     msoa_dwelling_pop_path: pathlib.Path
