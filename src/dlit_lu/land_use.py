@@ -245,14 +245,14 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     emp_zone_sites.set_index(
         ["site_reference_id", "normits_id", "land_use"], inplace=True
     )
-    emp_zone_sites = convert_gfa_to_jobs_site(
+    emp_zone_sites = convert_gfa_to_jobs(
         emp_zone_sites,
         config.land_use.employment_density_matrix_path,
         build_out_columns,
     )
-    emp_zone_sites = convert_luc_to_sic_site(
-        emp_zone_sites, config.land_use.luc_sic_conversion_path
-    )
+    emp_zone_sites.set_index(["site_reference_id", "normits_id", "land_use"], inplace=True)
+    emp_zone_sites = convert_luc_to_sic(emp_zone_sites, config.land_use.luc_sic_conversion_path)
+    emp_zone_sites.set_index(["site_reference_id", "normits_id", "sic_code"], inplace=True)
 
     LOG.info("Compare total new jobs to existing")
     compare_existing_proposed_jobs_zone(
@@ -323,9 +323,9 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     emp_msoa_base = convert_gfa_to_jobs(
         emp_msoa_base, config.land_use.employment_density_matrix_path, build_out_columns
     )
-    emp_msoa_base = convert_luc_to_sic(
-        emp_msoa_base, config.land_use.luc_sic_conversion_path
-    )
+    emp_msoa_base.set_index(["msoa_zone_id", "land_use"], inplace=True)
+    emp_msoa_base = convert_luc_to_sic(emp_msoa_base, config.land_use.luc_sic_conversion_path)
+    emp_msoa_base.set_index(["msoa_zone_id", "sic_code"], inplace=True)
 
     compare_existing_proposed_jobs(
         msoa_jobs,
@@ -663,46 +663,6 @@ def convert_gfa_to_jobs(
     )
     data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
     data_jobs = data_jobs[has_jobs]
-    data_jobs.set_index(["msoa_zone_id", "land_use"], inplace=True)
-    return data_jobs
-
-
-def convert_gfa_to_jobs_site(
-    data: pd.DataFrame, matrix_path: pathlib.Path, unit_cols
-) -> pd.DataFrame:
-    """Converts GFA build-out profile to jobs
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        DataFrame with GFA build out profiles
-    matrix_path : pathlib.Path
-        Path to the job density matrix
-    unit_cols : list[str]
-        Columns in the data that contain build-out profile data
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing job build-out profiles
-    """
-    matrix = pd.read_csv(matrix_path).loc[:, ["land_use_code", "fte_floorspace"]]
-    matrix.loc[:, "land_use_code"] = matrix["land_use_code"].str.lower()
-    data_jobs = data.reset_index().merge(
-        matrix, how="left", left_on="land_use", right_on="land_use_code"
-    )
-    data_jobs.loc[:, unit_cols] = data_jobs.loc[:, unit_cols].divide(
-        data_jobs.loc[:, "fte_floorspace"], axis=0
-    )
-    data_jobs.loc[data_jobs["fte_floorspace"].isnull(), unit_cols] = 0
-    has_jobs = (
-        ~pd.DataFrame([data_jobs[col] == 0 for col in unit_cols])
-        .transpose()
-        .all(axis=1)
-    )
-    data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
-    data_jobs = data_jobs[has_jobs]
-    data_jobs.set_index(["site_reference_id", "normits_id", "land_use"], inplace=True)
     return data_jobs
 
 
@@ -733,40 +693,6 @@ def convert_luc_to_sic(
         right_on="land_use_code",
     )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
-    data_sic_code.set_index(["msoa_zone_id", "sic_code"], inplace=True)
-    return data_sic_code
-
-
-def convert_luc_to_sic_site(
-    data: pd.DataFrame, conversion_path: pathlib.Path
-) -> pd.DataFrame:
-    """Convert the land use codes (LUC) to standard industrial classification (SIC) codes.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        The DataFrame containing the land use codes.
-    conversion_path : pathlib.Path
-        The path to a csv file that maps the LUC codes to the SIC codes.
-
-    Returns
-    -------
-    pd.DataFrame
-        The DataFrame with the SIC codes
-
-    """
-    conversion = pd.read_csv(conversion_path).loc[:, ["land_use_code", "sic_code"]]
-    conversion["land_use_code"] = conversion["land_use_code"].str.lower()
-    data_sic_code = data.reset_index(drop=False).merge(
-        conversion,
-        how="left",
-        left_on="land_use",
-        right_on="land_use_code",
-    )
-    data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
-    data_sic_code.set_index(
-        ["site_reference_id", "normits_id", "sic_code"], inplace=True
-    )
     return data_sic_code
 
 
