@@ -1,7 +1,7 @@
 """Performs the conversion from D-Log formatting to the input to the Trip-Ends Module.
 Conversion process involves disagregating by:
     land use code,
-    aggregating by MSOA
+    aggregating by LSOA
     
     Residential:
         disagregate by dwelling type and convert to population
@@ -27,11 +27,11 @@ LOG = logging.getLogger(__name__)
 
 
 def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
-    """runs process for converting DLOG to MSOA build out profiles
+    """runs process for converting DLOG to site and LSOA build out profiles
 
     disaggregaes mixed into employment and residential and land use codes
-    applys dwelling types using land use split by MSOA
-    rebases to MSOA build-out profiles
+    applys dwelling types using land use split by LSOA
+    rebases to LSOA build-out profiles
 
     Parameters
     ----------
@@ -51,32 +51,39 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         config.output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE
     )
 
-    zone_data = pd.read_csv(config.land_use.zone_data_path)
-    zone = parser.parse_zone(config.land_use.zone_shapefile_path)
 
     traveller_type_factor = analyse_traveller_type_distribution(
-        config.land_use.msoa_traveller_type_path
+        config.land_use.lsoa_traveller_type_path
     )
 
-    msoa_jobs = pd.read_csv(config.land_use.msoa_jobs_path).rename(
-        columns={"2018": "jobs"}
+    lsoa_jobs = pd.read_csv(config.land_use.lsoa_jobs_path).rename(
+        columns={"emp": "jobs"}
     )
 
-    msoa_pop_column_names = [
-        "zone_id",
+    lsoa_pop_column_names = [
+        "lsoa2021_id",
         "dwelling_type",
-        "n_uprn",
-        "pop_per_dwelling",
-        "zone",
-        "pop_aj_factor",
+        "household",
         "population",
+        "pop_per_dwelling",
     ]
 
-    msoa_dwelling_ratio = calc_msoa_proportion(
-        config.land_use.msoa_dwelling_pop_path, msoa_pop_column_names
+    lsoa_dwelling_ratio = calc_lsoa_proportion(
+        config.land_use.lsoa_dwelling_pop_path, lsoa_pop_column_names
     )
 
-    msoa = parser.parse_msoa(config.land_use.msoa_shapefile_path)
+    by_lsoa_data = tot_by_pop_dwel_emp(
+        config.land_use.lsoa_dwelling_pop_path,
+        config.land_use.lsoa_traveller_type_path,
+        config.land_use.lsoa_jobs_path,
+        lsoa_pop_column_names,
+    )
+
+    by_lsoa_data_file_name = "tot_by_data_out.csv"
+    utilities.write_to_csv(config.output_folder / by_lsoa_data_file_name, by_lsoa_data)
+
+    lsoa = parser.parse_zone(config.land_use.lsoa_shapefile_path)
+    # msoa = parser.parse_msoa(config.land_use.msoa_shapefile_path)
     LOG.info("Disaggregating mixed into residential and employment")
     data = disagg_mixed(utilities.to_dict(input_data))
 
@@ -199,75 +206,83 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         ignore_index=True,
     )
 
-    LOG.info("performing MSOA geospatial lookup")
-    res_msoa_sites = msoa_site_geospatial_lookup(residential_build_out, msoa)
-    emp_msoa_sites = msoa_site_geospatial_lookup(employment_build_out, msoa)
+    LOG.info("performing LSOA geospatial lookup")
+    res_lsoa_sites = lsoa_site_geospatial_lookup(residential_build_out, lsoa)
+    emp_lsoa_sites = lsoa_site_geospatial_lookup(employment_build_out, lsoa)
 
-    # Site to zone
-    LOG.info("performing zone geospatial lookup")
-    res_zone_sites = zone_site_geospatial_lookup(residential_build_out, zone)
-    emp_zone_sites = zone_site_geospatial_lookup(employment_build_out, zone)
+    # # Site to zone
+    # LOG.info("performing zone geospatial lookup")
+    # res_zone_sites = zone_site_geospatial_lookup(residential_build_out, zone)
+    # emp_zone_sites = zone_site_geospatial_lookup(employment_build_out, zone)
 
-    res_zone_sites = res_zone_sites.loc[
+    res_sites = residential_build_out.loc[
         :,
-        ["site_reference_id", "normits_id", "easting", "northing"] + build_out_columns,
+        ["site_reference_id", "web_tag_certainty", "easting", "northing"] + build_out_columns,
     ]
 
-    emp_zone_sites = emp_zone_sites.loc[
+    emp_sites = employment_build_out.loc[
         :,
         build_out_columns
-        + ["site_reference_id", "normits_id", "land_use", "easting", "northing"],
+        + ["site_reference_id", "web_tag_certainty", "land_use", "easting", "northing"],
     ]
 
-    LOG.info("Compare total units of new dwelling to existing")
-    comparison_path = config.output_folder / "existing_proposed_development_comparison"
+    # compare_existing_proposed_dwellings_zone(
+    #     zone_data,
+    #     res_zone_sites,
+    #     build_out_columns,
+    #     comparison_path / "existing_proposed_dwelling_comparison_zone.csv",
+    # )
 
-    comparison_path.mkdir(exist_ok=True)
+    LOG.info("Export site level dwelling and floorspace data")
 
-    compare_existing_proposed_dwellings_zone(
-        zone_data,
-        res_zone_sites,
-        build_out_columns,
-        comparison_path / "existing_proposed_dwelling_comparison_zone.csv",
-    )
-
-    LOG.info("Export site level dwelling data")
-    res_zone_sites = res_zone_sites.groupby(
-        ["site_reference_id", "normits_id", "easting", "northing"]
+    res_sites_uncertainty = res_sites.groupby(
+        ["site_reference_id", "web_tag_certainty", "easting", "northing"]
     ).sum()
 
-    res_sites_file_name = "residential_sites_out.csv"
+    res_sites= res_sites.groupby(
+        ["site_reference_id", "easting", "northing"]
+    ).sum()
 
-    utilities.write_to_csv(config.output_folder / res_sites_file_name, res_zone_sites)
+
+    emp_sites_uncerntainty = emp_sites.groupby(
+        ["site_reference_id", "web_tag_certainty", "land_use", "easting", "northing"]
+    ).sum()
+    res_sites_file_name = "residential_sites_out.csv"
+    res_sites_uncertainty_file_name = "residential_sites_uncertainty_out.csv"
+    emp_sites_uncertainty_file_name = "employment_sites_uncerntainty_out.csv"
+    utilities.write_to_csv(config.output_folder / res_sites_file_name, res_sites)
+    utilities.write_to_csv(config.output_folder / res_sites_uncertainty_file_name, res_sites_uncertainty)
+    utilities.write_to_csv(config.output_folder / emp_sites_uncertainty_file_name, emp_sites_uncerntainty)
+
 
 
     LOG.info("Convert site development to jobs")
-    emp_zone_sites.set_index(
-        ["site_reference_id", "normits_id", "land_use"], inplace=True
+    emp_sites.set_index(
+        ["site_reference_id", "land_use"], inplace=True
     )
-    emp_zone_sites = convert_gfa_to_jobs_site(
-        emp_zone_sites,
+    emp_sites = convert_gfa_to_jobs_site(
+        emp_sites,
         config.land_use.employment_density_matrix_path,
         build_out_columns,
     )
-    emp_zone_sites = convert_luc_to_sic_site(
-        emp_zone_sites, config.land_use.luc_sic_conversion_path
+    emp_sites = convert_luc_to_sic_site(
+        emp_sites, config.land_use.luc_sic_conversion_path
     )
 
-    LOG.info("Compare total new jobs to existing")
-    compare_existing_proposed_jobs_zone(
-        zone_data,
-        emp_zone_sites,
-        build_out_columns,
-        comparison_path / "existing_proposed_jobs_comparison_zone.csv",
-    )
+    # LOG.info("Compare total new jobs to existing")
+    # compare_existing_proposed_jobs_zone(
+    #     zone_data,
+    #     emp_zone_sites,
+    #     build_out_columns,
+    #     comparison_path / "existing_proposed_jobs_comparison_zone.csv",
+    # )
 
     LOG.info("Export site level job data")
-    emp_site_use_base = emp_zone_sites.groupby(
-        ["site_reference_id", "normits_id", "sic_code"]
+    emp_site_use_base = emp_sites.groupby(
+        ["site_reference_id", "sic_code", "easting", "northing"]
     ).sum()
-    emp_site_base = emp_zone_sites.groupby(
-        ["site_reference_id", "normits_id", "easting", "northing"]
+    emp_site_base = emp_sites.groupby(
+        ["site_reference_id", "easting", "northing"]
     ).sum()
 
     emp_sites_use_file_name = "employment_sites_use_out.csv"
@@ -279,76 +294,101 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     utilities.write_to_csv(config.output_folder / emp_sites_file_name, emp_site_base)
 
 
+    LOG.info("Compare total units of new dwelling to existing")
+    comparison_path = config.output_folder / "existing_proposed_development_comparison"
+
+    comparison_path.mkdir(exist_ok=True)
+
     LOG.info("Disaggregating dwellings into population by dwelling type")
 
     compare_existing_proposed_dwellings(
-        msoa_dwelling_ratio,
-        res_msoa_sites,
+        lsoa_dwelling_ratio,
+        res_lsoa_sites,
         build_out_columns,
         comparison_path / "existing_proposed_dwelling_comparison.csv",
     )
 
-    res_msoa_sites = disagg_dwelling(
-        res_msoa_sites,
-        msoa_dwelling_ratio,
+    res_lsoa_sites = disagg_dwelling(
+        res_lsoa_sites,
+        lsoa_dwelling_ratio,
         build_out_columns,
     )
 
-    res_msoa_sites = res_msoa_sites.loc[
-        :, build_out_columns + ["msoa11cd", "dwelling_type"]
+    res_lsoa_sites = res_lsoa_sites.loc[
+        :, build_out_columns + ["LSOA21CD", "dwelling_type"]
     ]
-    emp_msoa_sites = emp_msoa_sites.loc[:, build_out_columns + ["msoa11cd", "land_use"]]
+    emp_lsoa_sites = emp_lsoa_sites.loc[:, build_out_columns + ["LSOA21CD", "land_use"]]
 
-    LOG.info("Rebasing to MSOA and Land use")
+    LOG.info("Rebasing to LSOA and Land use")
 
-    res_msoa_base = res_msoa_sites.groupby(["msoa11cd", "dwelling_type"]).sum()
-    emp_msoa_base = emp_msoa_sites.groupby(["msoa11cd", "land_use"]).sum()
+    # res_lsoa_base = res_lsoa_sites.groupby(["LSOA21CD", "dwelling_type"]).sum()
+    res_lsoa_base = res_lsoa_sites.groupby(["LSOA21CD"]).sum()
+    emp_lsoa_base = emp_lsoa_sites.groupby(["LSOA21CD", "land_use"]).sum()
 
     LOG.info("Disaggregating by traveller type")
-    res_msoa_base = apply_pop_land_use(
-        res_msoa_base, build_out_columns, traveller_type_factor
+    res_lsoa_base = apply_pop_land_use(
+        res_lsoa_base, build_out_columns, traveller_type_factor
     )
 
+    LOG.info("Check total yearly dwelling and population")
+
+    year_tot_dwel = res_sites.sum(axis=0)
+    # res_lsoa_base["sum_2018_upwards"] = res_lsoa_base.loc[:, "2018":].sum(axis=1)
+    # sum_year_tot_dwel = year_tot_dwel.loc["2018":].sum()
+
+
+    year_tot_pop = res_lsoa_base.sum(axis=0)
+    # res_lsoa_base["sum_2018_upwards"] = res_lsoa_base.loc[:, "2018":].sum(axis=1)
+    # sum_year_tot_pop = year_tot_pop.loc["2018":].sum()
+
+    year_tot_df = pd.DataFrame({
+        "year_tot_dwel": year_tot_dwel,
+        "year_tot_pop": year_tot_pop
+    })
+    year_tot_df_file_name = "year_totals.csv"
+    utilities.write_to_csv(config.output_folder / year_tot_df_file_name, year_tot_df)
+
+    LOG.info("Rename LSOA column id")    
     # rename columns
-    res_msoa_base.reset_index(drop=False, inplace=True)
-    emp_msoa_base.reset_index(drop=False, inplace=True)
-    res_msoa_base.rename(columns={"msoa11cd": "msoa_zone_id"}, inplace=True)
-    emp_msoa_base.rename(columns={"msoa11cd": "msoa_zone_id"}, inplace=True)
-    res_msoa_base.set_index(
-        ["msoa_zone_id", "dwelling_type", "tfn_traveller_type"], inplace=True
+    res_lsoa_base.reset_index(drop=False, inplace=True)
+    emp_lsoa_base.reset_index(drop=False, inplace=True)
+    res_lsoa_base.rename(columns={"LSOA21CD": "lsoa2021_id"}, inplace=True) #lsoa_zone_id
+    emp_lsoa_base.rename(columns={"LSOA21CD": "lsoa2021_id"}, inplace=True) #lsoa_zone_id
+    res_lsoa_base.set_index(
+        ["lsoa2021_id", "tt"], inplace=True
     )
-    emp_msoa_base.set_index(["msoa_zone_id", "land_use"], inplace=True)
+    emp_lsoa_base.set_index(["lsoa2021_id", "land_use"], inplace=True)
 
     LOG.info("Converting GFA to jobs")
-    emp_msoa_base = convert_gfa_to_jobs(
-        emp_msoa_base, config.land_use.employment_density_matrix_path, build_out_columns
+    emp_lsoa_base = convert_gfa_to_jobs(
+        emp_lsoa_base, config.land_use.employment_density_matrix_path, build_out_columns
     )
-    emp_msoa_base = convert_luc_to_sic(
-        emp_msoa_base, config.land_use.luc_sic_conversion_path
+    emp_lsoa_base = convert_luc_to_sic(
+        emp_lsoa_base, config.land_use.luc_sic_conversion_path
     )
 
     compare_existing_proposed_jobs(
-        msoa_jobs,
-        emp_msoa_base,
+        lsoa_jobs,
+        emp_lsoa_base,
         build_out_columns,
         comparison_path / "existing_proposed_jobs_comparison.csv",
     )
 
     LOG.info("Writing Land Use disaggregation and geospatial lookup results")
 
-    # res_file_name = "residential_msoa_build_out.csv"
-    # emp_file_name = "employment_msoa_build_out.csv"
+    res_file_name = "residential_lsoa_build_out.csv"
+    emp_file_name = "employment_lsoa_build_out.csv"
 
-    # utilities.write_to_csv(config.output_folder / res_file_name, res_msoa_base)
-    # utilities.write_to_csv(config.output_folder / emp_file_name, emp_msoa_base)
+    utilities.write_to_csv(config.output_folder / res_file_name, res_lsoa_base)
+    utilities.write_to_csv(config.output_folder / emp_file_name, emp_lsoa_base)
 
-    if config.land_use.summary_data is not None:
-        summary.summarise_landuse(
-            res_msoa_base,
-            emp_msoa_base,
-            config.land_use.summary_data,
-            config.output_folder / "land_use_summaries",
-        )
+    # if config.land_use.summary_data is not None:
+    #     summary.summarise_landuse(
+    #         res_msoa_base,
+    #         emp_msoa_base,
+    #         config.land_use.summary_data,
+    #         config.output_folder / "land_use_summaries",
+    #     )
 
     LOG.info("Ending Land Use Module")
 
@@ -375,13 +415,13 @@ def compare_existing_proposed_jobs(
     file_path : pathlib.Path
         path to save comparison output
     """
-    existing_jobs = (existing_data.groupby("msoa_zone_id")["jobs"].sum()).to_frame(
+    existing_jobs = (existing_data.groupby("lsoa21_id")["jobs"].sum()).to_frame(
         name="total_existing_jobs"
     )
     proposed_data["total_proposed_jobs"] = proposed_data[build_out_profile_cols].sum(
         axis=1
     )
-    proposed_jobs = proposed_data.groupby("msoa_zone_id")["total_proposed_jobs"].sum()
+    proposed_jobs = proposed_data.groupby("lsoa2021_id")["total_proposed_jobs"].sum()
     comparison = existing_jobs.merge(
         proposed_jobs, how="outer", left_index=True, right_index=True
     )
@@ -442,23 +482,24 @@ def analyse_traveller_type_distribution(file_path: pathlib.Path) -> pd.DataFrame
     Returns
     -------
     pd.DataFrame
-        contains factors for msoa traveller type
+        contains factors for lsoa traveller type
     """
     data = pd.read_csv(file_path)
-    agg_zones = data.groupby("tfn_traveller_type").sum()
-    ratios = (agg_zones["people"] / agg_zones["people"].sum()).reset_index(drop=False)
-    msoa_ratios = []
-    for id_ in data["msoa_zone_id"].unique():
+    agg_zones = data.groupby("tt").sum()
+    ratios = (agg_zones["pop"] / agg_zones["pop"].sum()).reset_index(drop=False)
+    lsoa_ratios = []
+    for id_ in data["LSOA"].unique():
         temp = ratios.copy()
-        temp["msoa_zone_id"] = (
+        temp["LSOA"] = (
             pd.Series([id_]).repeat(len(ratios)).reset_index(drop=True)
         )
-        msoa_ratios.append(temp)
-    all_msoa_ratios = pd.concat(msoa_ratios, axis=0).set_index(
-        ["msoa_zone_id", "tfn_traveller_type"]
+        lsoa_ratios.append(temp)
+    all_lsoa_ratios = pd.concat(lsoa_ratios, axis=0).set_index(
+        ["LSOA", "tt"]
     )
-    all_msoa_ratios.columns = ["ratios"]
-    return all_msoa_ratios
+    all_lsoa_ratios.columns = ["ratios"]
+    return all_lsoa_ratios
+
 
 
 def apply_pop_land_use(
@@ -480,7 +521,7 @@ def apply_pop_land_use(
     Returns
     -------
     pd.DataFrame
-        dataframe with updated unit values, indexed by msoa11cd,
+        dataframe with updated unit values, indexed by lsoa11cd,
         dwelling_type, and tfn_traveller_type
     """
 
@@ -488,15 +529,67 @@ def apply_pop_land_use(
         data.reset_index(drop=False)
         .merge(
             tt_factors.reset_index(drop=False),
-            left_on="msoa11cd",
-            right_on="msoa_zone_id",
+            left_on="LSOA21CD",
+            right_on="LSOA",
         )
-        .set_index(["msoa11cd", "dwelling_type", "tfn_traveller_type"])
+        .set_index(["LSOA21CD", "tt"])
     )
     data_ratios = data_ratios.loc[:, unit_columns].multiply(
         data_ratios["ratios"], axis=0
     )
     return data_ratios
+
+
+def tot_by_pop_dwel_emp(
+        hh_path: pathlib.Path, 
+        pop_path: pathlib.Path, 
+        emp_path: pathlib.Path,
+        columns: list[str],
+) -> pd.DataFrame:
+    """
+    Processes household, population, and employment data, then get lsoa total.
+
+    Parameters
+    ----------
+    hh_path : pathlib.Path
+        File path to the household dataset.
+    pop_path : pathlib.Path
+        File path to the population dataset.
+    emp_path : pathlib.Path
+        File path to the employment dataset.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing aggregated household, population, and employment data, 
+        merged on the LSOA zone identifier.
+    """
+
+    hh_data = pd.read_csv(hh_path)
+    hh_data.columns = columns
+    pop_data = pd.read_csv(pop_path)
+    emp_data = pd.read_csv(emp_path)
+
+    hh_data = hh_data.groupby("lsoa2021_id", as_index=False).agg({
+        "household": "sum",
+        # "population": "sum"
+    })
+
+    pop_data = pop_data.groupby("LSOA", as_index=False).agg({
+        "pop": "sum"
+    }).rename(columns={"pop": "population"})
+
+    emp_data = emp_data.groupby("lsoa21_id", as_index=False).agg({
+        "emp": "sum"
+    }).rename(columns={"emp": "jobs"})
+
+    # Merge datasets
+    all_data = hh_data.merge(pop_data, left_on="lsoa2021_id", right_on="LSOA", how="left")
+    all_data = all_data.merge(emp_data, left_on="lsoa2021_id", right_on="lsoa21_id", how="left").drop(columns=["lsoa21_id", "LSOA"])
+    all_data.set_index(
+        ["lsoa2021_id"], inplace=True
+    )    
+    return all_data
 
 
 def compare_existing_proposed_dwellings(
@@ -508,13 +601,13 @@ def compare_existing_proposed_dwellings(
     """produces a comparison of existing and proposed dwelling types
 
     outputs a csvfile at a defined location with the total existing and proposed
-    dwellings by msoa. existing jobs are taken from a defined external data
+    dwellings by lsoa. existing jobs are taken from a defined external data
     source (TfN landuse)
 
     Parameters
     ----------
     exisiting_data : pd.DataFrame
-        TfN land use data contain the number of dwellings by msoa
+        TfN land use data contain the number of dwellings by lsoa
     proposed_data : pd.DataFrame
         Dlog data
     build_out_profile_cols : list[str]
@@ -522,13 +615,13 @@ def compare_existing_proposed_dwellings(
     file_path : pathlib.Path
         path to save outputted csv
     """
-    existing_dwellings = (exisiting_data.groupby("zone_id")["n_uprn"].sum()).to_frame(
+    existing_dwellings = (exisiting_data.groupby("lsoa2021_id")["household"].sum()).to_frame(
         name="total_existing_dwellings"
     )
     proposed_data["total_proposed_dwellings"] = proposed_data[
         build_out_profile_cols
     ].sum(axis=1)
-    proposed_dwellings = proposed_data.groupby("msoa11cd")[
+    proposed_dwellings = proposed_data.groupby("LSOA21CD")[
         "total_proposed_dwellings"
     ].sum()
     comparison = existing_dwellings.merge(
@@ -552,13 +645,13 @@ def compare_existing_proposed_dwellings_zone(
     """produces a comparison of existing and proposed dwelling types
 
     outputs a csvfile at a defined location with the total existing and proposed
-    dwellings by msoa. existing jobs are taken from a defined external data
+    dwellings by zone. existing jobs are taken from a defined external data
     source (TfN landuse)
 
     Parameters
     ----------
     existing_data : pd.DataFrame
-        TfN land use data contain the number of dwellings by msoa
+        TfN land use data contain the number of dwellings by zone
     proposed_data : pd.DataFrame
         Dlog data
     build_out_profile_cols : list[str]
@@ -663,7 +756,7 @@ def convert_gfa_to_jobs(
     )
     data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
     data_jobs = data_jobs[has_jobs]
-    data_jobs.set_index(["msoa_zone_id", "land_use"], inplace=True)
+    data_jobs.set_index(["lsoa2021_id", "land_use"], inplace=True)
     return data_jobs
 
 
@@ -702,7 +795,7 @@ def convert_gfa_to_jobs_site(
     )
     data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
     data_jobs = data_jobs[has_jobs]
-    data_jobs.set_index(["site_reference_id", "normits_id", "land_use"], inplace=True)
+    data_jobs.set_index(["site_reference_id", "land_use"], inplace=True)
     return data_jobs
 
 
@@ -733,7 +826,7 @@ def convert_luc_to_sic(
         right_on="land_use_code",
     )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
-    data_sic_code.set_index(["msoa_zone_id", "sic_code"], inplace=True)
+    data_sic_code.set_index(["lsoa2021_id", "sic_code"], inplace=True)
     return data_sic_code
 
 
@@ -765,7 +858,7 @@ def convert_luc_to_sic_site(
     )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
     data_sic_code.set_index(
-        ["site_reference_id", "normits_id", "sic_code"], inplace=True
+        ["site_reference_id", "sic_code"], inplace=True
     )
     return data_sic_code
 
@@ -906,7 +999,7 @@ def disagg_mixed(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
 def disagg_dwelling(
     data: pd.DataFrame,
-    msoa_ratio: pd.DataFrame,
+    lsoa_ratio: pd.DataFrame,
     unit_columns: list[str],
 ) -> pd.DataFrame:
     """_summary_
@@ -917,8 +1010,8 @@ def disagg_dwelling(
     ----------
     data : pd.DataFrame
         DataFrame containing residential dwelling data
-    msoa_ratio : pd.DataFrame
-        contains the existing ratio of each type of dwelling and average occupancy for each MSOA
+    lsoa_ratio : pd.DataFrame
+        contains the existing ratio of each type of dwelling and average occupancy for each LSOA
     unit_columns : list[str]
         columns names for dwelling column to be disaggregated
 
@@ -928,9 +1021,10 @@ def disagg_dwelling(
         Path to the population data file
     """
 
-    msoa_ratio.reset_index("dwelling_type", inplace=True)
+    lsoa_ratio.reset_index("dwelling_type", inplace=True)
 
-    data = data.merge(msoa_ratio, how="left", left_on="msoa11cd", right_on="zone_id")
+    data = data.merge(lsoa_ratio, how="left", left_on="LSOA21CD", right_on="lsoa2021_id")
+    # data.rename(columns={"LSOA21CD": "lsoa21cd"}, inplace=True)
 
     for column in unit_columns:
         data.loc[:, column] = (
@@ -940,19 +1034,19 @@ def disagg_dwelling(
     return data
 
 
-def msoa_site_geospatial_lookup(
+def lsoa_site_geospatial_lookup(
     data: pd.DataFrame,
-    msoa: gpd.GeoDataFrame,
+    lsoa: gpd.GeoDataFrame,
 ) -> gpd.GeoDataFrame:
-    """spatially joins MSOA shapefile to DLOG sites
+    """spatially joins LSOA shapefile to DLOG sites
 
 
     Parameters
     ----------
     data : pd.DataFrame
-        data to join to msoa
-    msoa : gpd.GeoDataFrame
-        msoa data
+        data to join to lsoa
+    lsoa : gpd.GeoDataFrame
+        lsoa data
 
     Returns
     -------
@@ -963,46 +1057,19 @@ def msoa_site_geospatial_lookup(
     dlog_geom = gpd.GeoDataFrame(
         data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
     )
-    dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
-    return dlog_msoa
+    dlog_lsoa = gpd.sjoin(dlog_geom, lsoa, how="left")
+    return dlog_lsoa
 
 
-def zone_site_geospatial_lookup(
-    data: pd.DataFrame,
-    zone: gpd.GeoDataFrame,
-) -> gpd.GeoDataFrame:
-    """spatially joins MSOA shapefile to DLOG sites
-
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        data to join to msoa
-    msoa : gpd.GeoDataFrame
-        msoa data
-
-    Returns
-    -------
-    gpd.GeoDataFrame
-        spatially joined data
-    """
-
-    dlog_geom = gpd.GeoDataFrame(
-        data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
-    )
-    dlog_zone = gpd.sjoin(dlog_geom, zone, how="left")
-    return dlog_zone
-
-
-def calc_msoa_proportion(
-    msoa_pop_path: pathlib.Path, columns: list[str]
+def calc_lsoa_proportion(
+    lsoa_hh_path: pathlib.Path, columns: list[str]
 ) -> pd.DataFrame:
-    """calculates the msoa population by dwelling type
+    """calculates the lsoa population by dwelling type
 
 
     Parameters
     ----------
-    msoa_pop_path : pathlib.Path
+    lsoa_pop_path : pathlib.Path
         path to TfN population land use
     columns : list[str]
         column names in for the land use data
@@ -1012,14 +1079,14 @@ def calc_msoa_proportion(
     pd.DataFrame
         population and ratio of dwellings by dwelling type
     """
-    msoa_pop = pd.read_csv(msoa_pop_path)
-    msoa_pop.columns = columns
-    msoa_pop.set_index(["zone_id", "dwelling_type"], inplace=True)
-    msoa_pop["dwelling_ratio"] = (
-        msoa_pop["n_uprn"] / msoa_pop["n_uprn"].groupby(level="zone_id").sum()
+    lsoa_hh = pd.read_csv(lsoa_hh_path)
+    lsoa_hh.columns = columns
+    lsoa_hh.set_index(["lsoa2021_id", "dwelling_type"], inplace=True)
+    lsoa_hh["dwelling_ratio"] = (
+        lsoa_hh["household"] / lsoa_hh["household"].groupby(level="lsoa2021_id").sum()
     )
 
-    return msoa_pop
+    return lsoa_hh
 
 
 def disagg_land_use_codes(

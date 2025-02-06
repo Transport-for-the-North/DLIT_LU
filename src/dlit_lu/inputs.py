@@ -97,13 +97,13 @@ class LandUseConfig:
 
     Parameters
     ----------
-    msoa_shapefile_path: pathlib.Path
+    lsoa_shapefile_path: pathlib.Path
         path to msoa shape file
-    msoa_dwelling_pop_path: pathlib.Path
+    lsoa_dwelling_pop_path: pathlib.Path
         path to msoa dwelling population file
-    msoa_traveller_type_path: pathlib.Path
+    lsoa_traveller_type_path: pathlib.Path
         path to msoa split of traveller type
-    msoa_jobs_path: pathlib.Path
+    lsoa_jobs_path: pathlib.Path
         path to msoa split of jobs
     employment_density_matrix_path: pathlib.Path
         path to employment density matrix
@@ -120,13 +120,14 @@ class LandUseConfig:
         Lookup file and shapefile for creating output summaries
         at a different zone system.
     """
-
-    zone_shapefile_path: pydantic.FilePath
-    zone_data_path: pydantic.FilePath
-    msoa_shapefile_path: pydantic.FilePath
-    msoa_dwelling_pop_path: pydantic.FilePath
-    msoa_traveller_type_path: pydantic.FilePath
-    msoa_jobs_path: pydantic.FilePath
+    lsoa_shapefile_path: pydantic.FilePath
+    lsoa_dwelling_pop_path: pydantic.FilePath
+    lsoa_traveller_type_path: pydantic.FilePath
+    lsoa_jobs_path: pydantic.FilePath
+    # msoa_shapefile_path: pydantic.FilePath
+    # msoa_dwelling_pop_path: pydantic.FilePath
+    # msoa_traveller_type_path: pydantic.FilePath
+    # msoa_jobs_path: pydantic.FilePath
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
 
@@ -138,6 +139,53 @@ class LandUseConfig:
     land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
     summary_data: SummaryInputs | None = None
+
+@dataclasses.dataclass
+class DevPatnConfig:
+    """Manages reading / writing the tool's config file.
+
+    Parameters
+    ----------
+    normits_shapefile_path: pathlib.Path
+        path to normits zone shape file
+    noham_shapefile_path: pathlib.Path
+        path to noham zone shape file
+    norms_shapefile_path: pathlib.Path
+        path to norms zone shape file
+    msoa_shapefile_path: pathlib.Path
+        path to msoa shape file
+    lsoa_to_normits: pydantic.FilePath:
+        translation file from lsoa to normits
+    lsoa_to_noham: pydantic.FilePath
+        translation file from lsoa to noham
+    lsoa_to_norms: pydantic.FilePath
+        translation file from lsoa to norms
+    lsoa_to_msoa: pydantic.FilePath
+        translation file from lsoa to msoa
+    lsoa_data_path: pathlib.Path
+        path to zonal totals on population, dwelling (household) and employment file
+    assessment_input: pathlib.Path
+        path to sites assessment input to determine the land use values are estimated or not
+    emp_site_data: pathlib.Path
+        path to employmwnt sites
+    res_site_data: pathlib.Path
+        path to residential sites
+    """
+    geo_boundary: str
+    normits_shapefile_path: pydantic.FilePath
+    noham_shapefile_path: pydantic.FilePath
+    norms_shapefile_path: pydantic.FilePath
+    msoa_shapefile_path: pydantic.FilePath
+    lsoa_to_normits: pydantic.FilePath
+    lsoa_to_noham: pydantic.FilePath
+    lsoa_to_norms: pydantic.FilePath
+    lsoa_to_msoa: pydantic.FilePath   
+    lsoa_data_path: Optional[pathlib.Path] = None
+    assessment_input: Optional[pathlib.Path] = None
+    emp_site_data: Optional[pathlib.Path] = None
+    res_site_data: Optional[pathlib.Path] = None
+
+
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -173,6 +221,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     run_infill: bool
     run_land_use: bool
+    run_dev_pattern: bool
 
     output_folder: pathlib.Path
     proposed_luc_split_path: pathlib.Path
@@ -182,6 +231,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     infill: Optional[InfillConfig] = None
     land_use: Optional[LandUseConfig] = None
+    dev_pattern: Optional[DevPatnConfig] = None
 
     @pydantic.validator("infill")
     def check_running_infill(  # pylint: disable=no-self-argument
@@ -207,7 +257,29 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
         if not values["run_infill"] and value.land_use_input is None:
             # Need land use input path if not running infill module
-            raise ValueError("land_use_input value required if not running infilling")
+            raise ValueError("land_use_input required if not running land_use")
+
+        return value
+    
+    @pydantic.validator("dev_pattern")
+    def dev_pattern_input_check(  # pylint: disable=no-self-argument
+        cls, value: DevPatnConfig | None, values: dict[str, Any]
+    ) -> DevPatnConfig:
+        """Check dev pattern is given if running module."""
+        if not values["run_dev_pattern"]:
+            # Don't need to check if we aren't running dev_pattern module
+            return value
+
+        if value is None:
+            raise ValueError("dev_pattern is required if run_dev_pattern is true")
+
+        if (
+            not values.get("run_land_use") 
+            and not all([value.lsoa_data_path, value.emp_site_data, value.res_site_data])
+        ):
+            raise ValueError(
+                "lsoa_data_path, emp_site_data, and res_site_data are required if not running infill module"
+            )
 
         return value
 
@@ -215,11 +287,11 @@ class DLitConfig(caf.toolkit.BaseConfig):
     def check_running(  # pylint: disable=no-self-argument
         cls, values: dict[str, Any]
     ) -> dict[str, Any]:
-        """Raise error if neither module has running set to True."""
-        if not values["run_infill"] and not values["run_land_use"]:
+        """Ensure at least one module is set to run."""
+        if not any([values.get("run_infill"), values.get("run_land_use"), values.get("run_dev_pattern")]):
             raise ValueError(
-                "run_infill and run_land_use cannot both be "
-                "false because there is nothing to run"
+                "At least one of run_infill, run_land_use, "
+                "or run_dev_pattern must be set to True"
             )
 
         return values

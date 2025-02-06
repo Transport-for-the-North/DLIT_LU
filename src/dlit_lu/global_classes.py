@@ -173,6 +173,27 @@ class AuxiliaryData(NamedTuple):
     incomplete_luc: pd.DataFrame
     regions: gpd.GeoDataFrame
 
+class AssessData(NamedTuple):
+    """used to store and pass the read DLOg data set
+
+    note that the DataFrames do not have identical column names
+    Parameters
+    ----------
+    residential_data: pd.DataFrame
+        the residential data set
+    employment_data: pd.DataFrame
+        the employment data set
+    mixed_data: Optional[pd.DataFrame]
+        sites which have residential and employment developments
+    """
+
+
+    residential_data: pd.DataFrame
+    employment_data: pd.DataFrame
+    mixed_data: pd.DataFrame
+
+
+
 
 class ResultsReport:
     """stores the results report
