@@ -3,11 +3,12 @@
 
 import pandas as pd
 import numpy as np
+import pathlib
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
 
-def plot_distribution(df, columns):
+def plot_distribution(df:pd.DataFrame, columns: list, save_path: pathlib.Path):
     """
     Visualize the distribution of the density variables.
     
@@ -20,10 +21,26 @@ def plot_distribution(df, columns):
     for col in columns:
         plt.figure(figsize=(8, 6))
         sns.histplot(df[col], kde=True, bins=30, color='skyblue')
+        
+        # Calculate key statistics
+        mean = df[col].mean()
+        percentile_25 = np.percentile(df[col], 25)
+        percentile_75 = np.percentile(df[col], 75)
+        
+        # Add vertical lines for mean, 25th, and 75th percentiles
+        plt.axvline(mean, color='red', linestyle='--', label=f'Mean: {mean:.2f}')
+        plt.axvline(percentile_25, color='green', linestyle='--', label=f'25th Percentile: {percentile_25:.2f}')
+        plt.axvline(percentile_75, color='orange', linestyle='--', label=f'75th Percentile: {percentile_75:.2f}')
+        
         plt.title(f'Distribution of {col}')
         plt.xlabel(col)
         plt.ylabel('Frequency')
-        plt.show()
+        plt.legend()
+        
+        # If save_path is provided, save the figure to that directory
+        if save_path:
+            plt.savefig(f"{save_path}/{col}_distribution.png", dpi=300)
+        plt.close()
 
 def basic_statistics(df, columns):
     """
@@ -40,9 +57,20 @@ def basic_statistics(df, columns):
         Dataframe with mean, median, and std for each column.
     """
     stats = pd.DataFrame(index=columns)
+    # Calculate mean, median, and std
     stats['Mean'] = df[columns].mean()
     stats['Median'] = df[columns].median()
     stats['Standard Deviation'] = df[columns].std()
+    
+    # Calculate percentiles
+    stats['25th Percentile'] = df[columns].apply(lambda col: np.percentile(col, 25))
+    stats['75th Percentile'] = df[columns].apply(lambda col: np.percentile(col, 75))
+    
+    # Calculate Z-scores
+    z_scores = df[columns].apply(lambda col: zscore(col.dropna()))
+    stats['Z-Score Mean'] = z_scores.mean()
+    stats['Z-Score Std'] = z_scores.std()
+    
     return stats
 
 def percentiles_or_quantiles(df, columns, percentile=25):
@@ -91,24 +119,4 @@ def z_score_method(df: pd.DataFrame, columns: list, threshold=-1):
     
     return low_density_zones
 
-# # Example usage:
-# columns_to_explore = [
-#     "Total new dwelling",
-#     "Existing density of hh",
-#     "Existing density of emp",
-#     "Growth over existing zonal total dwelling",
-#     "Distance to the existing centroids of population"
-# ]
 
-# # Assuming `df` is your dataframe
-# plot_distribution(df, columns_to_explore)
-# stats = basic_statistics(df, columns_to_explore)
-# print(stats)
-
-# low_density_percentiles = percentiles_or_quantiles(df, columns_to_explore, percentile=25)
-# print("Low Density Zones based on Percentile:")
-# print(low_density_percentiles)
-
-# low_density_z_scores = z_score_method(df, columns_to_explore, threshold=-1)
-# print("Low Density Zones based on Z-score:")
-# print(low_density_z_scores)

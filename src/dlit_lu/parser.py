@@ -150,14 +150,14 @@ def parse_dev_pattern_input(config: inputs.DLitConfig) -> global_classes.AssessD
     data_output (global_classes.DLogData): Parsed land use data in a DLogData object
 
     """
-    LOG.info(f"Parsing {str(config.land_use.land_use_input)}")
+    LOG.info(f"Parsing {str(config.dev_pattern.assessment_input)}")
     # parse sheets
     LOG.info("Parsing Residential sheet")
-    residential_data = parse_sheet(config.dev_pattern.assessment_input, "residential")
+    residential_data = parse_sheet(config.dev_pattern.assessment_input, "Residential")
     LOG.info("Parsing Employment sheet")
-    employment_data = parse_sheet(config.dev_pattern.assessment_input, "employment")
+    employment_data = parse_sheet(config.dev_pattern.assessment_input, "Employment")
     LOG.info("Parsing Mixed sheet")
-    mixed_data = parse_sheet(config.dev_pattern.assessment_input, "mixed")
+    mixed_data = parse_sheet(config.dev_pattern.assessment_input, "Mixed")
 
     for frame in [
         residential_data,

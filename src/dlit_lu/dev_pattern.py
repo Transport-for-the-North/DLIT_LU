@@ -10,6 +10,7 @@ import pathlib
 import pandas as pd
 import geopandas as gpd
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 # local imports
 from dlit_lu import stats, utilities, global_classes, parser, inputs, data_repair
@@ -62,10 +63,17 @@ class BaseZoneHandler:
         self.zone_gdf = parser.parse_zone(self.zone_info["shapefile_path"])
 
 
-class ZoneProcessor(BaseZoneHandler):
+class SiteZoneProcessor(BaseZoneHandler):
+    def merge_zonal_attributes(self, data: pd.DataFrame, by_data: pd.DataFrame) -> pd.DataFrame:
+        """Merge the zonal attributes with the data based on the zone ID."""
+        group_by_column = self.zone_info["group_by_column"]
+        zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
+        # Merge the zonal attributes with the data based on the zone ID
+        data = data.merge(by_data, left_on=zone_gdf_id_col, right_on=group_by_column, how="left")
+        return data
     def process_sites(self, data: pd.DataFrame):
         """Process residential and employment sites based on the zone boundary."""
-        updated_data = self.zone_site_geospatial_lookup(data, self.zone_gdf)
+        updated_data = self.zone_site_geospatial_lookup(data)
         return updated_data
     def zone_site_geospatial_lookup(self, data: pd.DataFrame) -> gpd.GeoDataFrame:
         """Spatially joins site data (DLOG sites) to the zones (e.g., MSOA shapefile) based on location.
@@ -87,8 +95,11 @@ class ZoneProcessor(BaseZoneHandler):
 
         # Perform a spatial join between the DLOG points and the zone geometries
         dlog_zone = gpd.sjoin(dlog_geom, self.zone_gdf, how="left")
+    
+        # Select only the columns from the original data plus the zone_gdf_id_col
+        updated_data = dlog_zone[[col for col in data.columns] + [self.zone_info["zone_gdf_id_col"]]]
         
-        return dlog_zone
+        return updated_data
 
 
 class ZoneTranslator(BaseZoneHandler):
@@ -149,6 +160,8 @@ class ZoneTranslator(BaseZoneHandler):
 
         return zone_df
 
+
+
 def get_site_reference_ids(site_df: pd.DataFrame, missing_area_col: str, missing_gfa_col: str) -> list:
     """
     Function to add a 'value_estimated' column and retrieve site_reference_ids where the value is 'estimated'.
@@ -173,6 +186,32 @@ def get_site_reference_ids(site_df: pd.DataFrame, missing_area_col: str, missing
     # Return the list of site_reference_ids
     return estimated_sites['site_reference_id'].tolist()
 
+
+def calculate_density_and_index(by_data: pd.DataFrame, columns_to_process: list) -> pd.DataFrame:
+    """
+    Calculate density and index values for specified columns.
+
+    Parameters
+    ----------
+    by_data : pd.DataFrame
+        DataFrame containing columns to process and 'area_sqm'.
+    columns_to_process : list
+        List of column names to calculate density and index for.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame with density and index columns added.
+    """
+    scaler = MinMaxScaler()
+    # Loop through each column to calculate density and index
+
+    for col in columns_to_process:
+        density_col = f"{col[:2]}_den"
+        by_data[density_col] = by_data[col] / by_data['area_sqm'] * 1000000
+        index_col = f"{density_col}_index"
+        by_data[index_col] = scaler.fit_transform(by_data[[density_col]])
+    return by_data
 
 def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     """runs process for converting DLOG to MSOA build out profiles
@@ -199,6 +238,24 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
     res_sites = pd.read_csv(config.dev_pattern.res_site_data)
     by_data = pd.read_csv(config.dev_pattern.lsoa_data_path)
+    geo_boundary = config.dev_pattern.geo_boundary
+
+
+    LOG.info("Creating list of sites with estimated development values")
+    # list of residential sites with estimated values
+    resi_estsite_reference_ids = get_site_reference_ids(
+        site_assessment['residential'], 'missing_area', 'missing_gfa_or_dwellings_no_site_area'
+    )
+    # list of employment sites with estimated values
+    emp_estsite_reference_ids = get_site_reference_ids(
+        site_assessment['employment'], 'missing_area', 'missing_gfa_or_dwellings_no_site_area'
+    )
+
+    LOG.info("Processing base year land use data")    
+    zone_translator = ZoneTranslator(geo_boundary, config)
+    by_data = zone_translator.merge_data(by_data)
+    columns_to_calden = ['household', 'population', 'jobs']
+    by_data = calculate_density_and_index(by_data, columns_to_calden)
 
 
     LOG.info("Getting subset of future development from 2024 onwards")
@@ -212,30 +269,20 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     emp_sites = emp_sites[columns_to_keep]
     res_sites = res_sites[columns_to_keep]
 
-    LOG.info("Creating list of sites with estimated development values")
-    # list of residential sites with estimated values
-    resi_estsite_reference_ids = get_site_reference_ids(
-        site_assessment['residential'], 'missing_area', 'missing_gfa_or_dwellings_no_site_area'
-    )
-
-    # list of employment sites with estimated values
-    emp_estsite_reference_ids = get_site_reference_ids(
-        site_assessment['employment'], 'missing_area', 'missing_gfa_or_dwellings_no_site_area'
-    )
-
-    # Display the result
-    print("Residential Site Reference IDs:", resi_estsite_reference_ids)
-    print("Employment Site Reference IDs:", emp_estsite_reference_ids)
 
 
-    LOG.info("Getting zonal attributes associated to development sites")    
-    geo_boundary = config.dev_pattern.geo_boundary
-    zone_processor = ZoneProcessor(geo_boundary, config)
-    zone_translator = ZoneTranslator(geo_boundary, config)
-    res_zone_sites = zone_processor.process_sites(res_sites)
-    emp_zone_sites = zone_processor.process_sites(emp_sites)
-    by_data = zone_translator.merge_data(by_data)
+    # # Display the result
+    # print("Residential Site Reference IDs:", resi_estsite_reference_ids)
+    # print("Employment Site Reference IDs:", emp_estsite_reference_ids)
 
+    LOG.info("Mapping development sites to pre_defined zone")    
+
+    sitezone_processor = SiteZoneProcessor(geo_boundary, config)
+
+    res_zone_sites = sitezone_processor.process_sites(res_sites)
+    emp_zone_sites = sitezone_processor.process_sites(emp_sites)
+
+    LOG.info("Getting attributes associated to development sites") 
     # Add the 'value_estimated' column for residential zone sites
     res_zone_sites['value_estimated'] = res_zone_sites['site_reference_id'].apply(
         lambda x: 'estimated' if x in resi_estsite_reference_ids else 'real'
@@ -245,173 +292,50 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
 
 
+    # Merge sites with associated zonal attributes
+    res_zone_sites = sitezone_processor.merge_zonal_attributes(res_zone_sites, by_data)
+    emp_zone_sites = sitezone_processor.merge_zonal_attributes(emp_zone_sites, by_data)
 
-# # Function to process zone sites based on geo_boundary
-# def process_geo_sites(geo_boundary: str, config: inputs.DLitConfig, res_sites: pd.DataFrame, emp_sites:pd.DataFrame):
-#     if geo_boundary == 'lsoa':
-#         lsoa = parser.parse_zone(config.land_use.lsoa_shapefile_path)
-#         res_zone_sites = zone_site_geospatial_lookup(res_sites, lsoa)
-#         emp_zone_sites = zone_site_geospatial_lookup(emp_sites, lsoa)
 
-#     elif geo_boundary == 'normits':
-#         normits = parser.parse_zone(config.dev_pattern.normits_shapefile_path)
-#         res_zone_sites = zone_site_geospatial_lookup(res_sites, normits)
-#         emp_zone_sites = zone_site_geospatial_lookup(emp_sites, normits)
+    # Calculate ratio of new development to existing development
+    res_zone_sites['n_e_ratio'] = res_zone_sites['sum_from_2024_to_last'] / res_zone_sites['household']
+    emp_zone_sites['n_e_ratio'] = emp_zone_sites['sum_from_2024_to_last'] / emp_zone_sites['jobs']
+    print("Residential Sites Data:", res_zone_sites)
 
-#     elif geo_boundary == 'noham':
-#         noham = parser.parse_zone(config.dev_pattern.noham_shapefile_path)
-#         res_zone_sites = zone_site_geospatial_lookup(res_sites, noham)
-#         emp_zone_sites = zone_site_geospatial_lookup(emp_sites, noham)
 
-#     elif geo_boundary == 'norms':
-#         norms = parser.parse_zone(config.dev_pattern.norms_shapefile_path)
-#         res_zone_sites = zone_site_geospatial_lookup(res_sites, norms)
-#         emp_zone_sites = zone_site_geospatial_lookup(emp_sites, norms)
+    LOG.info("Visualizing the distribution of the attributes of the development sites")
+    columns_to_explore = [
+        'sum_from_2024_to_last',
+        'ho_den',
+        'po_den', 
+        'jo_den', 
+        'n_e_ratio', 
+        # 'dist_ho_c',
+        # 'dist_po_c',
+        # 'dist_jo_c',
+        ]
+    plot_path = config.output_folder / "plot_distribution_attributes"
+    plot_path.mkdir(exist_ok=True)
+    stats.plot_distribution(res_zone_sites, columns_to_explore, plot_path, category='Residential')
+    stats.plot_distribution(emp_zone_sites, columns_to_explore, plot_path, category='Employment')
 
-#     elif geo_boundary == 'msoa':
-#         msoa = parser.parse_zone(config.dev_pattern.msoa_shapefile_path)
-#         res_zone_sites = zone_site_geospatial_lookup(res_sites, msoa)
-#         emp_zone_sites = zone_site_geospatial_lookup(emp_sites, msoa)
+    LOG.info("Calculating basic statistics of the development sites")
+    res_stats = stats.basic_statistics(res_zone_sites, columns_to_explore)
+    emp_stats = stats.basic_statistics(emp_zone_sites, columns_to_explore)
+    print("Residential Sites Statistics:", res_stats)
+    print("Employment Sites Statistics:", emp_stats)
+    res_low_density_zones = stats.percentiles_or_quantiles(res_zone_sites, columns_to_explore)
+    emp_low_density_zones = stats.percentiles_or_quantiles(emp_zone_sites, columns_to_explore)
+    print("Residential Low Density Zones:", res_low_density_zones)
+    print("Employment Low Density Zones:", emp_low_density_zones)
+    res_low_density_zones_z = stats.z_score_method(res_zone_sites, columns_to_explore)
+    emp_low_density_zones_z = stats.z_score_method(emp_zone_sites, columns_to_explore)
+    print("Residential Low Density Zones (Z-Score):", res_low_density_zones_z)
+    print("Employment Low Density Zones (Z-Score):", emp_low_density_zones_z)
 
-#     return res_zone_sites, emp_zone_sites
 
-# # Function to merge zone translation data based on geo_boundary
-# def merge_zone_translation_data(geo_boundary: str, config:inputs.DLitConfig, by_data: pd.DataFrame):
-#     if geo_boundary == 'lsoa':
-#         # No need for zone translation for LSOA
-#         zone_shapefile_path = config.land_use.lsoa_shapefile_path
-#         by_data = compute_zonal_area(by_data, zone_shapefile_path, zone_id_col="lsoa2021_id")
-#         return by_data
+    LOG.info("Ending Development Pattern Module")
+    return res_zone_sites, emp_zone_sites
 
-#     # Load the appropriate zone translation file and merge with by_data
-#     zone_translation_path = None
-#     group_by_column = None
-
-#     if geo_boundary == 'normits':
-#         zone_translation_path = config.dev_pattern.lsoa_to_normits
-#         zone_shapefile_path = config.dev_pattern.normits_shapefile_path
-#         group_by_column = "normits_v3_3_id"
-#     elif geo_boundary == 'noham':
-#         zone_translation_path = config.dev_pattern.lsoa_to_noham
-#         zone_shapefile_path = config.dev_pattern.noham_shapefile_path
-#         group_by_column = "noham_id"
-#     elif geo_boundary == 'norms':
-#         zone_translation_path = config.dev_pattern.lsoa_to_norms
-#         zone_shapefile_path = config.dev_pattern.norms_shapefile_path
-#         group_by_column = "norms_id"
-#     elif geo_boundary == 'msoa':
-#         zone_translation_path = config.dev_pattern.lsoa_to_msoa
-#         zone_shapefile_path = config.dev_pattern.msoa_shapefile_path
-#         group_by_column = "msoa2021_id"
-#     # Load the zone translation file
-#     zone_translation = pd.read_csv(zone_translation_path)
-
-#     # Merge by_data with the zone translation data
-#     by_data = by_data.merge(zone_translation, on="lsoa2021_id", how="left")
-
-#     # Group by the appropriate column and sum the values
-#     by_data = by_data.groupby(group_by_column)[["household", "population", "jobs"]].sum()
-
-#     return by_data
-
-# def process_geo_boundary(config, parser., res_sites, emp_sites):
-#     geo_boundary = config.dev_pattern.geo_boundary.lower()
-#     boundary_map = {
-#         "lsoa": config.land_use.lsoa_shapefile_path,
-#         "normits_v3_3": config.dev_pattern.normits_shapefile_path,
-#         "noham": config.dev_pattern.noham_shapefile_path,
-#         "norms": config.dev_pattern.norms_shapefile_path,
-#         "msoa": config.dev_pattern.msoa_shapefile_path,
-#     }
     
-#     if geo_boundary in boundary_map:
-#         boundary_data = parser.parse_zone(boundary_map[geo_boundary])
-#         res_zone_sites = zone_site_geospatial_lookup(res_sites, boundary_data)
-#         emp_zone_sites = zone_site_geospatial_lookup(emp_sites, boundary_data)
-#         return res_zone_sites, emp_zone_sites
-#     else:
-#         raise ValueError(f"Invalid geo_boundary: {geo_boundary}")
-
-# def compute_zonal_area(zone_gdf, zone_df, zone_id_col="ZoneID", crs_target=27700):
-#     """
-#     Compute the area of each zone and merge it into the zone dataframe.
-
-#     Parameters:
-#     - zone_gdf (GeoDataFrame): The GeoDataFrame containing zone geometries.
-#     - zone_df (DataFrame): The DataFrame containing zone information.
-#     - zone_id_col (str): The common identifier column between zone_gdf and zone_df.
-#     - crs_target (int): The EPSG code for the target CRS (default: 27700 for British National Grid).
-
-#     Returns:
-#     - DataFrame: The updated zone_df with an additional 'area_sqm' column.
-#     """
-#     # Check if CRS is defined
-#     if zone_gdf.crs is None:
-#         raise ValueError("Shapefile has no CRS defined. Please check the source data.")
-
-#     # Ensure it's projected in the correct CRS
-#     if not zone_gdf.crs.is_projected or zone_gdf.crs.to_epsg() != crs_target:
-#         zone_gdf = zone_gdf.to_crs(epsg=crs_target)
-
-#     # Compute area in square meters
-#     zone_gdf["area_sqm"] = zone_gdf.geometry.area
-
-#     # Merge area information into zone_data DataFrame
-#     zone_df = zone_df.merge(zone_gdf[[zone_id_col, "area_sqm"]], on=zone_id_col, how="left")
-
-#     return zone_df
-
-# def msoa_site_geospatial_lookup(
-#     data: pd.DataFrame,
-#     msoa: gpd.GeoDataFrame,
-# ) -> gpd.GeoDataFrame:
-#     """spatially joins MSOA shapefile to DLOG sites
-
-
-#     Parameters
-#     ----------
-#     data : pd.DataFrame
-#         data to join to msoa
-#     msoa : gpd.GeoDataFrame
-#         msoa data
-
-#     Returns
-#     -------
-#     gpd.GeoDataFrame
-#         spatially joined data
-#     """
-
-#     dlog_geom = gpd.GeoDataFrame(
-#         data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
-#     )
-#     dlog_msoa = gpd.sjoin(dlog_geom, msoa, how="left")
-#     return dlog_msoa
-
-# def zone_site_geospatial_lookup(
-#     data: pd.DataFrame,
-#     zone: gpd.GeoDataFrame,
-# ) -> gpd.GeoDataFrame:
-#     """spatially joins MSOA shapefile to DLOG sites
-
-
-#     Parameters
-#     ----------
-#     data : pd.DataFrame
-#         data to join to msoa
-#     msoa : gpd.GeoDataFrame
-#         msoa data
-
-#     Returns
-#     -------
-#     gpd.GeoDataFrame
-#         spatially joined data
-#     """
-
-#     dlog_geom = gpd.GeoDataFrame(
-#         data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
-#     )
-#     dlog_zone = gpd.sjoin(dlog_geom, zone, how="left")
-#     return dlog_zone
-
-
 

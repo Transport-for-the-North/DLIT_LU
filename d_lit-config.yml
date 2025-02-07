@@ -51,7 +51,7 @@ land_use:
     geometry_simplify_tolerance: 100
 
 dev_pattern:
-  geo_boundary: lsoa # lsoa, normits_v3_3, noham, norms, mosa2021
+  geo_boundary: normits # lsoa, normits, noham, norms, mosa2021
   assessment_input: I:\Data\D-Log\DLIT\Outputs\Test4\00_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
   emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test4\employment_sites_out.csv
   res_site_data: I:\Data\D-Log\DLIT\Outputs\Test4\residential_sites_out.csv
