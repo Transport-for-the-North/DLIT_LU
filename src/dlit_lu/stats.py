@@ -8,15 +8,17 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
 
-def plot_distribution(df:pd.DataFrame, columns: list, save_path: pathlib.Path):
+def plot_distribution(df: pd.DataFrame, columns: list, save_path: pathlib.Path, category: str = 'Res'):
     """
     Visualize the distribution of the density variables.
-    
+
     Parameters:
     df: pandas.DataFrame
         The input dataframe.
     columns: list of str
         List of column names to visualize.
+    category: str, optional (default is 'General')
+        Category of the data to differentiate between residential and employment.
     """
     for col in columns:
         plt.figure(figsize=(8, 6))
@@ -28,18 +30,19 @@ def plot_distribution(df:pd.DataFrame, columns: list, save_path: pathlib.Path):
         percentile_75 = np.percentile(df[col], 75)
         
         # Add vertical lines for mean, 25th, and 75th percentiles
-        plt.axvline(mean, color='red', linestyle='--', label=f'Mean: {mean:.2f}')
-        plt.axvline(percentile_25, color='green', linestyle='--', label=f'25th Percentile: {percentile_25:.2f}')
-        plt.axvline(percentile_75, color='orange', linestyle='--', label=f'75th Percentile: {percentile_75:.2f}')
+        plt.axvline(mean, color='red', linestyle='--', label=f'Mean: {mean:.4f}')
+        plt.axvline(percentile_25, color='green', linestyle='--', label=f'25th Percentile: {percentile_25:.4f}')
+        plt.axvline(percentile_75, color='orange', linestyle='--', label=f'75th Percentile: {percentile_75:.4f}')
         
-        plt.title(f'Distribution of {col}')
+        plt.title(f'Distribution of {col} - {category}')
         plt.xlabel(col)
         plt.ylabel('Frequency')
         plt.legend()
         
-        # If save_path is provided, save the figure to that directory
+        # If save_path is provided, save the figure to that directory with category in filename
         if save_path:
-            plt.savefig(f"{save_path}/{col}_distribution.png", dpi=300)
+            save_filename = f"{category}_{col}_distribution.png"
+            plt.savefig(save_path / save_filename, dpi=300)
         plt.close()
 
 def basic_statistics(df, columns):
@@ -58,6 +61,8 @@ def basic_statistics(df, columns):
     """
     stats = pd.DataFrame(index=columns)
     # Calculate mean, median, and std
+    stats['Max'] = df[columns].max()
+    stats['Min'] = df[columns].min()
     stats['Mean'] = df[columns].mean()
     stats['Median'] = df[columns].median()
     stats['Standard Deviation'] = df[columns].std()
@@ -65,13 +70,25 @@ def basic_statistics(df, columns):
     # Calculate percentiles
     stats['25th Percentile'] = df[columns].apply(lambda col: np.percentile(col, 25))
     stats['75th Percentile'] = df[columns].apply(lambda col: np.percentile(col, 75))
-    
-    # Calculate Z-scores
-    z_scores = df[columns].apply(lambda col: zscore(col.dropna()))
-    stats['Z-Score Mean'] = z_scores.mean()
-    stats['Z-Score Std'] = z_scores.std()
-    
+   
     return stats
+
+def calculate_z_scores(df, columns):
+    """
+    Calculate Z-scores for the given columns.
+    
+    Parameters:
+    df: pandas.DataFrame
+        The input dataframe.
+    columns: list of str
+        List of column names to calculate Z-scores for.
+    
+    Returns:
+    z_scores: pandas.DataFrame
+        Dataframe with Z-scores for each column.
+    """
+    z_scores = df[columns].apply(lambda col: zscore(col.dropna()))
+    return z_scores
 
 def percentiles_or_quantiles(df, columns, percentile=25):
     """

@@ -11,6 +11,7 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from scipy.spatial import cKDTree
 
 # local imports
 from dlit_lu import stats, utilities, global_classes, parser, inputs, data_repair
@@ -62,46 +63,6 @@ class BaseZoneHandler:
         self.zone_info = self.zone_info_map[geo_boundary]
         self.zone_gdf = parser.parse_zone(self.zone_info["shapefile_path"])
 
-
-class SiteZoneProcessor(BaseZoneHandler):
-    def merge_zonal_attributes(self, data: pd.DataFrame, by_data: pd.DataFrame) -> pd.DataFrame:
-        """Merge the zonal attributes with the data based on the zone ID."""
-        group_by_column = self.zone_info["group_by_column"]
-        zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
-        # Merge the zonal attributes with the data based on the zone ID
-        data = data.merge(by_data, left_on=zone_gdf_id_col, right_on=group_by_column, how="left")
-        return data
-    def process_sites(self, data: pd.DataFrame):
-        """Process residential and employment sites based on the zone boundary."""
-        updated_data = self.zone_site_geospatial_lookup(data)
-        return updated_data
-    def zone_site_geospatial_lookup(self, data: pd.DataFrame) -> gpd.GeoDataFrame:
-        """Spatially joins site data (DLOG sites) to the zones (e.g., MSOA shapefile) based on location.
-
-        Parameters
-        ----------
-        data : pd.DataFrame
-            DataFrame containing site information with 'easting' and 'northing' columns for coordinates.
-
-        Returns
-        -------
-        gpd.GeoDataFrame
-            A GeoDataFrame with the spatially joined data.
-        """
-        # Convert the 'data' DataFrame to a GeoDataFrame with geometry based on coordinates
-        dlog_geom = gpd.GeoDataFrame(
-            data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
-        )
-
-        # Perform a spatial join between the DLOG points and the zone geometries
-        dlog_zone = gpd.sjoin(dlog_geom, self.zone_gdf, how="left")
-    
-        # Select only the columns from the original data plus the zone_gdf_id_col
-        updated_data = dlog_zone[[col for col in data.columns] + [self.zone_info["zone_gdf_id_col"]]]
-        
-        return updated_data
-
-
 class ZoneTranslator(BaseZoneHandler):
     def merge_data(self, by_data: pd.DataFrame) -> pd.DataFrame:
         """Merge zone translation data and perform aggregation."""
@@ -116,6 +77,10 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Compute zonal area by merging geometry data
         by_data = self.compute_zonal_area(self.zone_gdf, by_data, zone_gdf_id_col, group_by_column)
+
+        # Calculate density and index for specified columns
+        columns_to_process = ['household', 'population', 'jobs']  # Example columns
+        by_data = self.calculate_density_and_index(by_data, columns_to_process)
 
         return by_data
 
@@ -157,9 +122,121 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Merge area information into zone_data DataFrame
         zone_df = zone_df.merge(zone_gdf[[zone_gdf_id_col, "area_sqm"]], left_on=zone_df_id_col, right_on=zone_gdf_id_col, how="left")
+        # zone_df.drop(columns=[zone_gdf_id_col], inplace=True)
 
         return zone_df
 
+    def calculate_density_and_index(self, by_data: pd.DataFrame, columns_to_process: list) -> pd.DataFrame:
+        """
+        Calculate density and index values for specified columns.
+
+        Parameters
+        ----------
+        by_data : pd.DataFrame
+            DataFrame containing columns to process and 'area_sqm'.
+        columns_to_process : list
+            List of column names to calculate density and index for.
+
+        Returns
+        -------
+        pd.DataFrame
+            Updated DataFrame with density and index columns added.
+        """
+        scaler = MinMaxScaler()
+        # Loop through each column to calculate density and index
+
+        for col in columns_to_process:
+            density_col = f"{col[:2]}_den"
+            # Check if 'area_sqm' > 0, otherwise set density to 0
+            by_data[density_col] = np.where(by_data['area_sqm'] > 0, by_data[col] / by_data['area_sqm'] * 1000000, 0)
+            index_col = f"{density_col}_index"
+            by_data[index_col] = scaler.fit_transform(by_data[[density_col]])
+
+        return by_data
+
+class SiteZoneProcessor(BaseZoneHandler):
+    def merge_zonal_attributes(self, site_data: pd.DataFrame, by_data: pd.DataFrame) -> pd.DataFrame:
+        """Merge the zonal attributes with the data based on the zone ID."""
+        group_by_column = self.zone_info["group_by_column"]
+        zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
+        # Merge the zonal attributes with the data based on the zone ID
+        site_data = site_data.merge(by_data, on=zone_gdf_id_col, how="left")
+        return site_data
+    # def process_sites(self, data: pd.DataFrame):
+    #     """Process residential and employment sites based on the zone boundary."""
+    #     updated_data = self.zone_site_geospatial_lookup(data)
+    #     return updated_data
+    def zone_site_geospatial_lookup(self, site_data: pd.DataFrame) -> gpd.GeoDataFrame:
+        """Spatially joins site data (DLOG sites) to the zones (e.g., MSOA shapefile) based on location.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing site information with 'easting' and 'northing' columns for coordinates.
+
+        Returns
+        -------
+        gpd.GeoDataFrame
+            A GeoDataFrame with the spatially joined data.
+        """
+        # Convert the 'data' DataFrame to a GeoDataFrame with geometry based on coordinates
+        dlog_geom = gpd.GeoDataFrame(
+            site_data, geometry=gpd.points_from_xy(site_data["easting"], site_data["northing"])
+        )
+
+        # Perform a spatial join between the DLOG points and the zone geometries
+        dlog_zone = gpd.sjoin(dlog_geom, self.zone_gdf, how="left")
+    
+        # Select only the columns from the original data plus the zone_gdf_id_col
+        updated_data = dlog_zone[[col for col in site_data.columns] + [self.zone_info["zone_gdf_id_col"]]]
+        
+        return updated_data
+    
+    def calculate_distance_to_zone_centroids(self, site_data: pd.DataFrame, centroid_type: str) -> pd.DataFrame:
+        centroid_file_map = {
+            # "lsoa": {
+            #     "hh": self.config.dev_pattern.lsoa_hh_centroids,
+            #     "emp": self.config.dev_pattern.lsoa_emp_centroids,
+            #     "pop": self.config.dev_pattern.lsoa_pop_centroids,
+            # },
+            "normits": {
+                "hh": self.config.dev_pattern.normits_hh_centroids,
+                "emp": self.config.dev_pattern.normits_emp_centroids,
+                "pop": self.config.dev_pattern.normits_pop_centroids,
+            },
+            # "noham": {
+            #     "hh": self.config.dev_pattern.noham_hh_centroids,
+            #     "emp": self.config.dev_pattern.noham_emp_centroids,
+            #     "pop": self.config.dev_pattern.noham_pop_centroids,
+            # },
+            # "norms": {
+            #     "hh": self.config.dev_pattern.norms_hh_centroids,
+            #     "emp": self.config.dev_pattern.norms_emp_centroids,
+            #     "pop": self.config.dev_pattern.norms_pop_centroids,
+            # },
+            # "msoa": {
+            #     "hh": self.config.dev_pattern.msoa_hh_centroids,
+            #     "emp": self.config.dev_pattern.msoa_emp_centroids,
+            #     "pop": self.config.dev_pattern.msoa_pop_centroids,
+            # }
+        }
+        
+        if self.geo_boundary not in centroid_file_map:
+            raise ValueError(f"Unsupported geo_boundary: {self.geo_boundary}")
+
+        centroid_file = centroid_file_map[self.geo_boundary].get(centroid_type)
+        if not centroid_file:
+            raise ValueError("Invalid centroid type. Choose from 'hh', 'emp', or 'pop'.")
+
+        centroids = pd.read_csv(centroid_file)
+        site_coords = np.vstack((site_data["easting"], site_data["northing"])).T
+        centroid_coords = np.vstack((centroids["x"], centroids["y"])).T
+
+        tree = cKDTree(centroid_coords)
+        distances, _ = tree.query(site_coords)
+        site_data[f"dist_to_{centroid_type}_c"] = distances
+
+        return site_data
 
 
 def get_site_reference_ids(site_df: pd.DataFrame, missing_area_col: str, missing_gfa_col: str) -> list:
@@ -187,31 +264,91 @@ def get_site_reference_ids(site_df: pd.DataFrame, missing_area_col: str, missing
     return estimated_sites['site_reference_id'].tolist()
 
 
-def calculate_density_and_index(by_data: pd.DataFrame, columns_to_process: list) -> pd.DataFrame:
+def process_site_data(site_data: pd.DataFrame,  by_data: pd.DataFrame, site_type: str, site_reference_ids: list, sitezone_processor: SiteZoneProcessor,):
+    LOG.info(f"Processing {site_type} site data")
+
+    # Find the last column (year) in your dataframe
+    last_year = site_data.columns[site_data.columns.str.isnumeric()].astype(int).max()
+
+    # Create a new column 'sum_from_2024_to_last' which is the sum of the columns from 2024 to the last year
+    site_data['sum_from_2024_to_last'] = site_data.loc[:, '2024':str(last_year)].sum(axis=1)
+    columns_to_keep = ['site_reference_id', 'easting', 'northing', 'sum_from_2024_to_last']
+    site_data = site_data[columns_to_keep]
+
+    # Map development sites to pre-defined zone
+    site_zone_sites = sitezone_processor.zone_site_geospatial_lookup(site_data)
+
+    LOG.info(f"Calculating distance to zone centroids for {site_type} sites")
+    centroid_types = ['hh', 'emp', 'pop']
+
+    for centroid_type in centroid_types:
+        site_zone_sites = sitezone_processor.calculate_distance_to_zone_centroids(site_zone_sites, centroid_type)
+
+    LOG.info(f"Getting attributes associated with {site_type} development sites")
+    # Add the 'value_estimated' column for zone sites
+    site_zone_sites['value_estimated'] = site_zone_sites['site_reference_id'].apply(
+        lambda x: 'estimated' if x in site_reference_ids else 'real'
+    )
+
+    # Merge sites with associated zonal attributes
+    site_zone_sites = sitezone_processor.merge_zonal_attributes(site_zone_sites, by_data)
+
+    # Calculate ratio of new development to existing development
+    ratio_column = 'n_e_ratio'
+    if site_type == 'Residential':
+        # Calculate the ratio for Residential sites using household data
+        site_zone_sites[ratio_column] = site_zone_sites['sum_from_2024_to_last'] / site_zone_sites['household']
+    elif site_type == 'Employment':
+        # Calculate the ratio for Employment sites using jobs data
+        site_zone_sites[ratio_column] = site_zone_sites['sum_from_2024_to_last'] / site_zone_sites['jobs']
+    else:
+        # For any other site type, default ratio calculation (can be customized as needed)
+        LOG.warning(f"Unknown site type: {site_type}. Defaulting to a ratio using jobs.")
+        site_zone_sites[ratio_column] = site_zone_sites['sum_from_2024_to_last'] / site_zone_sites['jobs']
+
+    return site_zone_sites
+
+def process_stats(site_data: pd.DataFrame, site_type: str, columns_to_explore: list, plot_path: pathlib.Path):
     """
-    Calculate density and index values for specified columns.
-
-    Parameters
-    ----------
-    by_data : pd.DataFrame
-        DataFrame containing columns to process and 'area_sqm'.
-    columns_to_process : list
-        List of column names to calculate density and index for.
-
-    Returns
-    -------
-    pd.DataFrame
-        Updated DataFrame with density and index columns added.
+    This function processes the statistics for the given site data, generates plots, 
+    and calculates percentiles, quantiles, and z-scores.
+    
+    :param site_data: The dataframe of processed site data (either residential or employment).
+    :param site_type: A string indicating the type of site ('Residential' or 'Employment').
+    :param columns_to_explore: A list of column names for which statistics will be calculated.
+    :param plot_path: The path where plots will be saved.
+    :return: None
     """
-    scaler = MinMaxScaler()
-    # Loop through each column to calculate density and index
+    # Visualize the distribution of attributes
+    LOG.info(f"Visualizing the distribution of {site_type} site attributes")
+    stats.plot_distribution(site_data, columns_to_explore, plot_path, category=site_type)
 
-    for col in columns_to_process:
-        density_col = f"{col[:2]}_den"
-        by_data[density_col] = by_data[col] / by_data['area_sqm'] * 1000000
-        index_col = f"{density_col}_index"
-        by_data[index_col] = scaler.fit_transform(by_data[[density_col]])
-    return by_data
+    # Calculate basic statistics
+    LOG.info(f"Calculating basic statistics for {site_type} site data")
+    print(f"Total number of rows for {site_type} data:", len(site_data))
+    print(f"Total number of columns for {site_type} data:",len(site_data.columns))
+    site_stats= stats.basic_statistics(site_data, columns_to_explore)
+
+    site_z_scores = stats.calculate_z_scores(site_data, columns_to_explore)
+    print(f"Total number of rows for {site_type} z_scores data:", len(site_data))
+    print(f"Total number of columns for {site_type} z_scores data:",len(site_data.columns))
+
+    site_z_scores_stats= stats.basic_statistics(site_z_scores, columns_to_explore)
+    # Concatenate site_stats and site_z_scores_stats along columns (axis=1)
+    combined_stats = pd.concat([site_stats, site_z_scores_stats], axis=1)
+    print(f"{site_type} Sites Statistics:", site_stats)
+    print(f"{site_type} Sites Z_score Statistics:", site_z_scores_stats)
+    # Calculate percentiles or quantiles for low-density zones
+    low_density_zones = stats.percentiles_or_quantiles(site_data, columns_to_explore)
+    print(f"{site_type} Low Density Zones:", low_density_zones)
+
+    # Calculate z-scores for low-density zones
+    # low_density_zones_z = stats.z_score_method(site_data, columns_to_explore)
+    # print(f"{site_type} Low Density Zones (Z-Score):", low_density_zones_z)
+
+    return combined_stats, site_z_scores 
+
+
 
 def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     """runs process for converting DLOG to MSOA build out profiles
@@ -254,88 +391,78 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Processing base year land use data")    
     zone_translator = ZoneTranslator(geo_boundary, config)
     by_data = zone_translator.merge_data(by_data)
-    columns_to_calden = ['household', 'population', 'jobs']
-    by_data = calculate_density_and_index(by_data, columns_to_calden)
+    # columns_to_calden = ['household', 'population', 'jobs']
+    # by_data = calculate_density_and_index(by_data, columns_to_calden)
 
 
-    LOG.info("Getting subset of future development from 2024 onwards")
-    # Find the last column (year) in your dataframe
-    last_year_emp = emp_sites.columns[emp_sites.columns.str.isnumeric()].astype(int).max()
-    last_year_res = res_sites.columns[emp_sites.columns.str.isnumeric()].astype(int).max()
-    # Create a new column 'sum_from_2024_to_last' which is the sum of the columns from 2024 to the last year
-    emp_sites['sum_from_2024_to_last'] = emp_sites.loc[:, '2024':str(last_year_emp)].sum(axis=1)
-    res_sites['sum_from_2024_to_last'] = res_sites.loc[:, '2024':str(last_year_res)].sum(axis=1)
-    columns_to_keep = ['site_reference_id', 'easting', 'northing', 'sum_from_2024_to_last']
-    emp_sites = emp_sites[columns_to_keep]
-    res_sites = res_sites[columns_to_keep]
-
-
-
-    # # Display the result
-    # print("Residential Site Reference IDs:", resi_estsite_reference_ids)
-    # print("Employment Site Reference IDs:", emp_estsite_reference_ids)
-
-    LOG.info("Mapping development sites to pre_defined zone")    
-
-    sitezone_processor = SiteZoneProcessor(geo_boundary, config)
-
-    res_zone_sites = sitezone_processor.process_sites(res_sites)
-    emp_zone_sites = sitezone_processor.process_sites(emp_sites)
-
-    LOG.info("Getting attributes associated to development sites") 
-    # Add the 'value_estimated' column for residential zone sites
-    res_zone_sites['value_estimated'] = res_zone_sites['site_reference_id'].apply(
-        lambda x: 'estimated' if x in resi_estsite_reference_ids else 'real'
-    )
-    emp_zone_sites['value_estimated'] = emp_zone_sites['site_reference_id'].apply(
-        lambda x: 'estimated' if x in emp_estsite_reference_ids else 'real'
-    )
-
-
-    # Merge sites with associated zonal attributes
-    res_zone_sites = sitezone_processor.merge_zonal_attributes(res_zone_sites, by_data)
-    emp_zone_sites = sitezone_processor.merge_zonal_attributes(emp_zone_sites, by_data)
-
-
-    # Calculate ratio of new development to existing development
-    res_zone_sites['n_e_ratio'] = res_zone_sites['sum_from_2024_to_last'] / res_zone_sites['household']
-    emp_zone_sites['n_e_ratio'] = emp_zone_sites['sum_from_2024_to_last'] / emp_zone_sites['jobs']
+    LOG.info("Processing site data for year 2024 upwards")
+    res_zone_sites = process_site_data(res_sites, by_data, 'Residential', resi_estsite_reference_ids, SiteZoneProcessor(geo_boundary, config))
+    emp_zone_sites = process_site_data(emp_sites, by_data, 'Employment', emp_estsite_reference_ids, SiteZoneProcessor(geo_boundary, config))
     print("Residential Sites Data:", res_zone_sites)
+    print("Employment Sites Data:", emp_zone_sites)
+    # columns_to_keep = [zoneconfig.zone_info["zone_gdf_id_col"], 
+    #                    'easting', 
+    #                    'northing', 
+    #                    'normits_id', 
+    #                    'household', 
+    #                    'population', 
+    #                    'jobs', 
+    #                    'area_sqm', 
+    #                    'value_estimated',
+    #                    'sum_from_2024_to_last', 
+    #                    'dist_to_hh_c', 
+    #                    'dist_to_emp_c', 
+    #                    'dist_to_pop_c', 
+    #                    'n_e_ratio', 
+    #                    'ho_den', 
+    #                    'po_den', 
+    #                    'jo_den']
+    # res_zone_sites = res_zone_sites[columns_to_keep]
+    # emp_zone_sites = emp_zone_sites[columns_to_keep]
+    res_file_name = "residential_site_zone.csv"
+    emp_file_name = "employment_site_zone.csv"
+    utilities.write_to_csv(config.output_folder / res_file_name, res_zone_sites)
+    utilities.write_to_csv(config.output_folder / emp_file_name, emp_zone_sites)
 
-
-    LOG.info("Visualizing the distribution of the attributes of the development sites")
+    # Columns to explore for both residential and employment sites
     columns_to_explore = [
         'sum_from_2024_to_last',
         'ho_den',
         'po_den', 
         'jo_den', 
         'n_e_ratio', 
-        # 'dist_ho_c',
-        # 'dist_po_c',
-        # 'dist_jo_c',
-        ]
+        'dist_to_hh_c',
+        'dist_to_emp_c',
+        'dist_to_pop_c',
+    ]
     plot_path = config.output_folder / "plot_distribution_attributes"
     plot_path.mkdir(exist_ok=True)
-    stats.plot_distribution(res_zone_sites, columns_to_explore, plot_path, category='Residential')
-    stats.plot_distribution(emp_zone_sites, columns_to_explore, plot_path, category='Employment')
 
-    LOG.info("Calculating basic statistics of the development sites")
-    res_stats = stats.basic_statistics(res_zone_sites, columns_to_explore)
-    emp_stats = stats.basic_statistics(emp_zone_sites, columns_to_explore)
-    print("Residential Sites Statistics:", res_stats)
-    print("Employment Sites Statistics:", emp_stats)
-    res_low_density_zones = stats.percentiles_or_quantiles(res_zone_sites, columns_to_explore)
-    emp_low_density_zones = stats.percentiles_or_quantiles(emp_zone_sites, columns_to_explore)
-    print("Residential Low Density Zones:", res_low_density_zones)
-    print("Employment Low Density Zones:", emp_low_density_zones)
-    res_low_density_zones_z = stats.z_score_method(res_zone_sites, columns_to_explore)
-    emp_low_density_zones_z = stats.z_score_method(emp_zone_sites, columns_to_explore)
-    print("Residential Low Density Zones (Z-Score):", res_low_density_zones_z)
-    print("Employment Low Density Zones (Z-Score):", emp_low_density_zones_z)
-
+    # Process statistics for residential and employment sites
+    res_combined_stats, res_z_scores = process_stats(
+        res_zone_sites, 
+        'Residential', 
+        columns_to_explore, 
+        plot_path)
+    emp_combined_stats, emp_z_scores = process_stats(
+        emp_zone_sites, 
+        'Employment', 
+        columns_to_explore, 
+        plot_path)
+    res_combined_stats_file = "residential_sites_combined_stats.csv"
+    res_z_scores_file = "residential_sites_z_scores.csv"
+    emp_combined_stats_file = "employment_sites_combined_stats.csv"
+    emp_z_scores_file = "employment_sites_z_scores.csv"
+    utilities.write_to_csv(config.output_folder / res_combined_stats_file, res_combined_stats)
+    utilities.write_to_csv(config.output_folder / res_z_scores_file, res_z_scores)
+    utilities.write_to_csv(config.output_folder / emp_combined_stats_file, emp_combined_stats)
+    utilities.write_to_csv(config.output_folder / emp_z_scores_file, emp_z_scores)
+  
 
     LOG.info("Ending Development Pattern Module")
     return res_zone_sites, emp_zone_sites
+
+# if __name__ == "__main__":
 
     
 
