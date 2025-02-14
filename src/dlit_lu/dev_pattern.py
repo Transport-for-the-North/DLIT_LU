@@ -581,7 +581,7 @@ def cal_site_weight(
     # Final weighted index, ensuring the total weight sums to 1
     site_data[index_col] = weighted_sum / total_weight
     site_data[index_col] = site_data[index_col] * site_data['site_with_realval']
-    columns = ["site_reference_id"] + index_col
+    columns = ["site_reference_id"] + [index_col]
 
     return site_data[columns]
 
