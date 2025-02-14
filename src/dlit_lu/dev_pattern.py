@@ -740,17 +740,17 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         columns_to_keep,  
         plot_path
     )
-    res_stats_file = "residential_sites_stats.csv"
-    emp_stats_file = "employment_sites_stats.csv"
+    # res_stats_file = "residential_sites_stats.csv"
+    # emp_stats_file = "employment_sites_stats.csv"
 
-    utilities.write_to_csv(config.output_folder / res_stats_file, res_stats)
-    utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
+    # utilities.write_to_csv(config.output_folder / res_stats_file, res_stats)
+    # utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
 
   
     enable_visualization = False  # Set to False to skip plotting
 
     if enable_visualization:
-        plot_path = config.output_folder / "plot_distribution_attributes_2"
+        plot_path = config.output_folder / f"{geo_boundary}_plot_distribution_attributes"
         plot_path.mkdir(exist_ok=True)
 
         LOG.info(f"Visualizing the distribution of residential site attributes")
@@ -850,15 +850,15 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         index_col="weighted_index",
         index_threshold=0.6
     )    
+    key_output_path = config.output_folder / f"{geo_boundary}"
+    key_output_path.mkdir(exist_ok=True)    
+    res_file_name = f"residential_site_{geo_boundary}.csv"
+    emp_file_name = f"employment_site_{geo_boundary}.csv"
+    utilities.write_to_csv(key_output_path / res_file_name, res_zone_sites_index)
+    utilities.write_to_csv(key_output_path / emp_file_name, emp_zone_sites_index)
 
-
-    res_file_name = "residential_site_zone.csv"
-    emp_file_name = "employment_site_zone.csv"
-    utilities.write_to_csv(config.output_folder / res_file_name, res_zone_sites_index)
-    utilities.write_to_csv(config.output_folder / emp_file_name, emp_zone_sites_index)
-
-    large_res_sites_file_name = "large_residential_site_zone.csv"
-    large_emp_sites_file_name = "large_employment_site_zone.csv"
+    large_res_sites_file_name = f"large_residential_site_{geo_boundary}.csv"
+    large_emp_sites_file_name = f"large_employment_site_{geo_boundary}.csv"
     utilities.write_to_csv(config.output_folder / large_res_sites_file_name, large_res_sites)
     utilities.write_to_csv(config.output_folder / large_emp_sites_file_name, large_emp_sites)
 
