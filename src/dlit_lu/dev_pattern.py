@@ -243,13 +243,6 @@ class ZoneTranslator(BaseZoneHandler):
         return by_data
 
 class SiteZoneProcessor(BaseZoneHandler):
-    def merge_zonal_attributes(self, site_data: pd.DataFrame, by_data: pd.DataFrame) -> pd.DataFrame:
-        """Merge the zonal attributes with the data based on the zone ID."""
-        zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
-        # Merge the zonal attributes with the data based on the zone ID
-        site_data = site_data.merge(by_data, on=zone_gdf_id_col, how="left")
-        return site_data
-
     def zone_site_geospatial_lookup(self, site_data: pd.DataFrame) -> gpd.GeoDataFrame:
         """Spatially joins site data (DLOG sites) to the zones (e.g., MSOA shapefile) based on location.
 
@@ -275,6 +268,12 @@ class SiteZoneProcessor(BaseZoneHandler):
         updated_data = dlog_zone[[col for col in site_data.columns] + [self.zone_info["zone_gdf_id_col"]]]
         
         return updated_data
+    def merge_zonal_attributes(self, site_data: pd.DataFrame, by_data: pd.DataFrame) -> pd.DataFrame:
+        """Merge the zonal attributes with the data based on the zone ID."""
+        zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
+        # Merge the zonal attributes with the data based on the zone ID
+        site_data = site_data.merge(by_data, on=zone_gdf_id_col, how="left")
+        return site_data
     
     def calculate_distance_to_zone_centroids(self, site_data: pd.DataFrame, centroid_type: str) -> pd.DataFrame:
         if self.geo_boundary not in self.zone_info_map:
@@ -447,7 +446,7 @@ def process_site_data(site_data: pd.DataFrame,  by_data: pd.DataFrame, site_type
         LOG.warning(f"Unknown site type: {site_type}. Defaulting to a ratio using jobs.")
         site_zone_sites[ratio_column] = site_zone_sites['sum_from_2024_to_last'] / site_zone_sites['jobs']
 
-    LOG.info(f"Calculating one centroid shfit caused by {site_type} sites")
+    LOG.info(f"Calculating centroid shift caused by {site_type} sites")
     centroid_types = ['hh', 'emp']
 
     for centroid_type in centroid_types:
@@ -748,7 +747,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
 
   
-    enable_visualization = True  # Set to False to skip plotting
+    enable_visualization = False  # Set to False to skip plotting
 
     if enable_visualization:
         plot_path = config.output_folder / "plot_distribution_attributes_2"
@@ -839,13 +838,13 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
 
     # Get site list for large sites
-    res_zone_sites, large_res_sites, res_large_site_list= large_sites(
+    res_zone_sites_index, large_res_sites, res_large_site_list= large_sites(
         res_zone_sites, 
         res_z_scores_withindex, 
         index_col="weighted_index",
         index_threshold=1.1
     )
-    emp_zone_sites, large_emp_sites, emp_large_site_list= large_sites(
+    emp_zone_sites_index, large_emp_sites, emp_large_site_list= large_sites(
         res_zone_sites, 
         res_z_scores_withindex, 
         index_col="weighted_index",
@@ -855,8 +854,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     res_file_name = "residential_site_zone.csv"
     emp_file_name = "employment_site_zone.csv"
-    utilities.write_to_csv(config.output_folder / res_file_name, res_zone_sites)
-    utilities.write_to_csv(config.output_folder / emp_file_name, emp_zone_sites)
+    utilities.write_to_csv(config.output_folder / res_file_name, res_zone_sites_index)
+    utilities.write_to_csv(config.output_folder / emp_file_name, emp_zone_sites_index)
 
     large_res_sites_file_name = "large_residential_site_zone.csv"
     large_emp_sites_file_name = "large_employment_site_zone.csv"
