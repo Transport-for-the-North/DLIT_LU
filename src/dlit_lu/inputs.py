@@ -120,10 +120,13 @@ class LandUseConfig:
         Lookup file and shapefile for creating output summaries
         at a different zone system.
     """
+
     lsoa_shapefile_path: pydantic.FilePath
     lsoa_dwelling_pop_path: pydantic.FilePath
     lsoa_traveller_type_path: pydantic.FilePath
     lsoa_jobs_path: pydantic.FilePath
+    lad_shapefile_path: pydantic.FilePath
+    lsoa_to_lad: pydantic.FilePath
     # msoa_shapefile_path: pydantic.FilePath
     # msoa_dwelling_pop_path: pydantic.FilePath
     # msoa_traveller_type_path: pydantic.FilePath
@@ -134,11 +137,12 @@ class LandUseConfig:
     # land_use_input: Optional[pydantic.FilePath] = None
     # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]
     # as pydantic.FilePath immediately validates whether the file exists when parsing the YAML
-    # while using pathlib.Path (or str), the validation will only happen inside the custom validator, 
+    # while using pathlib.Path (or str), the validation will only happen inside the custom validator,
     # which properly checks run_land_use before verifying the file path
     land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
     summary_data: SummaryInputs | None = None
+
 
 @dataclasses.dataclass
 class DevPatnConfig:
@@ -171,6 +175,7 @@ class DevPatnConfig:
     res_site_data: pathlib.Path
         path to residential sites
     """
+
     geo_boundary: str
     normits_shapefile_path: pydantic.FilePath
     noham_shapefile_path: pydantic.FilePath
@@ -194,13 +199,11 @@ class DevPatnConfig:
     lsoa_to_normits: pydantic.FilePath
     lsoa_to_noham: pydantic.FilePath
     lsoa_to_norms: pydantic.FilePath
-    lsoa_to_msoa: pydantic.FilePath   
+    lsoa_to_msoa: pydantic.FilePath
     lsoa_data_path: Optional[pathlib.Path] = None
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
     res_site_data: Optional[pathlib.Path] = None
-
-
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -275,7 +278,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("land_use_input required if not running land_use")
 
         return value
-    
+
     @pydantic.validator("dev_pattern")
     def dev_pattern_input_check(  # pylint: disable=no-self-argument
         cls, value: DevPatnConfig | None, values: dict[str, Any]
@@ -288,9 +291,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
         if value is None:
             raise ValueError("dev_pattern is required if run_dev_pattern is true")
 
-        if (
-            not values.get("run_land_use") 
-            and not all([value.lsoa_data_path, value.emp_site_data, value.res_site_data])
+        if not values.get("run_land_use") and not all(
+            [value.lsoa_data_path, value.emp_site_data, value.res_site_data]
         ):
             raise ValueError(
                 "lsoa_data_path, emp_site_data, and res_site_data are required if not running infill module"
@@ -303,7 +305,13 @@ class DLitConfig(caf.toolkit.BaseConfig):
         cls, values: dict[str, Any]
     ) -> dict[str, Any]:
         """Ensure at least one module is set to run."""
-        if not any([values.get("run_infill"), values.get("run_land_use"), values.get("run_dev_pattern")]):
+        if not any(
+            [
+                values.get("run_infill"),
+                values.get("run_land_use"),
+                values.get("run_dev_pattern"),
+            ]
+        ):
             raise ValueError(
                 "At least one of run_infill, run_land_use, "
                 "or run_dev_pattern must be set to True"

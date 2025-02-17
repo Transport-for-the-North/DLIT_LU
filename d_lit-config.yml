@@ -36,6 +36,8 @@ land_use:
   lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
   lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
   lsoa_jobs_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output E4_3.csv
+  lad_shapefile_path: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+  lsoa_to_lad: I:\Data\D-Log\DLIT\Inputs\lsoa2021_lad2011\lsoa2021_lad2011_spatial.csv
   # msoa_shapefile_path: I:\Data\D-Log\DLIT\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
   # msoa_dwelling_pop_path: I:\Data\D-Log\DLIT\Inputs\gb_msoa_agg_prt_2018_hh_pop.csv
   # msoa_traveller_type_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_pop.csv
@@ -44,10 +46,10 @@ land_use:
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
   demolition_dampener: 0
   summary_data:
-    summary_zone_name: lad_2020
-    lookup_file: I:\Data\D-Log\DLIT\Inputs\msoa_to_lad_2020_lookup.csv
-    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2020_December\Local_Authority_Districts_(December_2020)_UK_BGC.shp
-    shapefile_id_column: LAD20CD
+    summary_zone_name: lad2011
+    lookup_file: I:\Data\D-Log\DLIT\Inputs\lsoa2021_lad2011\lsoa2021_lad2011_spatial.csv
+    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+    shapefile_id_column: la
     geometry_simplify_tolerance: 100
 
 dev_pattern:

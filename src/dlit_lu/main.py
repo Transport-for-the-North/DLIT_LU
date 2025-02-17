@@ -9,6 +9,7 @@
 
     Kieran Fishwick: kieran.fishwick@wsp.com
 """
+
 # standard imports
 import pathlib
 import logging
@@ -56,7 +57,7 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
 
     if config.run_land_use and infilled_data is not None:
         land_use.run(infilled_data, config)
-    
+
     assess_data = parser.parse_dev_pattern_input(config)
     if config.run_dev_pattern and assess_data is not None:
         dev_pattern.run(assess_data, config)
