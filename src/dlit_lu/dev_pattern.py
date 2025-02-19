@@ -98,16 +98,6 @@ class BaseZoneHandler:
         self.zone_info = self.zone_info_map[geo_boundary]
         self.zone_gdf = parser.parse_zone(self.zone_info["shapefile_path"])
 
-# ##### CLASSES #####
-# @dataclasses.dataclass
-# class Sitedata:
-#     """Data for translating to the summary zone system."""
-
-#     site_data: pd.DataFrame
-#     site_reference_column: str
-#     easting_column: str
-#     northing: str
-#     build_out_columns : list
 
 class ZoneTranslator(BaseZoneHandler):
     def merge_data(
@@ -116,6 +106,8 @@ class ZoneTranslator(BaseZoneHandler):
         new_hh_data: Optional[pd.DataFrame]=None,
         new_pop_data: Optional[pd.DataFrame]=None,
         new_job_data: Optional[pd.DataFrame]=None,
+        merge_translation_data: bool = True,
+        aggregate_by_zone: bool = True,
         compute_area: bool = True, 
         calculate_density: bool = True,
         model_zone_data: bool = True
@@ -145,12 +137,14 @@ class ZoneTranslator(BaseZoneHandler):
         # Calculate density and index for specified columns
         columns_to_process = ["household", "population", "jobs"]  # Example columns
         # Merge data with translation if needed
-        by_data = self._merge_translation_data(
-            by_data, translation_path, columns_to_process, prop_column, group_by_column
-        )
+        if merge_translation_data:
+            by_data = self._merge_translation_data(
+                by_data, translation_path, columns_to_process, prop_column, group_by_column
+            )
 
         # Perform aggregation by group
-        by_data = self._aggregate_by_zone(by_data, group_by_column, columns_to_process)
+        if aggregate_by_zone:
+            by_data = self._aggregate_by_zone(by_data, group_by_column, columns_to_process)
 
         # Compute zonal area if enabled
         if compute_area:
@@ -1030,10 +1024,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     by_data_tot = pd.read_csv(config.dev_pattern.lsoa_data_path)
 
     geo_boundary = config.dev_pattern.geo_boundary
+    base_year = config.dev_pattern.base_year
+    base_year_int = int(base_year)
     key_output_path = config.output_folder / f"{geo_boundary}"
     key_output_path.mkdir(exist_ok=True)
 
-    build_out_columns = np.arange(2024, 2067, 1).tolist()
+    build_out_columns = np.arange(base_year_int + 1, 2067, 1).tolist()
     build_out_columns = [str(year) for year in build_out_columns]
 
     LOG.info("Creating list of sites with estimated development values")
@@ -1059,12 +1055,25 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         f"Sum of Input Totals-- Total Household: {by_tot_hhs_prev}, Total Population: {by_tot_pops_prev}, Total Jobs: {by_tot_jobs_prev}"
     )
     zone_translator = ZoneTranslator(geo_boundary, config)
-    by_data = zone_translator.merge_data(
-        by_data_tot,
-        compute_area = True, 
-        calculate_density = True,
-        model_zone_data= False
-    )
+    if geo_boundary == "lsoa":
+        by_data = zone_translator.merge_data(
+            by_data_tot,
+            merge_translation_data = False,
+            aggregate_by_zone = False,
+            compute_area = True, 
+            calculate_density = True,
+            model_zone_data= False
+        )
+    else:
+        by_data = zone_translator.merge_data(
+            by_data_tot,
+            merge_translation_data = True,
+            aggregate_by_zone = True,
+            compute_area = True, 
+            calculate_density = True,
+            model_zone_data= False
+        )
+
 
     # get totals after zone translation and other calculations
     by_tot_hhs_post = by_data["household"].sum()
@@ -1309,6 +1318,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         new_hh_data=hh_zone, 
         new_pop_data=pop_zone, 
         new_job_data=job_zone,
+        merge_translation_data = True,
+        aggregate_by_zone = True,
         compute_area=False, 
         calculate_density=False,
         model_zone_data=True,
