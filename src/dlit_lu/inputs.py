@@ -189,12 +189,12 @@ class DevPatnConfig:
     noham_shapefile_path: pydantic.FilePath
     norms_shapefile_path: pydantic.FilePath
     msoa_shapefile_path: pydantic.FilePath
-    # lsoa_hh_centroids: pydantic.FilePath
-    # lsoa_emp_centroids: pydantic.FilePath
-    # lsoa_pop_centroids: pydantic.FilePath
-    normits_hh_centroids: pydantic.FilePath
-    normits_emp_centroids: pydantic.FilePath
-    normits_pop_centroids: pydantic.FilePath
+    lsoa_hh_centroids: pydantic.FilePath
+    lsoa_emp_centroids: pydantic.FilePath
+    lsoa_pop_centroids: pydantic.FilePath
+    # normits_hh_centroids: pydantic.FilePath
+    # normits_emp_centroids: pydantic.FilePath
+    # normits_pop_centroids: pydantic.FilePath
     # noham_hh_centroids: pydantic.FilePath
     # noham_emp_centroids: pydantic.FilePath
     # noham_pop_centroids: pydantic.FilePath

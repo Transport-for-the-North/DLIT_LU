@@ -33,11 +33,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "LSOA21CD",
                 "prop_column": None,  # No proportion column needed for LSOA
                 "translation_path": None,  # No translation needed for LSOA
-                # "centroid_files": {
-                #     "hh": config.dev_pattern.lsoa_hh_centroids,
-                #     "emp": config.dev_pattern.lsoa_emp_centroids,
-                #     "pop": config.dev_pattern.lsoa_pop_centroids,
-                # },
+                "centroid_files": {
+                    "hh": config.dev_pattern.lsoa_hh_centroids,
+                    "emp": config.dev_pattern.lsoa_emp_centroids,
+                    "pop": config.dev_pattern.lsoa_pop_centroids,
+                },
             },
             "normits": {
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
@@ -45,11 +45,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "normits_id",
                 "prop_column": "lsoa_2021_to_normits_v3.3",
                 "translation_path": config.dev_pattern.lsoa_to_normits,
-                "centroid_files": {
-                    "hh": config.dev_pattern.normits_hh_centroids,
-                    "emp": config.dev_pattern.normits_emp_centroids,
-                    "pop": config.dev_pattern.normits_pop_centroids,
-                },
+                # "centroid_files": {
+                #     "hh": config.dev_pattern.normits_hh_centroids,
+                #     "emp": config.dev_pattern.normits_emp_centroids,
+                #     "pop": config.dev_pattern.normits_pop_centroids,
+                # },
                 "zone_to_lad_path": config.dev_pattern.summary_data.normits_to_lad_file,
                 "lad_id_col": "lad2011_id",
                 "zone_to_lad_prop": "normits_v3.3_to_lad2011",
@@ -58,7 +58,7 @@ class BaseZoneHandler:
                 "shapefile_path": config.dev_pattern.noham_shapefile_path,
                 "group_by_column": "noham_id",
                 "zone_gdf_id_col": "ZONE ID_v3",
-                "prop_column": "lsoa2021_to_noham",
+                "prop_column": "lsoa_2021_to_noham_v3.7",
                 "translation_path": config.dev_pattern.lsoa_to_noham,
                 # "centroid_files": {
                 #     "hh": config.dev_pattern.noham_hh_centroids,
@@ -82,7 +82,7 @@ class BaseZoneHandler:
                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
                 "group_by_column": "msoa2021_id",
                 "zone_gdf_id_col": "MSOA21CD",
-                "prop_column": "lsoa_2021_to_msoa",
+                "prop_column": "lsoa_2021_to_msoa2021",
                 "translation_path": config.dev_pattern.lsoa_to_msoa,
                 # "centroid_files": {
                 #     "hh": config.dev_pattern.msoa_hh_centroids,
@@ -1187,12 +1187,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "zscore"
     ]  # could also work out weighted index using 'robust_zscore', 'modified_zscore'
     res_weight_dict = {
-        "sum_proposed_index": 0.6,
-        "ho_den_index": 0.19,
+        "sum_proposed_index": 0.45,
+        "ho_den_index": 0.3,
         "po_den_index": 0,
-        "jo_den_index": 0.01,
-        "n_e_ratio_index": 0.1,
-        "centroid_shift_index": 0.1,
+        "jo_den_index": 0,
+        "n_e_ratio_index": 0.05,
+        "centroid_shift_index": 0.2,
     }
     emp_weight_dict = {
         "sum_proposed_index": 0.4,
@@ -1368,24 +1368,24 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     #     key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
     # )
 
-    LOG.info("Aggregating zonal household, population and jobs to LAD")
-    lad_household = zone_translator.lad_summary(zonal_household, ["2023"] + build_out_columns)
-    lad_population = zone_translator.lad_summary(zonal_population, ["2023"] + build_out_columns)
-    lad_job = zone_translator.lad_summary(zonal_job, ["2023"] + build_out_columns)
+    # LOG.info("Aggregating zonal household, population and jobs to LAD")
+    # lad_household = zone_translator.lad_summary(zonal_household, ["2023"] + build_out_columns)
+    # lad_population = zone_translator.lad_summary(zonal_population, ["2023"] + build_out_columns)
+    # lad_job = zone_translator.lad_summary(zonal_job, ["2023"] + build_out_columns)
 
-    lad_household_file_name = f"{geo_boundary}_lad_household.csv"
-    lad_population_file_name = f"{geo_boundary}_lad_population.csv"
-    lad_job_file_name = f"{geo_boundary}_lad_job.csv"
-    utilities.write_to_csv(
-        key_output_path / lad_household_file_name, lad_household
-    )
-    utilities.write_to_csv(
-        key_output_path / lad_population_file_name, lad_population
-    )
-    utilities.write_to_csv(
-        key_output_path / lad_job_file_name, lad_job
-    )
-    LOG.info("Ending Development Pattern Module")
+    # lad_household_file_name = f"{geo_boundary}_lad_household.csv"
+    # lad_population_file_name = f"{geo_boundary}_lad_population.csv"
+    # lad_job_file_name = f"{geo_boundary}_lad_job.csv"
+    # utilities.write_to_csv(
+    #     key_output_path / lad_household_file_name, lad_household
+    # )
+    # utilities.write_to_csv(
+    #     key_output_path / lad_population_file_name, lad_population
+    # )
+    # utilities.write_to_csv(
+    #     key_output_path / lad_job_file_name, lad_job
+    # )
+    # LOG.info("Ending Development Pattern Module")
 
 
 # if __name__ == "__main__":
