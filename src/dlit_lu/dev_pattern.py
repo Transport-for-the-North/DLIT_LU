@@ -173,7 +173,8 @@ class ZoneTranslator(BaseZoneHandler):
     def lad_summary(
         self,
         data: pd.DataFrame,
-        val_cols: list
+        base_year_column: str,
+        future_year_columns: list,
     ) -> pd.DataFrame:
         """
         Aggregate zone data to lad.
@@ -191,17 +192,22 @@ class ZoneTranslator(BaseZoneHandler):
         zone_id = self.zone_info["group_by_column"]
         lad_id = self.zone_info["lad_id_col"]
         zone_to_lad_prop_col = self.zone_info["zone_to_lad_prop"]
-        lad_data = self._zone_to_lad(
+        lad_data_annualgrowth = self._zone_to_lad(
             data,
             lookup_path,
             zone_id,
-            val_cols,
+            base_year_column,
+            future_year_columns,
             lad_id,
             zone_to_lad_prop_col
         )
-        
-
-        return lad_data
+        lad_data_annualgrowth = lad_data_annualgrowth.set_index(lad_id)
+        lad_data_annualtot = self._cumulative_yearly_totals(
+            lad_data_annualgrowth,
+            base_year_column,
+            future_year_columns,
+        )
+        return lad_data_annualgrowth, lad_data_annualtot
 
 
     def _merge_translation_data(
@@ -374,7 +380,8 @@ class ZoneTranslator(BaseZoneHandler):
         data: pd.DataFrame,
         lookup_path: pathlib.Path,
         zone_id: str,
-        val_cols: list,
+        base_year_column: str,
+        future_year_columns: list,
         lad_id: str,
         zone_to_lad_prop_col: str,
     ) -> pd.DataFrame:
@@ -410,6 +417,7 @@ class ZoneTranslator(BaseZoneHandler):
         lookup_df = pd.read_csv(lookup_path)
 
         # Check initial totals for all val_cols
+        val_cols = [base_year_column] + future_year_columns
         totals_before = {col: data[col].sum() for col in val_cols}
 
         # Merge data with lookup to assign LADs and proportions
@@ -437,6 +445,41 @@ class ZoneTranslator(BaseZoneHandler):
 
         return lad_agg
 
+
+    def _cumulative_yearly_totals(
+        self,
+        data: pd.DataFrame,
+        base_year_column : str = "2023",
+        future_year_columns: list = None,
+    ) -> pd.DataFrame:
+        """
+        Calculate cumulative yearly totals from 2023 onwards, where each year's total
+        is the sum of the previous year's total and the new values for that year.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame with 'lad2011_id', '2023' column, and future year columns.
+        base_year : str, optional
+            The base year column from which cumulative sums start (default is "2023").
+        build_out_columns : list, optional
+            List of year columns as strings representing future years.
+
+        Returns
+        -------
+        pd.DataFrame
+            Updated DataFrame with cumulative totals for each year.
+        """
+        updated_data = data.copy()
+        if future_year_columns is None:
+            future_year_columns = [str(year) for year in np.arange(int(base_year_column)+1, 2067, 1)]
+
+        # Compute cumulative totals year by year
+        for idx, year in enumerate(future_year_columns):
+            prev_year = base_year_column if idx == 0 else future_year_columns[idx - 1]
+            updated_data[year] = updated_data[prev_year] + data[year]
+
+        return updated_data
 
 class SiteZoneProcessor(BaseZoneHandler):
     def zone_site_geospatial_lookup(self, site_data: pd.DataFrame) -> gpd.GeoDataFrame:
@@ -1369,13 +1412,28 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # )
 
     LOG.info("Aggregating zonal household, population and jobs to LAD")
-    lad_household = zone_translator.lad_summary(zonal_household, ["2023"] + build_out_columns)
-    lad_population = zone_translator.lad_summary(zonal_population, ["2023"] + build_out_columns)
-    lad_job = zone_translator.lad_summary(zonal_job, ["2023"] + build_out_columns)
+    lad_household_ab_growth, lad_household = zone_translator.lad_summary(
+        zonal_household,
+        base_year,
+        build_out_columns,
+    )
+    lad_population_ab_growth, lad_population = zone_translator.lad_summary(
+        zonal_population,
+        base_year,
+        build_out_columns,
+    )
+    lad_job_ab_growth, lad_job = zone_translator.lad_summary(
+        zonal_job, 
+        base_year,
+        build_out_columns,
+    )
 
     lad_household_file_name = f"{geo_boundary}_lad_household.csv"
     lad_population_file_name = f"{geo_boundary}_lad_population.csv"
     lad_job_file_name = f"{geo_boundary}_lad_job.csv"
+    lad_household_abgrowth_file_name = f"{geo_boundary}_lad_household_growth.csv"
+    lad_population_abgrowth_file_name = f"{geo_boundary}_lad_population_growth.csv"
+    lad_job_abgrowth_file_name = f"{geo_boundary}_lad_job_growth.csv"
     utilities.write_to_csv(
         key_output_path / lad_household_file_name, lad_household
     )
@@ -1384,6 +1442,15 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
     utilities.write_to_csv(
         key_output_path / lad_job_file_name, lad_job
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_household_abgrowth_file_name, lad_household_ab_growth
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_population_abgrowth_file_name, lad_population_ab_growth
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_job_abgrowth_file_name, lad_job_ab_growth
     )
     LOG.info("Ending Development Pattern Module")
 
