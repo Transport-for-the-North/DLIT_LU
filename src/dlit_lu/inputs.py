@@ -85,7 +85,7 @@ class SummaryInputs:
     """Lookup file and shapefile for creating output summaries."""
 
     summary_zone_name: str
-    lookup_file: pydantic.FilePath
+    normits_to_lad_file: pydantic.FilePath
     shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
@@ -125,8 +125,8 @@ class LandUseConfig:
     lsoa_dwelling_pop_path: pydantic.FilePath
     lsoa_traveller_type_path: pydantic.FilePath
     lsoa_jobs_path: pydantic.FilePath
-    lad_shapefile_path: pydantic.FilePath
-    lsoa_to_lad: pydantic.FilePath
+    # lad_shapefile_path: pydantic.FilePath
+    # lsoa_to_lad: pydantic.FilePath
     # msoa_shapefile_path: pydantic.FilePath
     # msoa_dwelling_pop_path: pydantic.FilePath
     # msoa_traveller_type_path: pydantic.FilePath
@@ -141,7 +141,7 @@ class LandUseConfig:
     # which properly checks run_land_use before verifying the file path
     land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
-    summary_data: SummaryInputs | None = None
+    # summary_data: SummaryInputs | None = None
 
 
 @dataclasses.dataclass
@@ -150,6 +150,10 @@ class DevPatnConfig:
 
     Parameters
     ----------
+    base_year: str
+        base year str
+    geo_boundary: str
+        specify model zone
     normits_shapefile_path: pathlib.Path
         path to normits zone shape file
     noham_shapefile_path: pathlib.Path
@@ -174,8 +178,12 @@ class DevPatnConfig:
         path to employmwnt sites
     res_site_data: pathlib.Path
         path to residential sites
+    pop_tt_site_data: pathlib.Path
+        path to population segmented by tt
+    emp_sic_soc_site_data: pathlib.Path
+        path to jobs segmented by sic 2 digit and soc
     """
-
+    base_year: str
     geo_boundary: str
     normits_shapefile_path: pydantic.FilePath
     noham_shapefile_path: pydantic.FilePath
@@ -204,6 +212,9 @@ class DevPatnConfig:
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
     res_site_data: Optional[pathlib.Path] = None
+    pop_tt_site_data: Optional[pathlib.Path] = None
+    emp_sic_soc_site_data: Optional[pathlib.Path] = None
+    summary_data: SummaryInputs | None = None
 
 
 class DLitConfig(caf.toolkit.BaseConfig):

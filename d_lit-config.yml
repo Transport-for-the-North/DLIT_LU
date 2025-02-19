@@ -36,8 +36,8 @@ land_use:
   lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
   lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
   lsoa_jobs_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output E4_3.csv
-  lad_shapefile_path: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
-  lsoa_to_lad: I:\Data\D-Log\DLIT\Inputs\lsoa2021_lad2011\lsoa2021_lad2011_spatial.csv
+  # lad_shapefile_path: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+  # lsoa_to_lad: I:\Data\D-Log\DLIT\Inputs\lsoa2021_lad2011\lsoa2021_lad2011_spatial.csv
   # msoa_shapefile_path: I:\Data\D-Log\DLIT\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
   # msoa_dwelling_pop_path: I:\Data\D-Log\DLIT\Inputs\gb_msoa_agg_prt_2018_hh_pop.csv
   # msoa_traveller_type_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_pop.csv
@@ -54,11 +54,14 @@ land_use:
 
 dev_pattern:
   # Key input paths
+  base_year: 2023
   geo_boundary: normits # lsoa, normits, noham, norms, mosa2021
   assessment_input: I:\Data\D-Log\DLIT\Outputs\Test5\00_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
-  emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test5\employment_sites_out.csv
-  res_site_data: I:\Data\D-Log\DLIT\Outputs\Test5\residential_sites_out.csv
+  emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test5\04_land_use_outputs\jobs_sites_build_out.csv
+  res_site_data: I:\Data\D-Log\DLIT\Outputs\Test5\04_land_use_outputs\dwelling_sites_build_out.csv
   lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\Test5\tot_by_data_out.csv
+  pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\Test5\04_land_use_outputs\population_segmented_sites_build_out.csv.bz2
+  emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\Test5\04_land_use_outputs\jobs_segmented_sites_build_out.csv.bz2
   # shape file paths
   normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
   noham_shapefile_path: P:\02_NorTMS Rebase\01_Highway\03.Data\06. Confirmed Zone Structure\2.NoHAM_zone_updates-TfN\NoHAM_zones_v3.7\NoHAM_Zones_v3.7.shp
@@ -85,5 +88,11 @@ dev_pattern:
   lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa2021_noham\lsoa2021_to_noham_spatial.csv
   lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa2021_norms\lsoa2021_to_norms_spatial.csv
   lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
+  summary_data:
+    summary_zone_name: lad2011
+    normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normits_v3.3_lad2011\normits_v3.3_lad2011_spatial.csv
+    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+    shapefile_id_column: la
+    geometry_simplify_tolerance: 100
 
 

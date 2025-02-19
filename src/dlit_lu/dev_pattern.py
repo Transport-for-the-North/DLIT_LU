@@ -5,6 +5,7 @@
 # standard imports
 import logging
 import pathlib
+from typing import Optional
 
 # third party imports
 import pandas as pd
@@ -14,7 +15,7 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial import cKDTree
 
 # local imports
-from dlit_lu import stats, utilities, global_classes, parser, inputs, data_repair
+from dlit_lu import stats, utilities, global_classes, parser, inputs
 from dlit_lu import land_use as lu
 
 # constants
@@ -36,7 +37,7 @@ class BaseZoneHandler:
                 #     "hh": config.dev_pattern.lsoa_hh_centroids,
                 #     "emp": config.dev_pattern.lsoa_emp_centroids,
                 #     "pop": config.dev_pattern.lsoa_pop_centroids,
-                # }
+                # },
             },
             "normits": {
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
@@ -49,6 +50,9 @@ class BaseZoneHandler:
                     "emp": config.dev_pattern.normits_emp_centroids,
                     "pop": config.dev_pattern.normits_pop_centroids,
                 },
+                "zone_to_lad_path": config.dev_pattern.summary_data.normits_to_lad_file,
+                "lad_id_col": "lad2011_id",
+                "zone_to_lad_prop": "normits_v3.3_to_lad2011",
             },
             "noham": {
                 "shapefile_path": config.dev_pattern.noham_shapefile_path,
@@ -60,7 +64,7 @@ class BaseZoneHandler:
                 #     "hh": config.dev_pattern.noham_hh_centroids,
                 #     "emp": config.dev_pattern.noham_emp_centroids,
                 #     "pop": config.dev_pattern.noham_pop_centroids,
-                # }
+                # },
             },
             "norms": {
                 "shapefile_path": config.dev_pattern.norms_shapefile_path,
@@ -72,7 +76,7 @@ class BaseZoneHandler:
                 #     "hh": config.dev_pattern.norms_hh_centroids,
                 #     "emp": config.dev_pattern.norms_emp_centroids,
                 #     "pop": config.dev_pattern.norms_pop_centroids,
-                # }
+                # },
             },
             "msoa": {
                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
@@ -84,7 +88,7 @@ class BaseZoneHandler:
                 #     "hh": config.dev_pattern.msoa_hh_centroids,
                 #     "emp": config.dev_pattern.msoa_emp_centroids,
                 #     "pop": config.dev_pattern.msoa_pop_centroids,
-                # }
+                # },
             },
         }
 
@@ -94,59 +98,46 @@ class BaseZoneHandler:
         self.zone_info = self.zone_info_map[geo_boundary]
         self.zone_gdf = parser.parse_zone(self.zone_info["shapefile_path"])
 
+# ##### CLASSES #####
+# @dataclasses.dataclass
+# class Sitedata:
+#     """Data for translating to the summary zone system."""
 
-# class BaseZoneHandler:
-#     def __init__(self, geo_boundary: str, config: inputs.DLitConfig):
-#         self.geo_boundary = geo_boundary
-#         self.config = config
-#         self.zone_info_map = {
-#             "lsoa": {
-#                 "shapefile_path": config.land_use.lsoa_shapefile_path,
-#                 "group_by_column": "lsoa2021_id",
-#                 "zone_gdf_id_col": "LSOA21CD",
-#                 "prop_column": None,  # No proportion column needed for LSOA
-#                 "translation_path": None  # No translation needed for LSOA
-#             },
-#             "normits": {
-#                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
-#                 "group_by_column": "normits_v3_3_id",
-#                 "zone_gdf_id_col": "normits_id",
-#                 "prop_column": "lsoa_2021_to_normits_v3.3",
-#                 "translation_path": config.dev_pattern.lsoa_to_normits
-#             },
-#             "noham": {
-#                 "shapefile_path": config.dev_pattern.noham_shapefile_path,
-#                 "group_by_column": "noham_id",
-#                 "zone_gdf_id_col": "ZONE ID_v3",
-#                 "prop_column": "lsoa2021_to_noham",
-#                 "translation_path": config.dev_pattern.lsoa_to_noham
-#             },
-#             "norms": {
-#                 "shapefile_path": config.dev_pattern.norms_shapefile_path,
-#                 "group_by_column": "norms_id",
-#                 "zone_gdf_id_col": "unique_id",
-#                 "prop_column": "lsoa_2021_to_norms",
-#                 "translation_path": config.dev_pattern.lsoa_to_norms
-#             },
-#             "msoa": {
-#                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
-#                 "group_by_column": "msoa2021_id",
-#                 "zone_gdf_id_col": "MSOA21CD",
-#                 "prop_column": "lsoa_2021_to_msoa",
-#                 "translation_path": config.dev_pattern.lsoa_to_msoa
-#             }
-#         }
-
-#         if geo_boundary not in self.zone_info_map:
-#             raise ValueError(f"Unsupported geo_boundary: {geo_boundary}")
-
-#         self.zone_info = self.zone_info_map[geo_boundary]
-#         self.zone_gdf = parser.parse_zone(self.zone_info["shapefile_path"])
-
+#     site_data: pd.DataFrame
+#     site_reference_column: str
+#     easting_column: str
+#     northing: str
+#     build_out_columns : list
 
 class ZoneTranslator(BaseZoneHandler):
-    def merge_data(self, by_data: pd.DataFrame) -> pd.DataFrame:
-        """Merge zone translation data and perform aggregation."""
+    def merge_data(
+        self, 
+        by_data: pd.DataFrame,
+        new_hh_data: Optional[pd.DataFrame]=None,
+        new_pop_data: Optional[pd.DataFrame]=None,
+        new_job_data: Optional[pd.DataFrame]=None,
+        compute_area: bool = True, 
+        calculate_density: bool = True,
+        model_zone_data: bool = True
+    ) -> pd.DataFrame:
+        """
+        Merge zone translation data and perform aggregation.
+
+        Parameters
+        ----------
+        by_data : pd.DataFrame
+            Input data containing zone-level information.
+        compute_area : bool, optional
+            Whether to compute zonal area by merging geometry data. Default is True.
+        calculate_density : bool, optional
+            Whether to calculate density for the specified columns. Default is True.
+        model_zone_data : bool, optional
+            Whether to merge model zone data. Default is True.
+        Returns
+        -------
+        pd.DataFrame
+            Processed DataFrame with optional area computation and density calculation.
+        """
         group_by_column = self.zone_info["group_by_column"]
         zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
         translation_path = self.zone_info["translation_path"]
@@ -154,23 +145,72 @@ class ZoneTranslator(BaseZoneHandler):
         # Calculate density and index for specified columns
         columns_to_process = ["household", "population", "jobs"]  # Example columns
         # Merge data with translation if needed
-        by_data = self.merge_translation_data(
+        by_data = self._merge_translation_data(
             by_data, translation_path, columns_to_process, prop_column, group_by_column
         )
 
         # Perform aggregation by group
-        by_data = self.aggregate_by_zone(by_data, group_by_column, columns_to_process)
+        by_data = self._aggregate_by_zone(by_data, group_by_column, columns_to_process)
 
-        # Compute zonal area by merging geometry data
-        by_data = self.compute_zonal_area(
-            self.zone_gdf, by_data, zone_gdf_id_col, group_by_column
-        )
+        # Compute zonal area if enabled
+        if compute_area:
+            by_data = self._compute_zonal_area(
+                self.zone_gdf, by_data, zone_gdf_id_col, group_by_column
+            )
 
-        by_data = self.calculate_density(by_data, columns_to_process)
+        # Calculate density if enabled
+        if calculate_density:
+            by_data = self._calculate_density(by_data, columns_to_process)
+        
+        # Merge zonal data
+        if model_zone_data:
+            zonal_household, zonal_population, zonal_job= self._model_zone_data(
+                by_data,
+                new_hh_data,
+                new_pop_data,
+                new_job_data,
+                group_by_column,
+                zone_gdf_id_col,
+            )
+            return zonal_household, zonal_population, zonal_job
 
         return by_data
+    
+    def lad_summary(
+        self,
+        data: pd.DataFrame,
+        val_cols: list
+    ) -> pd.DataFrame:
+        """
+        Aggregate zone data to lad.
 
-    def merge_translation_data(
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input data containing zone-level information.
+        Returns
+        -------
+        pd.DataFrame
+            LAD data.
+        """
+        lookup_path = self.zone_info["zone_to_lad_path"]
+        zone_id = self.zone_info["group_by_column"]
+        lad_id = self.zone_info["lad_id_col"]
+        zone_to_lad_prop_col = self.zone_info["zone_to_lad_prop"]
+        lad_data = self._zone_to_lad(
+            data,
+            lookup_path,
+            zone_id,
+            val_cols,
+            lad_id,
+            zone_to_lad_prop_col
+        )
+        
+
+        return lad_data
+
+
+    def _merge_translation_data(
         self,
         by_data: pd.DataFrame,
         translation_path: str,
@@ -191,7 +231,8 @@ class ZoneTranslator(BaseZoneHandler):
             by_data = by_data.reset_index(drop=False)
         return by_data
 
-    def aggregate_by_zone(
+
+    def _aggregate_by_zone(
         self, by_data: pd.DataFrame, group_by_column: str, columns_to_process: list
     ) -> pd.DataFrame:
         """Group data by the zone and aggregate household, population, and jobs."""
@@ -200,7 +241,7 @@ class ZoneTranslator(BaseZoneHandler):
         ].sum()
         return aggregated_df
 
-    def compute_zonal_area(
+    def _compute_zonal_area(
         self,
         zone_gdf: gpd.GeoDataFrame,
         zone_df: pd.DataFrame,
@@ -242,10 +283,9 @@ class ZoneTranslator(BaseZoneHandler):
             how="left",
         )
         # zone_df.drop(columns=[zone_gdf_id_col], inplace=True)
-
         return zone_df
 
-    def calculate_density(
+    def _calculate_density(
         self, by_data: pd.DataFrame, columns_to_process: list
     ) -> pd.DataFrame:
         """
@@ -275,6 +315,133 @@ class ZoneTranslator(BaseZoneHandler):
             # by_data[index_col] = scaler.fit_transform(by_data[[density_col]])
 
         return by_data
+    
+
+    def _model_zone_data(
+        self,
+        by_data: pd.DataFrame,
+        new_hh_data: pd.DataFrame, 
+        new_pop_data: pd.DataFrame, 
+        new_job_data: pd.DataFrame, 
+        zone_col_in_by: str,
+        zone_col_in_new: str,
+    ) -> pd.DataFrame:
+        """
+        Merge new dwelling, population, and job data into the existing zonal data.
+
+        Parameters
+        ----------
+        new_dwelling_data : pd.DataFrame
+            DataFrame containing new dwelling data with a zone column.
+        new_pop_data : pd.DataFrame
+            DataFrame containing new population data with a zone column.
+        new_job_data : pd.DataFrame
+            DataFrame containing new job data with a zone column.
+        by_data : pd.DataFrame
+            Existing zonal data to be updated.
+        zone_col_in_new : str
+            The column name representing zones in new dataframes.
+        zone_col_in_by : str
+            The column name representing zones in by_data.
+        build_out_columns: list
+            The column list with values
+        Returns
+        -------
+        pd.DataFrame
+            Updated zonal data with merged dwelling, population, and job information.
+        """
+        # Merging by_data with new_dwel_data to create zonal_dwelling
+
+        zonal_household = by_data.merge(new_hh_data, 
+                                    left_on=zone_col_in_by, 
+                                    right_on=zone_col_in_new, 
+                                    how="left")
+        zonal_household = zonal_household[[zone_col_in_by, "household"] + new_hh_data.columns.to_list()]
+        zonal_household = zonal_household.drop(columns= zone_col_in_new).rename(columns={"household": "2023"})
+        # Merging by_data with new_pop_data to create zonal_population
+        zonal_population = by_data.merge(new_pop_data, 
+                                        left_on=zone_col_in_by, 
+                                        right_on=zone_col_in_new, 
+                                        how="left")
+        zonal_population = zonal_population[[zone_col_in_by, "population"] + new_pop_data.columns.to_list()]
+        zonal_population = zonal_population.drop(columns= zone_col_in_new).rename(columns={"population": "2023"})
+        # Merging by_data with new_job_data to create zonal_jobs
+        zonal_job = by_data.merge(new_job_data, 
+                                left_on=zone_col_in_by, 
+                                right_on=zone_col_in_new, 
+                                how="left")
+        zonal_job = zonal_job[[zone_col_in_by, "jobs"] + new_job_data.columns.to_list()]
+        zonal_job = zonal_job.drop(columns= zone_col_in_new).rename(columns={"jobs": "2023"})
+
+        return zonal_household, zonal_population, zonal_job
+
+    def _zone_to_lad(
+        self,
+        data: pd.DataFrame,
+        lookup_path: pathlib.Path,
+        zone_id: str,
+        val_cols: list,
+        lad_id: str,
+        zone_to_lad_prop_col: str,
+    ) -> pd.DataFrame:
+        """
+        Aggregate zonal data to LAD level using a lookup file with proportional mapping.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing zone-level data.
+        lookup_path : Path
+            Path to the lookup CSV file containing zone-to-LAD mapping and proportion columns.
+        zone_id : str
+            Column name in data representing the zone identifier.
+        val_cols : list
+            List of columns in data with values to be aggregated.
+        lad_id : str
+            Column name in lookup representing the LAD identifier.
+        zone_to_lad_prop_col : str
+            Column in lookup representing the proportion of zone value allocated to each LAD.
+
+        Returns
+        -------
+        pd.DataFrame
+            Aggregated LAD-level DataFrame with the summed values.
+
+        Raises
+        ------
+        ValueError
+            If the total values before and after aggregation differ for any column.
+        """
+        # Load the lookup DataFrame
+        lookup_df = pd.read_csv(lookup_path)
+
+        # Check initial totals for all val_cols
+        totals_before = {col: data[col].sum() for col in val_cols}
+
+        # Merge data with lookup to assign LADs and proportions
+        merged_df = data.merge(
+            lookup_df[[zone_id, lad_id, zone_to_lad_prop_col]],
+            on=zone_id,
+            how='left'
+        )
+
+        # Apply proportions to each value column
+        for col in val_cols:
+            merged_df[col] = merged_df[col] * merged_df[zone_to_lad_prop_col]
+
+        # Group by LAD and sum the values
+        lad_agg = merged_df.groupby(lad_id, as_index=False)[val_cols].sum()
+
+        # Check totals after aggregation
+        totals_after = {col: lad_agg[col].sum() for col in val_cols}
+
+        for col in val_cols:
+            if not np.isclose(totals_before[col], totals_after[col]):
+                raise ValueError(
+                    f"Total of '{col}' changed after aggregation: before={totals_before[col]}, after={totals_after[col]}"
+                )
+
+        return lad_agg
 
 
 class SiteZoneProcessor(BaseZoneHandler):
@@ -292,29 +459,95 @@ class SiteZoneProcessor(BaseZoneHandler):
             A GeoDataFrame with the spatially joined data.
         """
         # Convert the 'data' DataFrame to a GeoDataFrame with geometry based on coordinates
-        dlog_geom = gpd.GeoDataFrame(
-            site_data,
-            geometry=gpd.points_from_xy(site_data["easting"], site_data["northing"]),
+        site_data = site_data.copy()
+        site_data["geometry"] = gpd.points_from_xy(site_data["easting"], site_data["northing"])
+        site_gdf = gpd.GeoDataFrame(site_data, geometry="geometry", crs=self.zone_gdf.crs)
+
+        # Perform spatial join with the zone geometries
+        joined_data = gpd.sjoin(site_gdf, self.zone_gdf, how="left")
+
+        # Retain original site columns plus zone ID
+        return joined_data[site_data.columns.tolist() + [self.zone_info["zone_gdf_id_col"]]]
+
+    def agg_zonal_data(
+        self, 
+        site_data: pd.DataFrame, 
+        build_out_columns: list, 
+        site_size_column: str,
+        dimension_columns: Optional[list] = None
+    ) -> pd.DataFrame:
+        """
+        Aggregate zonal data by summing build-out columns after dropping site-related columns.
+        Additionally, compute separate zonal values for large and small sites.
+
+        Parameters
+        ----------
+        site_data : pd.DataFrame
+            DataFrame containing site-level data, including a 'site_size' column.
+        build_out_columns : list
+            List of columns to be summed during aggregation.
+        site_related_columns : list
+            List of columns to be dropped from site_data before aggregation.
+        dimension_columns : list, optional
+            Additional columns to group by, by default ["tt"].
+
+        Returns
+        -------
+        pd.DataFrame
+            Aggregated DataFrame grouped by zone ID and dimension columns with summed values
+            for all sites, large sites, and small sites.
+        """
+
+        # Define grouping keys
+        zone_id_col = self.zone_info["zone_gdf_id_col"]
+        if dimension_columns is None:
+            dimension_columns = []  # If None, set to an empty list
+        groupby_columns = [zone_id_col] + dimension_columns
+
+
+        # Aggregate for all sites
+        agg_all = site_data.groupby(groupby_columns, as_index=False)[build_out_columns].sum()
+
+        # Aggregate for large sites
+        agg_large = (
+            site_data[site_data[site_size_column] == "large"]
+            .groupby(groupby_columns, as_index=False)[build_out_columns]
+            .sum()
         )
+        # Add suffix only to the build_out_columns
+        agg_large = agg_large.rename(columns={col: f"{col}_large" for col in build_out_columns})
+        # Aggregate for small sites
+        agg_small = (
+            site_data[site_data[site_size_column] == "small"]
+            .groupby(groupby_columns, as_index=False)[build_out_columns]
+            .sum()
+        )
+        # Add suffix only to the build_out_columns
+        agg_small = agg_small.rename(columns={col: f"{col}_small" for col in build_out_columns})
+        # Merge all results
+        agg_data = agg_all.merge(agg_large, on=groupby_columns, how="left").merge(agg_small, on=groupby_columns, how="left")
 
-        # Perform a spatial join between the DLOG points and the zone geometries
-        dlog_zone = gpd.sjoin(dlog_geom, self.zone_gdf, how="left")
-
-        # Select only the columns from the original data plus the zone_gdf_id_col
-        updated_data = dlog_zone[
-            [col for col in site_data.columns] + [self.zone_info["zone_gdf_id_col"]]
-        ]
-
-        return updated_data
+        return agg_data
 
     def merge_zonal_attributes(
         self, site_data: pd.DataFrame, by_data: pd.DataFrame
     ) -> pd.DataFrame:
-        """Merge the zonal attributes with the data based on the zone ID."""
-        zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
-        # Merge the zonal attributes with the data based on the zone ID
-        site_data = site_data.merge(by_data, on=zone_gdf_id_col, how="left")
-        return site_data
+        """
+        Merges zonal attributes with site data.
+
+        Parameters
+        ----------
+        site_data : pd.DataFrame
+            Data containing site and assigned zone information.
+        by_data : pd.DataFrame
+            Zonal data with attributes to be merged.
+
+        Returns
+        -------
+        pd.DataFrame
+            Merged DataFrame with additional zonal attributes.
+        """
+        return site_data.merge(by_data, on=self.zone_info["zone_gdf_id_col"], how="left")
 
     def calculate_distance_to_zone_centroids(
         self, site_data: pd.DataFrame, centroid_type: str
@@ -577,17 +810,12 @@ def process_stats(
     """
     # Calculate basic statistics
     LOG.info(f"Calculating basic statistics for {site_type} site data")
-    # print(f"Total number of rows for {site_type} data:", len(site_data))
-    # print(f"Total number of columns for {site_type} data:",len(site_data.columns))
+
     site_stats = stats.basic_statistics(site_data, columns_to_explore)
 
+    LOG.info(f"Calculating z score value of each attribute")
     site_z_scores = stats.compute_z_scores(site_data, columns_to_explore)
-    # print(f"Total number of rows for {site_type} z_scores data:", len(site_data))
-    # print(f"Total number of columns for {site_type} z_scores data:",len(site_data.columns))
 
-    # site_z_scores_stats= stats.basic_statistics(site_z_scores, columns_to_explore)
-    # Concatenate site_stats and site_z_scores_stats along columns (axis=1)
-    # combined_stats = pd.concat([site_stats, site_z_scores_stats], axis=1)
 
     return site_stats, site_z_scores
 
@@ -596,7 +824,7 @@ def cal_site_weight(
     site_data: pd.DataFrame,
     columns_to_explore: list,
     category: str = "residential",
-    zscore_suffix: str = "robust_zscore",
+    zscore_suffix: str = "zscore",
     weight_dict: dict = None,
     index_col: str = "weighted_index",
 ):
@@ -686,7 +914,8 @@ def cal_site_weight(
     # Final weighted index, ensuring the total weight sums to 1
     site_data[index_col] = weighted_sum / total_weight
     site_data[index_col] = site_data[index_col] * site_data["site_with_realval"]
-    columns = ["site_reference_id"] + [index_col]
+    columns_to_explore_index = [col + "_index" for col in columns_to_explore]
+    columns = ["site_reference_id"] + [index_col] + columns_to_explore_index
 
     return site_data[columns]
 
@@ -790,12 +1019,22 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Initialising Development Pattern Module")
 
     config.output_folder.mkdir(exist_ok=True)
+    # dp_output_path = config.output_folder / "05_dev_pattern_outputs"
+    # dp_output_path.mkdir(exist_ok=True)
 
     site_assessment = lu.disagg_mixed(utilities.to_dict(input_data))
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
     res_sites = pd.read_csv(config.dev_pattern.res_site_data)
-    by_data = pd.read_csv(config.dev_pattern.lsoa_data_path)
+    pop_tt_sites = pd.read_csv(config.dev_pattern.pop_tt_site_data)
+    job_sic_soc_sites = pd.read_csv(config.dev_pattern.emp_sic_soc_site_data)
+    by_data_tot = pd.read_csv(config.dev_pattern.lsoa_data_path)
+
     geo_boundary = config.dev_pattern.geo_boundary
+    key_output_path = config.output_folder / f"{geo_boundary}"
+    key_output_path.mkdir(exist_ok=True)
+
+    build_out_columns = np.arange(2024, 2067, 1).tolist()
+    build_out_columns = [str(year) for year in build_out_columns]
 
     LOG.info("Creating list of sites with estimated development values")
     # list of residential sites with estimated values
@@ -813,14 +1052,20 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     LOG.info("Processing base year land use data")
     # get totals before zone translation
-    by_tot_hhs_prev = by_data["household"].sum()
-    by_tot_pops_prev = by_data["population"].sum()
-    by_tot_jobs_prev = by_data["jobs"].sum()
+    by_tot_hhs_prev = by_data_tot["household"].sum()
+    by_tot_pops_prev = by_data_tot["population"].sum()
+    by_tot_jobs_prev = by_data_tot["jobs"].sum()
     LOG.info(
         f"Sum of Input Totals-- Total Household: {by_tot_hhs_prev}, Total Population: {by_tot_pops_prev}, Total Jobs: {by_tot_jobs_prev}"
     )
     zone_translator = ZoneTranslator(geo_boundary, config)
-    by_data = zone_translator.merge_data(by_data)
+    by_data = zone_translator.merge_data(
+        by_data_tot,
+        compute_area = True, 
+        calculate_density = True,
+        model_zone_data= False
+    )
+
     # get totals after zone translation and other calculations
     by_tot_hhs_post = by_data["household"].sum()
     by_tot_pops_post = by_data["population"].sum()
@@ -838,7 +1083,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     ]
     by_data_stats = stats.basic_statistics(by_data, columns_stats)
     by_data_file = f"by_{geo_boundary}_data.csv"
-    by_data_stats_file = "by_data_stats.csv"
+    by_data_stats_file = f"by_{geo_boundary}_data_stats.csv"
     utilities.write_to_csv(config.output_folder / by_data_file, by_data)
     utilities.write_to_csv(config.output_folder / by_data_stats_file, by_data_stats)
 
@@ -867,28 +1112,25 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "n_e_ratio",
         "centroid_shift",
     ]
-    columns_to_keep = [
-        "site_reference_id",
-    ]
-    plot_path = config.output_folder / "plot_distribution_attributes"
-    plot_path.mkdir(exist_ok=True)
 
-    # Process statistics for residential and employment sites
+    LOG.info("Calculating zscores of each attribute")
     res_stats, res_z_scores = process_stats(
-        res_zone_sites, "Residential", columns_to_explore, columns_to_keep, plot_path
+        res_zone_sites, "Residential", columns_to_explore
     )
     emp_stats, emp_z_scores = process_stats(
-        emp_zone_sites, "Employment", columns_to_explore, columns_to_keep, plot_path
+        emp_zone_sites, "Employment", columns_to_explore
     )
-    # res_stats_file = "residential_sites_stats.csv"
-    # emp_stats_file = "employment_sites_stats.csv"
+    res_stats_file = "residential_sites_stats.csv"
+    emp_stats_file = "employment_sites_stats.csv"
 
-    # utilities.write_to_csv(config.output_folder / res_stats_file, res_stats)
-    # utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
+    utilities.write_to_csv(config.output_folder / res_stats_file, res_stats)
+    utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
 
     enable_visualization = False  # Set to False to skip plotting
-
+    plot_path = config.output_folder / "plot_distribution_attributes"
+    plot_path.mkdir(exist_ok=True)
     if enable_visualization:
+        LOG.info("Attribute value distribution plot")
         plot_path = (
             config.output_folder / f"{geo_boundary}_plot_distribution_attributes"
         )
@@ -931,6 +1173,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             emp_zone_sites, columns_to_explore, plot_path, category="emp_val"
         )
 
+    LOG.info("Calculating weighted index values to determine large sites")
     z_score_list = [
         "zscore"
     ]  # could also work out weighted index using 'robust_zscore', 'modified_zscore'
@@ -989,12 +1232,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         )
         emp_site_counts.append(emp_site_count)
 
-        # # Write results to CSV files
-        # res_z_scores_file_suffix = f"residential_sites_{zscore_suffix}.csv"
-        # emp_z_scores_file_suffix = f"employment_sites_{zscore_suffix}.csv"
-
-        # utilities.write_to_csv(config.output_folder / res_z_scores_file_suffix, res_z_scores_withindex)
-        # utilities.write_to_csv(config.output_folder / emp_z_scores_file_suffix, emp_z_scores_withindex)
 
     # Concatenate results into final dataframes
     res_site_count_summary = pd.concat(res_site_counts, axis=1)
@@ -1022,8 +1259,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         index_col="weighted_index",
         index_threshold=0.6,
     )
-    key_output_path = config.output_folder / f"{geo_boundary}"
-    key_output_path.mkdir(exist_ok=True)
+
     res_file_name = f"residential_site_{geo_boundary}.csv"
     emp_file_name = f"employment_site_{geo_boundary}.csv"
     utilities.write_to_csv(key_output_path / res_file_name, res_zone_sites_index)
@@ -1032,14 +1268,113 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     large_res_sites_file_name = f"large_residential_site_{geo_boundary}.csv"
     large_emp_sites_file_name = f"large_employment_site_{geo_boundary}.csv"
     utilities.write_to_csv(
-        config.output_folder / large_res_sites_file_name, large_res_sites
+        key_output_path / large_res_sites_file_name, large_res_sites
     )
     utilities.write_to_csv(
-        config.output_folder / large_emp_sites_file_name, large_emp_sites
+        key_output_path / large_emp_sites_file_name, large_emp_sites
     )
 
+    LOG.info("Processing zonal household, population and jobs based on D-log data")
+    site_size_column = "site_size"
+    hh_sites = res_sites.copy()
+    hh_sites[site_size_column] = np.where(hh_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    pop_tt_sites[site_size_column] =  np.where(pop_tt_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    job_sic_soc_sites[site_size_column] =  np.where(job_sic_soc_sites["site_reference_id"].isin(emp_large_site_list), "large", "small")
+    site_zone_processer = SiteZoneProcessor(geo_boundary, config)
+    hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(hh_sites)
+    pop_tt_sites_zone = site_zone_processer.zone_site_geospatial_lookup(pop_tt_sites)
+    job_sic_soc_sites_zone = site_zone_processer.zone_site_geospatial_lookup(job_sic_soc_sites)
+
+    hh_zone = site_zone_processer.agg_zonal_data(
+        hh_sites_zone,
+        build_out_columns,
+        site_size_column,
+        dimension_columns=None
+    )
+    pop_zone = site_zone_processer.agg_zonal_data(
+        pop_tt_sites_zone,
+        build_out_columns,
+        site_size_column,
+        dimension_columns=None
+    )
+    job_zone = site_zone_processer.agg_zonal_data(
+        job_sic_soc_sites_zone,
+        build_out_columns,
+        site_size_column,
+        dimension_columns=None
+    )
+    
+    zonal_household, zonal_population, zonal_job = zone_translator.merge_data(
+        by_data_tot,
+        new_hh_data=hh_zone, 
+        new_pop_data=pop_zone, 
+        new_job_data=job_zone,
+        compute_area=False, 
+        calculate_density=False,
+        model_zone_data=True,
+    )
+
+    pop_tt_zone = site_zone_processer.agg_zonal_data(
+        pop_tt_sites_zone,
+        build_out_columns,
+        site_size_column,
+        dimension_columns=["tt"]
+    )
+    pop_tt_zone_header_list=pop_tt_zone.columns.to_list()
+    print("The header of the output zonal population segmented by tt: ", pop_tt_zone_header_list)
+
+
+
+    job_sic_soc_zone = site_zone_processer.agg_zonal_data(
+        job_sic_soc_sites_zone,
+        build_out_columns,
+        site_size_column,
+        dimension_columns=["sic_2d", "soc"]
+    )
+    job_sic_soc_zone_header_list = job_sic_soc_zone.columns.to_list()
+    print("The header of the output zonal job segmented by tt: ", job_sic_soc_zone_header_list)
+
+    zonal_household_file_name = f"{geo_boundary}_zonal_household.csv"
+    zonal_population_file_name = f"{geo_boundary}_zonal_population.csv"
+    zonal_job_file_name = f"{geo_boundary}_zonal_job.csv"    
+    pop_tt_zone_file_name = f"{geo_boundary}_zonal_new_population_by_tt.csv.bz2"
+    job_sic_soc_zone_file_name = f"{geo_boundary}_zonal_new_job_by_sic_soc.csv.bz2"
+
+    utilities.write_to_csv(
+        key_output_path / zonal_household_file_name, zonal_household
+    )
+    utilities.write_to_csv(
+        key_output_path / zonal_population_file_name, zonal_population
+    )
+    utilities.write_to_csv(
+        key_output_path / zonal_job_file_name, zonal_job
+    )
+
+    # utilities.write_to_csv(
+    #     key_output_path / pop_tt_zone_file_name, pop_tt_zone
+    # )
+    # utilities.write_to_csv(
+    #     key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
+    # )
+
+    LOG.info("Aggregating zonal household, population and jobs to LAD")
+    lad_household = zone_translator.lad_summary(zonal_household, ["2023"] + build_out_columns)
+    lad_population = zone_translator.lad_summary(zonal_population, ["2023"] + build_out_columns)
+    lad_job = zone_translator.lad_summary(zonal_job, ["2023"] + build_out_columns)
+
+    lad_household_file_name = f"{geo_boundary}_lad_household.csv"
+    lad_population_file_name = f"{geo_boundary}_lad_population.csv"
+    lad_job_file_name = f"{geo_boundary}_lad_job.csv"
+    utilities.write_to_csv(
+        key_output_path / lad_household_file_name, lad_household
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_population_file_name, lad_population
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_job_file_name, lad_job
+    )
     LOG.info("Ending Development Pattern Module")
-    return res_zone_sites, emp_zone_sites
 
 
 # if __name__ == "__main__":
