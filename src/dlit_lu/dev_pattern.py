@@ -33,11 +33,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "LSOA21CD",
                 "prop_column": None,  # No proportion column needed for LSOA
                 "translation_path": None,  # No translation needed for LSOA
-                "centroid_files": {
-                    "hh": config.dev_pattern.lsoa_hh_centroids,
-                    "emp": config.dev_pattern.lsoa_emp_centroids,
-                    "pop": config.dev_pattern.lsoa_pop_centroids,
-                },
+                # "centroid_files": {
+                #     "hh": config.dev_pattern.lsoa_hh_centroids,
+                #     "emp": config.dev_pattern.lsoa_emp_centroids,
+                #     "pop": config.dev_pattern.lsoa_pop_centroids,
+                # },
             },
             "normits": {
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
@@ -45,11 +45,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "normits_id",
                 "prop_column": "lsoa_2021_to_normits_v3.3",
                 "translation_path": config.dev_pattern.lsoa_to_normits,
-                # "centroid_files": {
-                #     "hh": config.dev_pattern.normits_hh_centroids,
-                #     "emp": config.dev_pattern.normits_emp_centroids,
-                #     "pop": config.dev_pattern.normits_pop_centroids,
-                # },
+                "centroid_files": {
+                    "hh": config.dev_pattern.normits_hh_centroids,
+                    "emp": config.dev_pattern.normits_emp_centroids,
+                    "pop": config.dev_pattern.normits_pop_centroids,
+                },
                 "zone_to_lad_path": config.dev_pattern.summary_data.normits_to_lad_file,
                 "lad_id_col": "lad2011_id",
                 "zone_to_lad_prop": "normits_v3.3_to_lad2011",
@@ -58,7 +58,7 @@ class BaseZoneHandler:
                 "shapefile_path": config.dev_pattern.noham_shapefile_path,
                 "group_by_column": "noham_id",
                 "zone_gdf_id_col": "ZONE ID_v3",
-                "prop_column": "lsoa_2021_to_noham_v3.7",
+                "prop_column": "lsoa2021_to_noham",
                 "translation_path": config.dev_pattern.lsoa_to_noham,
                 # "centroid_files": {
                 #     "hh": config.dev_pattern.noham_hh_centroids,
@@ -82,7 +82,7 @@ class BaseZoneHandler:
                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
                 "group_by_column": "msoa2021_id",
                 "zone_gdf_id_col": "MSOA21CD",
-                "prop_column": "lsoa_2021_to_msoa2021",
+                "prop_column": "lsoa_2021_to_msoa",
                 "translation_path": config.dev_pattern.lsoa_to_msoa,
                 # "centroid_files": {
                 #     "hh": config.dev_pattern.msoa_hh_centroids,
@@ -173,7 +173,8 @@ class ZoneTranslator(BaseZoneHandler):
     def lad_summary(
         self,
         data: pd.DataFrame,
-        val_cols: list
+        base_year_column: str,
+        future_year_columns: list,
     ) -> pd.DataFrame:
         """
         Aggregate zone data to lad.
@@ -191,17 +192,22 @@ class ZoneTranslator(BaseZoneHandler):
         zone_id = self.zone_info["group_by_column"]
         lad_id = self.zone_info["lad_id_col"]
         zone_to_lad_prop_col = self.zone_info["zone_to_lad_prop"]
-        lad_data = self._zone_to_lad(
+        lad_data_annualgrowth = self._zone_to_lad(
             data,
             lookup_path,
             zone_id,
-            val_cols,
+            base_year_column,
+            future_year_columns,
             lad_id,
             zone_to_lad_prop_col
         )
-        
-
-        return lad_data
+        lad_data_annualgrowth = lad_data_annualgrowth.set_index(lad_id)
+        lad_data_annualtot = self._cumulative_yearly_totals(
+            lad_data_annualgrowth,
+            base_year_column,
+            future_year_columns,
+        )
+        return lad_data_annualgrowth, lad_data_annualtot
 
 
     def _merge_translation_data(
@@ -374,7 +380,8 @@ class ZoneTranslator(BaseZoneHandler):
         data: pd.DataFrame,
         lookup_path: pathlib.Path,
         zone_id: str,
-        val_cols: list,
+        base_year_column: str,
+        future_year_columns: list,
         lad_id: str,
         zone_to_lad_prop_col: str,
     ) -> pd.DataFrame:
@@ -410,6 +417,7 @@ class ZoneTranslator(BaseZoneHandler):
         lookup_df = pd.read_csv(lookup_path)
 
         # Check initial totals for all val_cols
+        val_cols = [base_year_column] + future_year_columns
         totals_before = {col: data[col].sum() for col in val_cols}
 
         # Merge data with lookup to assign LADs and proportions
@@ -437,6 +445,41 @@ class ZoneTranslator(BaseZoneHandler):
 
         return lad_agg
 
+
+    def _cumulative_yearly_totals(
+        self,
+        data: pd.DataFrame,
+        base_year_column : str = "2023",
+        future_year_columns: list = None,
+    ) -> pd.DataFrame:
+        """
+        Calculate cumulative yearly totals from 2023 onwards, where each year's total
+        is the sum of the previous year's total and the new values for that year.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame with 'lad2011_id', '2023' column, and future year columns.
+        base_year : str, optional
+            The base year column from which cumulative sums start (default is "2023").
+        build_out_columns : list, optional
+            List of year columns as strings representing future years.
+
+        Returns
+        -------
+        pd.DataFrame
+            Updated DataFrame with cumulative totals for each year.
+        """
+        updated_data = data.copy()
+        if future_year_columns is None:
+            future_year_columns = [str(year) for year in np.arange(int(base_year_column)+1, 2067, 1)]
+
+        # Compute cumulative totals year by year
+        for idx, year in enumerate(future_year_columns):
+            prev_year = base_year_column if idx == 0 else future_year_columns[idx - 1]
+            updated_data[year] = updated_data[prev_year] + data[year]
+
+        return updated_data
 
 class SiteZoneProcessor(BaseZoneHandler):
     def zone_site_geospatial_lookup(self, site_data: pd.DataFrame) -> gpd.GeoDataFrame:
@@ -1093,8 +1136,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     by_data_stats = stats.basic_statistics(by_data, columns_stats)
     by_data_file = f"by_{geo_boundary}_data.csv"
     by_data_stats_file = f"by_{geo_boundary}_data_stats.csv"
-    utilities.write_to_csv(config.output_folder / by_data_file, by_data)
-    utilities.write_to_csv(config.output_folder / by_data_stats_file, by_data_stats)
+    utilities.write_to_csv(key_output_path / by_data_file, by_data)
+    utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Processing site data for year 2024 upwards")
     res_zone_sites = process_site_data(
@@ -1129,11 +1172,11 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     emp_stats, emp_z_scores = process_stats(
         emp_zone_sites, "Employment", columns_to_explore
     )
-    res_stats_file = "residential_sites_stats.csv"
-    emp_stats_file = "employment_sites_stats.csv"
+    res_stats_file = "residential_sites_stats_{geo_boundary}.csv"
+    emp_stats_file = "employment_sites_stats_{geo_boundary}.csv"
 
-    utilities.write_to_csv(config.output_folder / res_stats_file, res_stats)
-    utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
+    utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
+    utilities.write_to_csv(key_output_path / emp_stats_file, emp_stats)
 
     enable_visualization = False  # Set to False to skip plotting
     plot_path = config.output_folder / "plot_distribution_attributes"
@@ -1187,12 +1230,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "zscore"
     ]  # could also work out weighted index using 'robust_zscore', 'modified_zscore'
     res_weight_dict = {
-        "sum_proposed_index": 0.45,
-        "ho_den_index": 0.3,
+        "sum_proposed_index": 0.6,
+        "ho_den_index": 0.19,
         "po_den_index": 0,
-        "jo_den_index": 0,
-        "n_e_ratio_index": 0.05,
-        "centroid_shift_index": 0.2,
+        "jo_den_index": 0.01,
+        "n_e_ratio_index": 0.1,
+        "centroid_shift_index": 0.1,
     }
     emp_weight_dict = {
         "sum_proposed_index": 0.4,
@@ -1368,24 +1411,48 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     #     key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
     # )
 
-    # LOG.info("Aggregating zonal household, population and jobs to LAD")
-    # lad_household = zone_translator.lad_summary(zonal_household, ["2023"] + build_out_columns)
-    # lad_population = zone_translator.lad_summary(zonal_population, ["2023"] + build_out_columns)
-    # lad_job = zone_translator.lad_summary(zonal_job, ["2023"] + build_out_columns)
+    LOG.info("Aggregating zonal household, population and jobs to LAD")
+    lad_household_ab_growth, lad_household = zone_translator.lad_summary(
+        zonal_household,
+        base_year,
+        build_out_columns,
+    )
+    lad_population_ab_growth, lad_population = zone_translator.lad_summary(
+        zonal_population,
+        base_year,
+        build_out_columns,
+    )
+    lad_job_ab_growth, lad_job = zone_translator.lad_summary(
+        zonal_job, 
+        base_year,
+        build_out_columns,
+    )
 
-    # lad_household_file_name = f"{geo_boundary}_lad_household.csv"
-    # lad_population_file_name = f"{geo_boundary}_lad_population.csv"
-    # lad_job_file_name = f"{geo_boundary}_lad_job.csv"
-    # utilities.write_to_csv(
-    #     key_output_path / lad_household_file_name, lad_household
-    # )
-    # utilities.write_to_csv(
-    #     key_output_path / lad_population_file_name, lad_population
-    # )
-    # utilities.write_to_csv(
-    #     key_output_path / lad_job_file_name, lad_job
-    # )
-    # LOG.info("Ending Development Pattern Module")
+    lad_household_file_name = f"{geo_boundary}_lad_household.csv"
+    lad_population_file_name = f"{geo_boundary}_lad_population.csv"
+    lad_job_file_name = f"{geo_boundary}_lad_job.csv"
+    lad_household_abgrowth_file_name = f"{geo_boundary}_lad_household_growth.csv"
+    lad_population_abgrowth_file_name = f"{geo_boundary}_lad_population_growth.csv"
+    lad_job_abgrowth_file_name = f"{geo_boundary}_lad_job_growth.csv"
+    utilities.write_to_csv(
+        key_output_path / lad_household_file_name, lad_household
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_population_file_name, lad_population
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_job_file_name, lad_job
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_household_abgrowth_file_name, lad_household_ab_growth
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_population_abgrowth_file_name, lad_population_ab_growth
+    )
+    utilities.write_to_csv(
+        key_output_path / lad_job_abgrowth_file_name, lad_job_ab_growth
+    )
+    LOG.info("Ending Development Pattern Module")
 
 
 # if __name__ == "__main__":
