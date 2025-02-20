@@ -370,6 +370,19 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         lu_output_path / res_sites_pop_tot_file, res_sites_pop
     )
 
+    LOG.info("Check total yearly dwelling and population")
+
+    year_tot_dwel = res_sites_tot.sum(axis=0)
+
+    year_tot_pop = res_lsoa_sites_pop.sum(axis=0)
+
+    year_tot_job =  emp_sites_jobs_tot.sum(axis=0)
+    year_tot_df = pd.DataFrame(
+        {"year_tot_dwel": year_tot_dwel, "year_tot_pop": year_tot_pop, "year_tot_job": year_tot_job}
+    )
+    year_tot_df_file_name = "year_totals.csv"
+    utilities.write_to_csv(lu_output_path / year_tot_df_file_name, year_tot_df)
+
     # LOG.info("Compare total units of new dwelling to existing")
     # comparison_path = config.output_folder / "existing_proposed_development_comparison"
 
@@ -397,19 +410,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     # res_lsoa_base = apply_pop_land_use(
     #     res_lsoa_base, build_out_columns, traveller_type_factor
     # )
-
-    LOG.info("Check total yearly dwelling and population")
-
-    year_tot_dwel = res_sites_tot.sum(axis=0)
-
-    year_tot_pop = res_lsoa_sites_pop.sum(axis=0)
-
-    year_tot_df = pd.DataFrame(
-        {"year_tot_dwel": year_tot_dwel, "year_tot_pop": year_tot_pop}
-    )
-    year_tot_df_file_name = "year_totals.csv"
-    utilities.write_to_csv(lu_output_path / year_tot_df_file_name, year_tot_df)
-
+    
     # LOG.info("Rename LSOA column id")
     # # rename columns
     # res_lsoa_base.reset_index(drop=False, inplace=True)

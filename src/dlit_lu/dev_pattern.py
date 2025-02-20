@@ -1136,8 +1136,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     by_data_stats = stats.basic_statistics(by_data, columns_stats)
     by_data_file = f"by_{geo_boundary}_data.csv"
     by_data_stats_file = f"by_{geo_boundary}_data_stats.csv"
-    utilities.write_to_csv(config.output_folder / by_data_file, by_data)
-    utilities.write_to_csv(config.output_folder / by_data_stats_file, by_data_stats)
+    utilities.write_to_csv(key_output_path / by_data_file, by_data)
+    utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Processing site data for year 2024 upwards")
     res_zone_sites = process_site_data(
@@ -1172,11 +1172,11 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     emp_stats, emp_z_scores = process_stats(
         emp_zone_sites, "Employment", columns_to_explore
     )
-    res_stats_file = "residential_sites_stats.csv"
-    emp_stats_file = "employment_sites_stats.csv"
+    res_stats_file = "residential_sites_stats_{geo_boundary}.csv"
+    emp_stats_file = "employment_sites_stats_{geo_boundary}.csv"
 
-    utilities.write_to_csv(config.output_folder / res_stats_file, res_stats)
-    utilities.write_to_csv(config.output_folder / emp_stats_file, emp_stats)
+    utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
+    utilities.write_to_csv(key_output_path / emp_stats_file, emp_stats)
 
     enable_visualization = False  # Set to False to skip plotting
     plot_path = config.output_folder / "plot_distribution_attributes"
