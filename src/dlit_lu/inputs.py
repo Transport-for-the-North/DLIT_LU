@@ -86,6 +86,7 @@ class SummaryInputs:
 
     summary_zone_name: str
     normits_to_lad_file: pydantic.FilePath
+    # lsoa_to_lad_file: pydantic.FilePath
     shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
@@ -192,18 +193,18 @@ class DevPatnConfig:
     lsoa_hh_centroids: pydantic.FilePath
     lsoa_emp_centroids: pydantic.FilePath
     lsoa_pop_centroids: pydantic.FilePath
-    # normits_hh_centroids: pydantic.FilePath
-    # normits_emp_centroids: pydantic.FilePath
-    # normits_pop_centroids: pydantic.FilePath
-    # noham_hh_centroids: pydantic.FilePath
-    # noham_emp_centroids: pydantic.FilePath
-    # noham_pop_centroids: pydantic.FilePath
-    # norms_hh_centroids: pydantic.FilePath
-    # norms_emp_centroids: pydantic.FilePath
-    # norms_pop_centroids: pydantic.FilePath
-    # msoa_hh_centroids: pydantic.FilePath
-    # msoa_emp_centroids: pydantic.FilePath
-    # msoa_pop_centroids: pydantic.FilePath
+    normits_hh_centroids: pydantic.FilePath
+    normits_emp_centroids: pydantic.FilePath
+    normits_pop_centroids: pydantic.FilePath
+    noham_hh_centroids: pydantic.FilePath
+    noham_emp_centroids: pydantic.FilePath
+    noham_pop_centroids: pydantic.FilePath
+    norms_hh_centroids: pydantic.FilePath
+    norms_emp_centroids: pydantic.FilePath
+    norms_pop_centroids: pydantic.FilePath
+    msoa_hh_centroids: pydantic.FilePath
+    msoa_emp_centroids: pydantic.FilePath
+    msoa_pop_centroids: pydantic.FilePath
     lsoa_to_normits: pydantic.FilePath
     lsoa_to_noham: pydantic.FilePath
     lsoa_to_norms: pydantic.FilePath

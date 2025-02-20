@@ -33,11 +33,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "LSOA21CD",
                 "prop_column": None,  # No proportion column needed for LSOA
                 "translation_path": None,  # No translation needed for LSOA
-                # "centroid_files": {
-                #     "hh": config.dev_pattern.lsoa_hh_centroids,
-                #     "emp": config.dev_pattern.lsoa_emp_centroids,
-                #     "pop": config.dev_pattern.lsoa_pop_centroids,
-                # },
+                "centroid_files": {
+                    "hh": config.dev_pattern.lsoa_hh_centroids,
+                    "emp": config.dev_pattern.lsoa_emp_centroids,
+                    "pop": config.dev_pattern.lsoa_pop_centroids,
+                },
             },
             "normits": {
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
@@ -60,11 +60,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "ZONE ID_v3",
                 "prop_column": "lsoa2021_to_noham",
                 "translation_path": config.dev_pattern.lsoa_to_noham,
-                # "centroid_files": {
-                #     "hh": config.dev_pattern.noham_hh_centroids,
-                #     "emp": config.dev_pattern.noham_emp_centroids,
-                #     "pop": config.dev_pattern.noham_pop_centroids,
-                # },
+                "centroid_files": {
+                    "hh": config.dev_pattern.noham_hh_centroids,
+                    "emp": config.dev_pattern.noham_emp_centroids,
+                    "pop": config.dev_pattern.noham_pop_centroids,
+                },
             },
             "norms": {
                 "shapefile_path": config.dev_pattern.norms_shapefile_path,
@@ -72,11 +72,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "unique_id",
                 "prop_column": "lsoa_2021_to_norms",
                 "translation_path": config.dev_pattern.lsoa_to_norms,
-                # "centroid_files": {
-                #     "hh": config.dev_pattern.norms_hh_centroids,
-                #     "emp": config.dev_pattern.norms_emp_centroids,
-                #     "pop": config.dev_pattern.norms_pop_centroids,
-                # },
+                "centroid_files": {
+                    "hh": config.dev_pattern.norms_hh_centroids,
+                    "emp": config.dev_pattern.norms_emp_centroids,
+                    "pop": config.dev_pattern.norms_pop_centroids,
+                },
             },
             "msoa": {
                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
@@ -84,11 +84,11 @@ class BaseZoneHandler:
                 "zone_gdf_id_col": "MSOA21CD",
                 "prop_column": "lsoa_2021_to_msoa",
                 "translation_path": config.dev_pattern.lsoa_to_msoa,
-                # "centroid_files": {
-                #     "hh": config.dev_pattern.msoa_hh_centroids,
-                #     "emp": config.dev_pattern.msoa_emp_centroids,
-                #     "pop": config.dev_pattern.msoa_pop_centroids,
-                # },
+                "centroid_files": {
+                    "hh": config.dev_pattern.msoa_hh_centroids,
+                    "emp": config.dev_pattern.msoa_emp_centroids,
+                    "pop": config.dev_pattern.msoa_pop_centroids,
+                },
             },
         }
 
@@ -1065,6 +1065,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     pop_tt_sites = pd.read_csv(config.dev_pattern.pop_tt_site_data)
     job_sic_soc_sites = pd.read_csv(config.dev_pattern.emp_sic_soc_site_data)
     by_data_tot = pd.read_csv(config.dev_pattern.lsoa_data_path)
+    # load ddg_pop_lad and ddg_emp_lad
 
     geo_boundary = config.dev_pattern.geo_boundary
     base_year = config.dev_pattern.base_year
@@ -1429,9 +1430,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
 
     lad_household_file_name = f"{geo_boundary}_lad_household.csv"
-    lad_population_file_name = f"{geo_boundary}_lad_population.csv"
-    lad_job_file_name = f"{geo_boundary}_lad_job.csv"
-    lad_household_abgrowth_file_name = f"{geo_boundary}_lad_household_growth.csv"
+    lad_population_file_name = f"{geo_boundary}_lad_population.csv" # use this
+    lad_job_file_name = f"{geo_boundary}_lad_job.csv" # use this 
+    lad_household_abgrowth_file_name = f"{geo_boundary}_lad_household_growth.csv" 
     lad_population_abgrowth_file_name = f"{geo_boundary}_lad_population_growth.csv"
     lad_job_abgrowth_file_name = f"{geo_boundary}_lad_job_growth.csv"
     utilities.write_to_csv(
