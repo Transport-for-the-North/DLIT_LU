@@ -148,7 +148,7 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Compute zonal area if enabled
         if compute_area:
-            by_data = self._compute_zonal_area(
+            by_data = self._compute_zonal_area_dia(
                 self.zone_gdf, by_data, zone_gdf_id_col, group_by_column
             )
 
@@ -241,7 +241,7 @@ class ZoneTranslator(BaseZoneHandler):
         ].sum()
         return aggregated_df
 
-    def _compute_zonal_area(
+    def _compute_zonal_area_dia(
         self,
         zone_gdf: gpd.GeoDataFrame,
         zone_df: pd.DataFrame,
@@ -274,10 +274,11 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Compute area in square meters
         zone_gdf["area_sqm"] = zone_gdf.geometry.area
+        zone_gdf["diameter"] = 2 * np.sqrt(zone_gdf["area_sqm"] / np.pi)
 
         # Merge area information into zone_data DataFrame
         zone_df = zone_df.merge(
-            zone_gdf[[zone_gdf_id_col, "area_sqm"]],
+            zone_gdf[[zone_gdf_id_col, "area_sqm", "diameter"]],
             left_on=zone_df_id_col,
             right_on=zone_gdf_id_col,
             how="left",
@@ -643,13 +644,13 @@ class SiteZoneProcessor(BaseZoneHandler):
 
             site_data[f"n_{centroid_type}_x"] = (
                 site_data[f"{centroid_type}_x"] * site_data["household"]
-                + site_data["easting"] * site_data["sum_from_2024_to_last"]
-            ) / (site_data["household"] + site_data["sum_from_2024_to_last"])
+                + site_data["easting"] * site_data["sum_proposed"]
+            ) / (site_data["household"] + site_data["sum_proposed"])
 
             site_data[f"n_{centroid_type}_y"] = (
                 site_data[f"{centroid_type}_y"] * site_data["household"]
-                + site_data["northing"] * site_data["sum_from_2024_to_last"]
-            ) / (site_data["household"] + site_data["sum_from_2024_to_last"])
+                + site_data["northing"] * site_data["sum_proposed"]
+            ) / (site_data["household"] + site_data["sum_proposed"])
 
             # Compute centroid shift distance
             site_data["centroid_shift"] = np.sqrt(
@@ -661,13 +662,13 @@ class SiteZoneProcessor(BaseZoneHandler):
         elif centroid_type == "emp":
             site_data[f"n_{centroid_type}_x"] = (
                 site_data[f"{centroid_type}_x"] * site_data["jobs"]
-                + site_data["easting"] * site_data["sum_from_2024_to_last"]
-            ) / (site_data["jobs"] + site_data["sum_from_2024_to_last"])
+                + site_data["easting"] * site_data["sum_proposed"]
+            ) / (site_data["jobs"] + site_data["sum_proposed"])
 
             site_data[f"n_{centroid_type}_y"] = (
                 site_data[f"{centroid_type}_y"] * site_data["jobs"]
-                + site_data["northing"] * site_data["sum_from_2024_to_last"]
-            ) / (site_data["jobs"] + site_data["sum_from_2024_to_last"])
+                + site_data["northing"] * site_data["sum_proposed"]
+            ) / (site_data["jobs"] + site_data["sum_proposed"])
 
             # Compute centroid shift distance
             site_data["centroid_shift"] = np.sqrt(
@@ -684,6 +685,7 @@ class SiteZoneProcessor(BaseZoneHandler):
     def streamline_dataset(
         self,
         site_data: pd.DataFrame,
+        key_columns: list[str]
     ) -> pd.DataFrame:
         """
         Streamline the site data with necessary columns and renaming.
@@ -695,34 +697,24 @@ class SiteZoneProcessor(BaseZoneHandler):
 
         # Define required columns and rename mapping
         rename_mapping = {
-            "value_estimated": "value_estimated",
-            "sum_from_2024_to_last": "sum_proposed",
-            "household": "Exsiting_Household",
-            "population": "Existing_Population",
-            "jobs": "Existing_Jobs",
-            "ho_den": "ho_den",
-            "po_den": "po_den",
-            "jo_den": "jo_den",
-            "centroid_shift": "centroid_shift",
-            "n_e_ratio": "n_e_ratio",
+            "household": "exsiting_Household",
+            "population": "existing_Population",
+            "jobs": "existing_Jobs",
         }
 
         # Select necessary columns
         streamlined_data = site_data[
-            [
-                "site_reference_id",
-                "easting",
-                "northing",
+            key_columns + [
                 zone_column,
                 "value_estimated",
-                "sum_from_2024_to_last",
+                "sum_proposed",
                 "household",
                 "population",
                 "jobs",
                 "ho_den",
                 "po_den",
                 "jo_den",
-                "centroid_shift",
+                "ctrd_shift_ratio",
                 "n_e_ratio",
             ]
         ].rename(columns=rename_mapping)
@@ -764,25 +756,24 @@ def process_site_data(
     by_data: pd.DataFrame,
     site_type: str,
     site_reference_ids: list,
+    key_columns: list[str],
+    build_out_columns: list,
+    probability_dict: dict,
     sitezone_processor: SiteZoneProcessor,
 ):
     LOG.info(f"Processing {site_type} site data")
 
-    # Find the last column (year) in your dataframe
-    last_year = site_data.columns[site_data.columns.str.isnumeric()].astype(int).max()
-
-    # Create a new column 'sum_from_2024_to_last' which is the sum of the columns from 2024 to the last year
-    site_data["sum_from_2024_to_last"] = site_data.loc[:, "2024" : str(last_year)].sum(
+    # Create a new column 'sum_proposed' which is the sum of the columns from 2024 to the last year
+    site_data["sum_proposed"] = site_data.loc[:, build_out_columns].sum(
         axis=1
     )
-    columns_to_keep = [
-        "site_reference_id",
-        "easting",
-        "northing",
-        "sum_from_2024_to_last",
+    columns_to_keep = key_columns + [
+        "sum_proposed",
     ]
     site_data = site_data[columns_to_keep]
 
+    site_data["prob_val"] = site_data["web_tag_certainty"].map(probability_dict)
+    site_data["sum_proposed"] = site_data["prob_val"] * site_data["sum_proposed"]
     # Map development sites to pre-defined zone
     site_zone_sites = sitezone_processor.zone_site_geospatial_lookup(site_data)
 
@@ -802,12 +793,12 @@ def process_site_data(
     if site_type == "Residential":
         # Calculate the ratio for Residential sites using household data
         site_zone_sites[ratio_column] = (
-            site_zone_sites["sum_from_2024_to_last"] / site_zone_sites["household"]
+            site_zone_sites["sum_proposed"] / site_zone_sites["household"]
         )
     elif site_type == "Employment":
         # Calculate the ratio for Employment sites using jobs data
         site_zone_sites[ratio_column] = (
-            site_zone_sites["sum_from_2024_to_last"] / site_zone_sites["jobs"]
+            site_zone_sites["sum_proposed"] / site_zone_sites["jobs"]
         )
     else:
         # For any other site type, default ratio calculation (can be customized as needed)
@@ -815,7 +806,7 @@ def process_site_data(
             f"Unknown site type: {site_type}. Defaulting to a ratio using jobs."
         )
         site_zone_sites[ratio_column] = (
-            site_zone_sites["sum_from_2024_to_last"] / site_zone_sites["jobs"]
+            site_zone_sites["sum_proposed"] / site_zone_sites["jobs"]
         )
 
     LOG.info(f"Calculating centroid shift caused by {site_type} sites")
@@ -826,7 +817,12 @@ def process_site_data(
             site_zone_sites, centroid_type
         )
 
-    site_zone_sites = sitezone_processor.streamline_dataset(site_zone_sites)
+    ctrd_shift_ratio_col = "ctrd_shift_ratio"
+    site_zone_sites[ctrd_shift_ratio_col] = site_zone_sites["centroid_shift"]/site_zone_sites["diameter"]
+
+    site_zone_sites = sitezone_processor.streamline_dataset(site_zone_sites, key_columns)
+
+
     return site_zone_sites
 
 
@@ -859,7 +855,7 @@ def process_stats(
 
 def cal_site_weight(
     site_data: pd.DataFrame,
-    columns_to_explore: list,
+    columns_to_explore: list[str],
     category: str = "residential",
     zscore_suffix: str = "zscore",
     weight_dict: dict = None,
@@ -874,6 +870,8 @@ def cal_site_weight(
     ----------
     site_data : pd.DataFrame
         DataFrame containing the site data with various z-scores and other data.
+    columns_to_explore: list[str]
+        List of columns to be further converted to standardised values.
     category : str, optional
         Category name, defaults to 'residential'. Determines how transformations are applied.
     zscore_suffix : str, optional
@@ -937,7 +935,7 @@ def cal_site_weight(
             "po_den_index": 0,
             "jo_den_index": 0.05,
             "n_e_ratio_index": 0.1,
-            "centroid_shift_index": 0.4,
+            "ctrd_shift_ratio_index": 0.4,
         }
 
     # Create 'weighted_index' column by calculating the weighted average
@@ -1035,11 +1033,11 @@ def large_sites(
 
 
 def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
-    """runs process for converting DLOG to MSOA build out profiles
+    """runs process for converting DLOG to zone build out profiles
 
     disaggregaes mixed into employment and residential and land use codes
     applys dwelling types using land use split by MSOA
-    rebases to MSOA build-out profiles
+    rebases to zone build-out profiles
 
     Parameters
     ----------
@@ -1056,8 +1054,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Initialising Development Pattern Module")
 
     config.output_folder.mkdir(exist_ok=True)
-    # dp_output_path = config.output_folder / "05_dev_pattern_outputs"
-    # dp_output_path.mkdir(exist_ok=True)
 
     site_assessment = lu.disagg_mixed(utilities.to_dict(input_data))
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
@@ -1070,9 +1066,10 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     geo_boundary = config.dev_pattern.geo_boundary
     base_year = config.dev_pattern.base_year
     base_year_int = int(base_year)
-    key_output_path = config.output_folder / f"{geo_boundary}"
+    key_output_path = config.output_folder / f"05_{geo_boundary}"
     key_output_path.mkdir(exist_ok=True)
 
+    key_columns = ["site_reference_id", "easting", "northing", "web_tag_certainty"]
     build_out_columns = np.arange(base_year_int + 1, 2067, 1).tolist()
     build_out_columns = [str(year) for year in build_out_columns]
 
@@ -1126,7 +1123,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info(
         f"Sum of Totals after translating LSOA to pre-defined zone-- Total Household: {by_tot_hhs_post}, Total Population: {by_tot_pops_post}, Total Jobs: {by_tot_jobs_post}"
     )
-    columns_stats = [
+    by_columns_stats = [
         "household",
         "population",
         "jobs",
@@ -1134,18 +1131,28 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "po_den",
         "jo_den",
     ]
-    by_data_stats = stats.basic_statistics(by_data, columns_stats)
+    by_data_stats = stats.basic_statistics(by_data, by_columns_stats)
     by_data_file = f"by_{geo_boundary}_data.csv"
     by_data_stats_file = f"by_{geo_boundary}_data_stats.csv"
     utilities.write_to_csv(key_output_path / by_data_file, by_data)
     utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Processing site data for year 2024 upwards")
+    probability_dict = {
+            "Near certain": 1,
+            "More than likely": 0.75,
+            "Reasonably forseeable": 0.65,
+            "Hypothetical": 0.0,
+            "Not specified": 0.0,
+    }
     res_zone_sites = process_site_data(
         res_sites,
         by_data,
         "Residential",
         resi_estsite_reference_ids,
+        key_columns,
+        build_out_columns,
+        probability_dict,
         SiteZoneProcessor(geo_boundary, config),
     ).fillna(0)
     emp_zone_sites = process_site_data(
@@ -1153,6 +1160,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         by_data,
         "Employment",
         emp_estsite_reference_ids,
+        key_columns,
+        build_out_columns,
+        probability_dict,
         SiteZoneProcessor(geo_boundary, config),
     ).fillna(0)
 
@@ -1163,7 +1173,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "po_den",
         "jo_den",
         "n_e_ratio",
-        "centroid_shift",
+        "ctrd_shift_ratio",
     ]
 
     LOG.info("Calculating zscores of each attribute")
@@ -1173,8 +1183,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     emp_stats, emp_z_scores = process_stats(
         emp_zone_sites, "Employment", columns_to_explore
     )
-    res_stats_file = "residential_sites_stats_{geo_boundary}.csv"
-    emp_stats_file = "employment_sites_stats_{geo_boundary}.csv"
+    res_stats_file = f"residential_sites_stats_{geo_boundary}.csv"
+    emp_stats_file = f"employment_sites_stats_{geo_boundary}.csv"
 
     utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
     utilities.write_to_csv(key_output_path / emp_stats_file, emp_stats)
@@ -1231,12 +1241,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "zscore"
     ]  # could also work out weighted index using 'robust_zscore', 'modified_zscore'
     res_weight_dict = {
-        "sum_proposed_index": 0.6,
-        "ho_den_index": 0.19,
+        "sum_proposed_index": 0.25,
+        "ho_den_index": 0.25,
         "po_den_index": 0,
-        "jo_den_index": 0.01,
-        "n_e_ratio_index": 0.1,
-        "centroid_shift_index": 0.1,
+        "jo_den_index": 0.05,
+        "n_e_ratio_index": 0.2,
+        "ctrd_shift_ratio_index": 0.25,
     }
     emp_weight_dict = {
         "sum_proposed_index": 0.4,
@@ -1244,7 +1254,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "po_den_index": 0,
         "jo_den_index": 0.25,
         "n_e_ratio_index": 0.1,
-        "centroid_shift_index": 0.2,
+        "ctrd_shift_ratio_index": 0.2,
     }
     # Initialize empty lists to store dataframes
     res_site_counts = []
@@ -1290,8 +1300,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     res_site_count_summary = pd.concat(res_site_counts, axis=1)
     emp_site_count_summary = pd.concat(emp_site_counts, axis=1)
     # Write final results to CSV files
-    res_site_count_summary_file = "residential_sites_count_summary.csv"
-    emp_site_count_summary_file = "employment_sites_count_summary.csv"
+    res_site_count_summary_file = f"residential_sites_count_{geo_boundary}_summary.csv"
+    emp_site_count_summary_file = f"employment_sites_count_{geo_boundary}_summary.csv"
     utilities.write_to_csv(
         config.output_folder / res_site_count_summary_file, res_site_count_summary
     )
@@ -1304,7 +1314,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         res_zone_sites,
         res_z_scores_withindex,
         index_col="weighted_index",
-        index_threshold=1.1,
+        index_threshold=1.5,
     )
     emp_zone_sites_index, large_emp_sites, emp_large_site_list = large_sites(
         emp_zone_sites,
@@ -1331,8 +1341,17 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     site_size_column = "site_size"
     hh_sites = res_sites.copy()
     hh_sites[site_size_column] = np.where(hh_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    hh_sites["prob_val"] = hh_sites["web_tag_certainty"].map(probability_dict)
+    hh_sites[build_out_columns] = hh_sites[build_out_columns].multiply(hh_sites["prob_val"], axis=0)
+
     pop_tt_sites[site_size_column] =  np.where(pop_tt_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    pop_tt_sites["prob_val"] = pop_tt_sites["web_tag_certainty"].map(probability_dict)
+    pop_tt_sites[build_out_columns] = pop_tt_sites[build_out_columns].multiply(pop_tt_sites["prob_val"], axis=0)
+
     job_sic_soc_sites[site_size_column] =  np.where(job_sic_soc_sites["site_reference_id"].isin(emp_large_site_list), "large", "small")
+    job_sic_soc_sites["prob_val"] = job_sic_soc_sites["web_tag_certainty"].map(probability_dict)
+    job_sic_soc_sites[build_out_columns] = job_sic_soc_sites[build_out_columns].multiply(job_sic_soc_sites["prob_val"], axis=0)
+
     site_zone_processer = SiteZoneProcessor(geo_boundary, config)
     hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(hh_sites)
     pop_tt_sites_zone = site_zone_processer.zone_site_geospatial_lookup(pop_tt_sites)
