@@ -760,6 +760,7 @@ def process_site_data(
     build_out_columns: list,
     probability_dict: dict,
     sitezone_processor: SiteZoneProcessor,
+    use_prob_for_size: bool,
 ):
     LOG.info(f"Processing {site_type} site data")
 
@@ -773,7 +774,8 @@ def process_site_data(
     site_data = site_data[columns_to_keep]
 
     site_data["prob_val"] = site_data["web_tag_certainty"].map(probability_dict)
-    site_data["sum_proposed"] = site_data["prob_val"] * site_data["sum_proposed"]
+    if use_prob_for_size:
+        site_data["sum_proposed"] = site_data["prob_val"] * site_data["sum_proposed"]
     # Map development sites to pre-defined zone
     site_zone_sites = sitezone_processor.zone_site_geospatial_lookup(site_data)
 
@@ -1139,9 +1141,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     LOG.info("Processing site data for year 2024 upwards")
     probability_dict = {
-            "Near certain": 1,
-            "More than likely": 0.75,
-            "Reasonably forseeable": 0.65,
+            "Near certain": 0.9,
+            "More than likely": 0.7,
+            "Reasonably forseeable": 0.5,
             "Hypothetical": 0.0,
             "Not specified": 0.0,
     }
@@ -1154,6 +1156,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         build_out_columns,
         probability_dict,
         SiteZoneProcessor(geo_boundary, config),
+        use_prob_for_size=False,
     ).fillna(0)
     emp_zone_sites = process_site_data(
         emp_sites,
@@ -1164,6 +1167,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         build_out_columns,
         probability_dict,
         SiteZoneProcessor(geo_boundary, config),
+        use_prob_for_size=False,
     ).fillna(0)
 
     # Columns to explore for both residential and employment sites
