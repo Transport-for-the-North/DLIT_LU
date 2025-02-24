@@ -5,7 +5,7 @@
 # standard imports
 import logging
 import pathlib
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # third party imports
 import pandas as pd
@@ -23,11 +23,11 @@ LOG = logging.getLogger(__name__)
 
 
 class BaseZoneHandler:
-    def __init__(self, geo_boundary: str, config: inputs.DLitConfig):
-        self.geo_boundary = geo_boundary
-        self.config = config
-        self.zone_info_map = {
-            "lsoa": {
+    def __init__(self, config: inputs.DLitConfig):
+        self.geo_boundary: inputs.GeoBoundary = config.dev_pattern.geo_boundary
+        self.config: inputs.DLitConfig = config
+        self.zone_info_map: Dict[inputs.GeoBoundary, Dict[str, Any]] = {
+            inputs.GeoBoundary.LSOA: {
                 "shapefile_path": config.land_use.lsoa_shapefile_path,
                 "group_by_column": "lsoa2021_id",
                 "zone_gdf_id_col": "LSOA21CD",
@@ -38,12 +38,15 @@ class BaseZoneHandler:
                     "emp": config.dev_pattern.lsoa_emp_centroids,
                     "pop": config.dev_pattern.lsoa_pop_centroids,
                 },
+                "zone_to_lad_path": config.dev_pattern.summary_data.lsoa_to_lad_file,
+                "lad_id_col": "lad2013_id",
+                "zone_to_lad_prop": "lsoa2021_to_lad2013",
             },
-            "normits": {
+            inputs.GeoBoundary.NORMITS: {
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
                 "group_by_column": "normits_v3.3_id",
                 "zone_gdf_id_col": "normits_id",
-                "prop_column": "lsoa_2021_to_normits_v3.3",
+                "prop_column": "lsoa2021_to_normits_v3.3",
                 "translation_path": config.dev_pattern.lsoa_to_normits,
                 "centroid_files": {
                     "hh": config.dev_pattern.normits_hh_centroids,
@@ -51,51 +54,60 @@ class BaseZoneHandler:
                     "pop": config.dev_pattern.normits_pop_centroids,
                 },
                 "zone_to_lad_path": config.dev_pattern.summary_data.normits_to_lad_file,
-                "lad_id_col": "lad2011_id",
-                "zone_to_lad_prop": "normits_v3.3_to_lad2011",
+                "lad_id_col": "lad2013_id",
+                "zone_to_lad_prop": "normits_v3.3_to_lad2013",
             },
-            "noham": {
+            inputs.GeoBoundary.NOHAM: {
                 "shapefile_path": config.dev_pattern.noham_shapefile_path,
-                "group_by_column": "noham_id",
+                "group_by_column": "noham_v3.7_id",
                 "zone_gdf_id_col": "ZONE ID_v3",
-                "prop_column": "lsoa2021_to_noham",
+                "prop_column": "lsoa2021_to_noham_v3.7",
                 "translation_path": config.dev_pattern.lsoa_to_noham,
                 "centroid_files": {
                     "hh": config.dev_pattern.noham_hh_centroids,
                     "emp": config.dev_pattern.noham_emp_centroids,
                     "pop": config.dev_pattern.noham_pop_centroids,
                 },
+                "zone_to_lad_path": config.dev_pattern.summary_data.noham_to_lad_file,
+                "lad_id_col": "lad2013_id",
+                "zone_to_lad_prop": "noham_v3.7_to_lad2013",
             },
-            "norms": {
+            inputs.GeoBoundary.NORMS: {
                 "shapefile_path": config.dev_pattern.norms_shapefile_path,
-                "group_by_column": "norms_id",
+                "group_by_column": "norms_v3.3_id",
                 "zone_gdf_id_col": "unique_id",
-                "prop_column": "lsoa_2021_to_norms",
+                "prop_column": "lsoa2021_to_norms_v3.3",
                 "translation_path": config.dev_pattern.lsoa_to_norms,
                 "centroid_files": {
                     "hh": config.dev_pattern.norms_hh_centroids,
                     "emp": config.dev_pattern.norms_emp_centroids,
                     "pop": config.dev_pattern.norms_pop_centroids,
                 },
+                "zone_to_lad_path": config.dev_pattern.summary_data.norms_to_lad_file,
+                "lad_id_col": "lad2013_id",
+                "zone_to_lad_prop": "norms_v3.3_to_lad2013",
             },
-            "msoa": {
+            inputs.GeoBoundary.MSOA: {
                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
                 "group_by_column": "msoa2021_id",
                 "zone_gdf_id_col": "MSOA21CD",
-                "prop_column": "lsoa_2021_to_msoa",
+                "prop_column": "lsoa2021_to_msoa2021",
                 "translation_path": config.dev_pattern.lsoa_to_msoa,
                 "centroid_files": {
                     "hh": config.dev_pattern.msoa_hh_centroids,
                     "emp": config.dev_pattern.msoa_emp_centroids,
                     "pop": config.dev_pattern.msoa_pop_centroids,
                 },
+                "zone_to_lad_path": config.dev_pattern.summary_data.msoa_to_lad_file,
+                "lad_id_col": "lad2013_id",
+                "zone_to_lad_prop": "msoa2021_to_lad2013",
             },
         }
 
-        if geo_boundary not in self.zone_info_map:
-            raise ValueError(f"Unsupported geo_boundary: {geo_boundary}")
+        if self.geo_boundary not in self.zone_info_map:
+            raise ValueError(f"Unsupported geo_boundary: {self.geo_boundary}")
 
-        self.zone_info = self.zone_info_map[geo_boundary]
+        self.zone_info: Dict[str, Any] = self.zone_info_map[self.geo_boundary]
         self.zone_gdf = parser.parse_zone(self.zone_info["shapefile_path"])
 
 
@@ -951,7 +963,7 @@ def cal_site_weight(
 
     # Final weighted index, ensuring the total weight sums to 1
     site_data[index_col] = weighted_sum / total_weight
-    site_data[index_col] = site_data[index_col] * site_data["site_with_realval"]
+    site_data[index_col] = site_data[index_col] * site_data["site_with_realval"] * site_data["prob_val"]
     columns_to_explore_index = [col + "_index" for col in columns_to_explore]
     columns = ["site_reference_id"] + [index_col] + columns_to_explore_index
 
@@ -974,7 +986,10 @@ def count_sites(
         -2,
         -1,
         0,
+        0.2,
+        0.4,
         0.6,
+        0.8,
         1,
         1.1,
         1.2,
@@ -1066,10 +1081,10 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     by_data_tot = pd.read_csv(config.dev_pattern.lsoa_data_path)
     # load ddg_pop_lad and ddg_emp_lad
 
-    geo_boundary = config.dev_pattern.geo_boundary
+    model_zone = config.dev_pattern.geo_boundary.value
     base_year = config.dev_pattern.base_year
     base_year_int = int(base_year)
-    key_output_path = config.output_folder / f"05_{geo_boundary}"
+    key_output_path = config.output_folder / f"05_{model_zone}"
     key_output_path.mkdir(exist_ok=True)
 
     key_columns = ["site_reference_id", "easting", "northing", "web_tag_certainty"]
@@ -1098,8 +1113,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info(
         f"Sum of Input Totals-- Total Household: {by_tot_hhs_prev}, Total Population: {by_tot_pops_prev}, Total Jobs: {by_tot_jobs_prev}"
     )
-    zone_translator = ZoneTranslator(geo_boundary, config)
-    if geo_boundary == "lsoa":
+    zone_translator = ZoneTranslator(config)
+    if model_zone == inputs.GeoBoundary.LSOA:
         by_data = zone_translator.merge_data(
             by_data_tot,
             merge_translation_data = False,
@@ -1126,6 +1141,21 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info(
         f"Sum of Totals after translating LSOA to pre-defined zone-- Total Household: {by_tot_hhs_post}, Total Population: {by_tot_pops_post}, Total Jobs: {by_tot_jobs_post}"
     )
+    totals_dict = {
+        "Category": ["Household", "Population", "Jobs"],
+        "Before Translation": [by_tot_hhs_prev, by_tot_pops_prev, by_tot_jobs_prev],
+        "After Translation": [by_tot_hhs_post, by_tot_pops_post, by_tot_jobs_post]
+    }
+    totals_df = pd.DataFrame(totals_dict)
+    # Format the numbers with commas as thousand separators
+    totals_df["Before Translation"] = totals_df["Before Translation"].apply(lambda x: "{:,}".format(x))
+    totals_df["After Translation"] = totals_df["After Translation"].apply(lambda x: "{:,}".format(x))
+    # Specify the output file path
+    totals_df_file = f"totals_before_after_{model_zone}_translation.csv"
+
+    # Save the DataFrame to a CSV file
+    utilities.write_to_csv(key_output_path / totals_df_file, totals_df)
+
     by_columns_stats = [
         "household",
         "population",
@@ -1135,8 +1165,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "jo_den",
     ]
     by_data_stats = stats.basic_statistics(by_data, by_columns_stats)
-    by_data_file = f"by_{geo_boundary}_data.csv"
-    by_data_stats_file = f"by_{geo_boundary}_data_stats.csv"
+    by_data_file = f"by_{model_zone}_data.csv"
+    by_data_stats_file = f"by_{model_zone}_data_stats.csv"
     utilities.write_to_csv(key_output_path / by_data_file, by_data)
     utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
@@ -1156,7 +1186,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_columns,
         build_out_columns,
         probability_dict,
-        SiteZoneProcessor(geo_boundary, config),
+        SiteZoneProcessor(config),
         use_prob_for_size=False,
     ).fillna(0)
     emp_zone_sites = process_site_data(
@@ -1167,7 +1197,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_columns,
         build_out_columns,
         probability_dict,
-        SiteZoneProcessor(geo_boundary, config),
+        SiteZoneProcessor(config),
         use_prob_for_size=False,
     ).fillna(0)
 
@@ -1188,8 +1218,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     emp_stats, emp_z_scores = process_stats(
         emp_zone_sites, "Employment", columns_to_explore
     )
-    res_stats_file = f"residential_sites_stats_{geo_boundary}.csv"
-    emp_stats_file = f"employment_sites_stats_{geo_boundary}.csv"
+    res_stats_file = f"residential_sites_stats_{model_zone}.csv"
+    emp_stats_file = f"employment_sites_stats_{model_zone}.csv"
 
     utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
     utilities.write_to_csv(key_output_path / emp_stats_file, emp_stats)
@@ -1200,7 +1230,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     if enable_visualization:
         LOG.info("Attribute value distribution plot")
         plot_path = (
-            config.output_folder / f"{geo_boundary}_plot_distribution_attributes"
+            config.output_folder / f"{model_zone}_plot_distribution_attributes"
         )
         plot_path.mkdir(exist_ok=True)
 
@@ -1246,12 +1276,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "zscore"
     ]  # could also work out weighted index using 'robust_zscore', 'modified_zscore'
     res_weight_dict = {
-        "sum_proposed_index": 0.25,
-        "ho_den_index": 0.25,
+        "sum_proposed_index": 0.35,
+        "ho_den_index": 0.3,
         "po_den_index": 0,
         "jo_den_index": 0.05,
-        "n_e_ratio_index": 0.2,
-        "ctrd_shift_ratio_index": 0.25,
+        "n_e_ratio_index": 0.05,
+        "ctrd_shift_ratio_index": 0.3,
     }
     emp_weight_dict = {
         "sum_proposed_index": 0.4,
@@ -1305,8 +1335,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     res_site_count_summary = pd.concat(res_site_counts, axis=1)
     emp_site_count_summary = pd.concat(emp_site_counts, axis=1)
     # Write final results to CSV files
-    res_site_count_summary_file = f"residential_sites_count_{geo_boundary}_summary.csv"
-    emp_site_count_summary_file = f"employment_sites_count_{geo_boundary}_summary.csv"
+    res_site_count_summary_file = f"residential_sites_count_{model_zone}_summary.csv"
+    emp_site_count_summary_file = f"employment_sites_count_{model_zone}_summary.csv"
     utilities.write_to_csv(
         config.output_folder / res_site_count_summary_file, res_site_count_summary
     )
@@ -1319,22 +1349,22 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         res_zone_sites,
         res_z_scores_withindex,
         index_col="weighted_index",
-        index_threshold=1.5,
+        index_threshold=1,
     )
     emp_zone_sites_index, large_emp_sites, emp_large_site_list = large_sites(
         emp_zone_sites,
         emp_z_scores_withindex,
         index_col="weighted_index",
-        index_threshold=0.6,
+        index_threshold=0.2,
     )
 
-    res_file_name = f"residential_site_{geo_boundary}.csv"
-    emp_file_name = f"employment_site_{geo_boundary}.csv"
+    res_file_name = f"residential_site_{model_zone}.csv"
+    emp_file_name = f"employment_site_{model_zone}.csv"
     utilities.write_to_csv(key_output_path / res_file_name, res_zone_sites_index)
     utilities.write_to_csv(key_output_path / emp_file_name, emp_zone_sites_index)
 
-    large_res_sites_file_name = f"large_residential_site_{geo_boundary}.csv"
-    large_emp_sites_file_name = f"large_employment_site_{geo_boundary}.csv"
+    large_res_sites_file_name = f"large_residential_site_{model_zone}.csv"
+    large_emp_sites_file_name = f"large_employment_site_{model_zone}.csv"
     utilities.write_to_csv(
         key_output_path / large_res_sites_file_name, large_res_sites
     )
@@ -1357,7 +1387,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     job_sic_soc_sites["prob_val"] = job_sic_soc_sites["web_tag_certainty"].map(probability_dict)
     job_sic_soc_sites[build_out_columns] = job_sic_soc_sites[build_out_columns].multiply(job_sic_soc_sites["prob_val"], axis=0)
 
-    site_zone_processer = SiteZoneProcessor(geo_boundary, config)
+    site_zone_processer = SiteZoneProcessor(config)
     hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(hh_sites)
     pop_tt_sites_zone = site_zone_processer.zone_site_geospatial_lookup(pop_tt_sites)
     job_sic_soc_sites_zone = site_zone_processer.zone_site_geospatial_lookup(job_sic_soc_sites)
@@ -1413,11 +1443,11 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     job_sic_soc_zone_header_list = job_sic_soc_zone.columns.to_list()
     print("The header of the output zonal job segmented by tt: ", job_sic_soc_zone_header_list)
 
-    zonal_household_file_name = f"{geo_boundary}_zonal_household.csv"
-    zonal_population_file_name = f"{geo_boundary}_zonal_population.csv"
-    zonal_job_file_name = f"{geo_boundary}_zonal_job.csv"    
-    pop_tt_zone_file_name = f"{geo_boundary}_zonal_new_population_by_tt.csv.bz2"
-    job_sic_soc_zone_file_name = f"{geo_boundary}_zonal_new_job_by_sic_soc.csv.bz2"
+    zonal_household_file_name = f"{model_zone}_zonal_household.csv"
+    zonal_population_file_name = f"{model_zone}_zonal_population.csv"
+    zonal_job_file_name = f"{model_zone}_zonal_job.csv"    
+    pop_tt_zone_file_name = f"{model_zone}_zonal_new_population_by_tt.csv.bz2"
+    job_sic_soc_zone_file_name = f"{model_zone}_zonal_new_job_by_sic_soc.csv.bz2"
 
     utilities.write_to_csv(
         key_output_path / zonal_household_file_name, zonal_household
@@ -1453,12 +1483,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         build_out_columns,
     )
 
-    lad_household_file_name = f"{geo_boundary}_lad_household.csv"
-    lad_population_file_name = f"{geo_boundary}_lad_population.csv" # use this
-    lad_job_file_name = f"{geo_boundary}_lad_job.csv" # use this 
-    lad_household_abgrowth_file_name = f"{geo_boundary}_lad_household_growth.csv" 
-    lad_population_abgrowth_file_name = f"{geo_boundary}_lad_population_growth.csv"
-    lad_job_abgrowth_file_name = f"{geo_boundary}_lad_job_growth.csv"
+    lad_household_file_name = f"{model_zone}_lad_household.csv"
+    lad_population_file_name = f"{model_zone}_lad_population.csv" # use this
+    lad_job_file_name = f"{model_zone}_lad_job.csv" # use this 
+    lad_household_abgrowth_file_name = f"{model_zone}_lad_household_growth.csv" 
+    lad_population_abgrowth_file_name = f"{model_zone}_lad_population_growth.csv"
+    lad_job_abgrowth_file_name = f"{model_zone}_lad_job_growth.csv"
     utilities.write_to_csv(
         key_output_path / lad_household_file_name, lad_household
     )

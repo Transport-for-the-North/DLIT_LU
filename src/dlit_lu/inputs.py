@@ -29,6 +29,21 @@ class GFAInfillMethod(enum.Enum):
         return [cls.REGRESSION, cls.REGRESSION_NO_NEGATIVES]
 
 
+class GeoBoundary(enum.Enum):
+    """Geography boundary options for processing site data."""
+    LSOA = "lsoa"
+    NORMITS = "normits"
+    NOHAM = "noham"
+    NORMS = "norms"
+    MSOA = "msoa"
+
+    @classmethod
+    def list_boundaries(cls) -> list[str]:
+        """Returns a list of all available geography boundary options as strings."""
+        return [boundary.value for boundary in cls]
+    
+
+
 @dataclasses.dataclass
 class InfillConfig:
     """Manages reading / writing the tool's config file.
@@ -86,7 +101,10 @@ class SummaryInputs:
 
     summary_zone_name: str
     normits_to_lad_file: pydantic.FilePath
-    # lsoa_to_lad_file: pydantic.FilePath
+    lsoa_to_lad_file: pydantic.FilePath
+    msoa_to_lad_file: pydantic.FilePath
+    norms_to_lad_file: pydantic.FilePath
+    noham_to_lad_file: pydantic.FilePath
     shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
@@ -126,8 +144,6 @@ class LandUseConfig:
     lsoa_dwelling_pop_path: pydantic.FilePath
     lsoa_traveller_type_path: pydantic.FilePath
     lsoa_jobs_path: pydantic.FilePath
-    # lad_shapefile_path: pydantic.FilePath
-    # lsoa_to_lad: pydantic.FilePath
     # msoa_shapefile_path: pydantic.FilePath
     # msoa_dwelling_pop_path: pydantic.FilePath
     # msoa_traveller_type_path: pydantic.FilePath
@@ -185,7 +201,7 @@ class DevPatnConfig:
         path to jobs segmented by sic 2 digit and soc
     """
     base_year: str
-    geo_boundary: str
+    geo_boundary: GeoBoundary
     normits_shapefile_path: pydantic.FilePath
     noham_shapefile_path: pydantic.FilePath
     norms_shapefile_path: pydantic.FilePath

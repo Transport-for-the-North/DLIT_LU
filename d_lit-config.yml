@@ -49,7 +49,7 @@ land_use:
 dev_pattern:
   # Key input paths
   base_year: 2023
-  geo_boundary: normits # lsoa, normits, noham, norms, mosa2021
+  geo_boundary: normits # lsoa, normits, noham, norms, mosa
   assessment_input: I:\Data\D-Log\DLIT\Outputs\Test9_mean\00_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
   emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test9_mean\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
   res_site_data: I:\Data\D-Log\DLIT\Outputs\Test9_mean\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
@@ -65,9 +65,9 @@ dev_pattern:
   lsoa_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_hh_centroids.csv
   lsoa_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_emp_centroids.csv
   lsoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_pop_centroids.csv
-  normits_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_hh_centroids.csv
-  normits_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_emp_centroids.csv
-  normits_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_pop_centroids.csv
+  normits_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_hh_centroids.csv
+  normits_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_emp_centroids.csv
+  normits_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_pop_centroids.csv
   noham_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_hh_centroids.csv
   noham_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_emp_centroids.csv
   noham_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_pop_centroids.csv
@@ -79,15 +79,26 @@ dev_pattern:
   msoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_pop_centroids.csv
   # lookup paths
   lsoa_to_normits: I:\Data\D-Log\DLIT\Inputs\lsoa2021_normits_v3.3\lsoa2021_normits_v3.3_spatial.csv
-  lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa2021_noham\lsoa2021_to_noham_spatial.csv
-  lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa2021_norms\lsoa2021_to_norms_spatial.csv
+  lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa_2021_noham_v3.7\lsoa_2021_noham_v3.7_spatial.csv
+  lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa_2021_norms_v3.3\lsoa_2021_norms_v3.3_spatial.csv
   lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
   summary_data:
-    summary_zone_name: lad2011 # lad2013
-    # lsoa_to_lad_file:
-    normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normits_v3.3_lad2011\normits_v3.3_lad2011_spatial.csv
-    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp # 2013 shp file
-    shapefile_id_column: la # shp file id col
+    summary_zone_name: lad2013 # lad2013
+    ###### 2011 LAD #######
+    # lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\lsoa2021_lad2011\lsoa_2021_lad2011_spatial.csv
+    # msoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\msoa2021_lad2011\msoa_2021_lad2011_spatial.csv
+    # norms_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normsv3.3_lad2011\norms_v3.3_lad2011_spatial.csv
+    # noham_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\nohamv3.7_lad2011\noham_v3.7_lad2011_spatial.csv
+    # normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normits_v3.3_lad2011\normits_v3.3_lad2011_spatial.csv
+    ###### 2013 LAD #######
+    lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\lsoa2021_lad2013\lsoa2021_lad2013_spatial.csv
+    msoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\msoa2021_lad2013\msoa2021_lad2013_spatial.csv
+    norms_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\normsv3.3_lad2013\norms_v3.3_lad2013_spatial.csv
+    noham_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\nohamv3.7_lad2013\noham_v3.7_lad2013_spatial.csv
+    normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\normitsv3.3_lad2013\normits_v3.3_lad2013_spatial.csv
+    # shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2013\LAD_DEC_2013_GB_BFC_-119125151109105358\LAD_DEC_2013_GB_BFC.shp
+    shapefile_id_column: LAD13CD # shp file id col
     geometry_simplify_tolerance: 100
     ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
     ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
