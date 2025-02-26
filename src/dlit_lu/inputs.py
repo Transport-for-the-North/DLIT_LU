@@ -106,6 +106,8 @@ class SummaryInputs:
     norms_to_lad_file: pydantic.FilePath
     noham_to_lad_file: pydantic.FilePath
     shapefile: pydantic.FilePath
+    ddg_pop: pydantic.FilePath
+    ddg_emp: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
 
