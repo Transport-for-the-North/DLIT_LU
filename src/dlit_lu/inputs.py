@@ -101,8 +101,6 @@ class SummaryInputs:
 
     summary_lad: str
     summary_region: str
-    lad_name: pydantic.FilePath
-    region_name: pydantic.FilePath
     lad_to_region_file: pydantic.FilePath
     normits_to_lad_file: pydantic.FilePath
     lsoa_to_lad_file: pydantic.FilePath
@@ -116,6 +114,10 @@ class SummaryInputs:
     geometry_simplify_tolerance: int | None = None
 
 
+    # Add this to contraints class
+    # lad_name: pydantic.FilePath
+    # region_name: pydantic.FilePath
+    
 @dataclasses.dataclass
 class LandUseConfig:
     """Manages reading / writing the tool's config file.

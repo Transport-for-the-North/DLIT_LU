@@ -1,7 +1,12 @@
-# load ddg_data ():
-# def calculate growth rate():
-# merge ddg and dlog 
-# visualise 
+# load ddg_data dlog (lad)():
+# aggregate(): from lad to region - ddg and dlog.  Should have region and lad data. 8 Datasets - 4 in lad for ddg and dlog and 4 region ddg and region dlog
+# assign zone id to name(): 
+# def calculate growth rate(): 
+# merge ddg and dlog(): pop and emp , 4 dataframes 
+# visualise(): pop and emp 4 visuals 
+# save in 06>visuals , 06>output 
+
+
 
 # lad_population and lad_job call these 
 
