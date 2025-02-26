@@ -44,6 +44,8 @@ class BaseZoneHandler:
                 "zone_to_lad_path": config.dev_pattern.summary_data.lsoa_to_lad_file,
                 "lad_id_col": "lad2013_id",
                 "zone_to_lad_prop": "lsoa2021_to_lad2013",
+                "region_id_col": "ntem_region_id",
+                "lad_to_region_prop": "lad2013_to_ntem_region",
             },
             inputs.GeoBoundary.NORMITS: {
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
@@ -59,6 +61,8 @@ class BaseZoneHandler:
                 "zone_to_lad_path": config.dev_pattern.summary_data.normits_to_lad_file,
                 "lad_id_col": "lad2013_id",
                 "zone_to_lad_prop": "normits_v3.3_to_lad2013",
+                "region_id_col": "ntem_region_id",
+                "lad_to_region_prop": "lad2013_to_ntem_region",
             },
             inputs.GeoBoundary.NOHAM: {
                 "shapefile_path": config.dev_pattern.noham_shapefile_path,
@@ -74,6 +78,8 @@ class BaseZoneHandler:
                 "zone_to_lad_path": config.dev_pattern.summary_data.noham_to_lad_file,
                 "lad_id_col": "lad2013_id",
                 "zone_to_lad_prop": "noham_v3.7_to_lad2013",
+                "region_id_col": "ntem_region_id",
+                "lad_to_region_prop": "lad2013_to_ntem_region",
             },
             inputs.GeoBoundary.NORMS: {
                 "shapefile_path": config.dev_pattern.norms_shapefile_path,
@@ -89,6 +95,8 @@ class BaseZoneHandler:
                 "zone_to_lad_path": config.dev_pattern.summary_data.norms_to_lad_file,
                 "lad_id_col": "lad2013_id",
                 "zone_to_lad_prop": "norms_v3.3_to_lad2013",
+                "region_id_col": "ntem_region_id",
+                "lad_to_region_prop": "lad2013_to_ntem_region",
             },
             inputs.GeoBoundary.MSOA: {
                 "shapefile_path": config.dev_pattern.msoa_shapefile_path,
@@ -104,6 +112,8 @@ class BaseZoneHandler:
                 "zone_to_lad_path": config.dev_pattern.summary_data.msoa_to_lad_file,
                 "lad_id_col": "lad2013_id",
                 "zone_to_lad_prop": "msoa2021_to_lad2013",
+                "region_id_col": "ntem_region_id",
+                "lad_to_region_prop": "lad2013_to_ntem_region",
             },
         }
 
@@ -241,6 +251,40 @@ class ZoneTranslator(BaseZoneHandler):
         )
         return lad_data_annualgrowth, lad_data_annualtot
 
+    def region_summary(
+        self,
+        data: pd.DataFrame,
+        base_year_column: str,
+        future_year_columns: list,
+    ) -> pd.DataFrame:
+        """
+        Aggregate LAD data to region.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Input data containing LAD-level information.
+        Returns
+        -------
+        pd.DataFrame
+            Region data.
+        """
+        lookup_path = self.config.dev_pattern.summary_data.lad_to_region_file
+        lad_id = self.zone_info["lad_id_col"]
+        region_id = self.zone_info["region_id_col"]
+        lad_to_region_prop_col = self.zone_info["lad_to_region_prop"]
+        region_data_annual = self._lad_to_region(
+            data,
+            lookup_path,
+            lad_id,
+            base_year_column,
+            future_year_columns,
+            region_id,
+            lad_to_region_prop_col
+        )
+        region_data = region_data_annual.set_index(lad_id, region_id)
+
+        return region_data
 
     def _merge_translation_data(
         self,
@@ -477,6 +521,76 @@ class ZoneTranslator(BaseZoneHandler):
                 )
 
         return lad_agg
+    
+    def _lad_to_region(
+        self,
+        data: pd.DataFrame,
+        lookup_path: pathlib.Path,
+        lad_id: str,
+        base_year_column: str,
+        future_year_columns: list,
+        region_id: str,
+        lad_to_region_prop_col: str,
+    ) -> pd.DataFrame:
+        """
+        Aggregate LAD data to region level using a lookup file with proportional mapping.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing LAD-level data.
+        lookup_path : Path
+            Path to the lookup CSV file containing LAD-to-region mapping and proportion columns.
+        lad_id : str
+            Column name in data representing the LAD identifier.
+        val_cols : list
+            List of columns in data with values to be aggregated.
+        region_id : str
+            Column name in lookup representing the region identifier.
+        lad_to_region_prop_col : str
+            Column in lookup representing the proportion of LAD value allocated to each region.
+
+        Returns
+        -------
+        pd.DataFrame
+            Aggregated region-level DataFrame with the summed values.
+
+        Raises
+        ------
+        ValueError
+            If the total values before and after aggregation differ for any column.
+        """
+        # Load the lookup DataFrame
+        lookup_df = pd.read_csv(lookup_path)
+
+        # Check initial totals for all val_cols
+        val_cols = [base_year_column] + future_year_columns
+        totals_before = {col: data[col].sum() for col in val_cols}
+
+        # Merge data with lookup to assign regions and proportions
+        merged_df = data.merge(
+            lookup_df[[lad_id, region_id, lad_to_region_prop_col]],
+            on=lad_id,
+            how='left'
+        )
+
+        # Apply proportions to each value column
+        for col in val_cols:
+            merged_df[col] = merged_df[col] * merged_df[lad_to_region_prop_col]
+
+        # Group by region and sum the values
+        region_agg = merged_df.groupby(region_id, as_index=False)[val_cols].sum()
+
+        # Check totals after aggregation
+        totals_after = {col: region_agg[col].sum() for col in val_cols}
+
+        for col in val_cols:
+            if not np.isclose(totals_before[col], totals_after[col]):
+                raise ValueError(
+                    f"Total of '{col}' changed after aggregation: before={totals_before[col]}, after={totals_after[col]}"
+                )
+
+        return region_agg
 
 
     def _cumulative_yearly_totals(
@@ -1105,6 +1219,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     base_year_int = int(base_year)
     key_output_path = config.output_folder / f"05_{model_zone}"
     key_output_path.mkdir(exist_ok=True)
+    key_agg_path = config.output_folder / f"05_aggregation"
+    key_agg_path.mkdir(exist_ok=True)
 
     ddg_pop_lad = pd.read_csv(config.dev_pattern.summary_data.ddg_pop, index_col=False)
     ddg_emp_lad = pd.read_csv(config.dev_pattern.summary_data.ddg_emp, index_col=False)
@@ -1483,12 +1599,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_output_path / zonal_job_file_name, zonal_job
     )
 
-    # utilities.write_to_csv(
-    #     key_output_path / pop_tt_zone_file_name, pop_tt_zone
-    # )
-    # utilities.write_to_csv(
-    #     key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
-    # )
+    utilities.write_to_csv(
+        key_output_path / pop_tt_zone_file_name, pop_tt_zone
+    )
+    utilities.write_to_csv(
+        key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
+    )
 
     LOG.info("Aggregating zonal household, population and jobs to LAD")
     lad_household_ab_growth, lad_household = zone_translator.lad_summary(
@@ -1507,29 +1623,59 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         build_out_columns,
     )
 
-    lad_household_file_name = f"{model_zone}_lad_household.csv"
-    lad_population_file_name = f"{model_zone}_lad_population.csv"
-    lad_job_file_name = f"{model_zone}_lad_job.csv" 
-    lad_household_abgrowth_file_name = f"{model_zone}_lad_household_growth.csv" 
-    lad_population_abgrowth_file_name = f"{model_zone}_lad_population_growth.csv"
-    lad_job_abgrowth_file_name = f"{model_zone}_lad_job_growth.csv"
+    lad_household_file_name = "lad_household.csv"
+    lad_population_file_name = "lad_population.csv"
+    lad_job_file_name = "lad_job.csv" 
+    lad_household_abgrowth_file_name = "lad_household_growth.csv" 
+    lad_population_abgrowth_file_name = "lad_population_growth.csv"
+    lad_job_abgrowth_file_name = "lad_job_growth.csv"
     utilities.write_to_csv(
-        key_output_path / lad_household_file_name, lad_household
+        key_agg_path / lad_household_file_name, lad_household
     )
     utilities.write_to_csv(
-        key_output_path / lad_population_file_name, lad_population
+        key_agg_path / lad_population_file_name, lad_population
     )
     utilities.write_to_csv(
-        key_output_path / lad_job_file_name, lad_job
+        key_agg_path / lad_job_file_name, lad_job
     )
     utilities.write_to_csv(
-        key_output_path / lad_household_abgrowth_file_name, lad_household_ab_growth
+        key_agg_path / lad_household_abgrowth_file_name, lad_household_ab_growth
     )
     utilities.write_to_csv(
-        key_output_path / lad_population_abgrowth_file_name, lad_population_ab_growth
+        key_agg_path / lad_population_abgrowth_file_name, lad_population_ab_growth
     )
     utilities.write_to_csv(
-        key_output_path / lad_job_abgrowth_file_name, lad_job_ab_growth
+        key_agg_path / lad_job_abgrowth_file_name, lad_job_ab_growth
+    )
+    LOG.info("Aggregating LAD household, population and jobs to Region")
+    region_household = zone_translator.region_summary(
+        lad_household,
+        base_year,
+        build_out_columns,
+    )
+
+    region_population = zone_translator.region_summary(
+        lad_population,
+        base_year,
+        build_out_columns,
+    )
+
+    region_job = zone_translator.region_summary(
+        lad_job,
+        base_year,
+        build_out_columns,
+    )
+    region_household_file_name = "region_household.csv"
+    region_population_file_name = "region_population.csv"
+    region_job_file_name = "region_job.csv"
+    utilities.write_to_csv(
+        key_agg_path / region_household_file_name, region_household
+    )
+    utilities.write_to_csv(
+        key_agg_path / region_population_file_name, region_population
+    )
+    utilities.write_to_csv(
+        key_agg_path / region_job_file_name, region_job
     )
     LOG.info("Ending Development Pattern Module")
 

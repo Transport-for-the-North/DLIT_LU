@@ -56,7 +56,7 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
     )
 
     # implement syntax fixes
-    initial_assessment_folder = config.output_folder / "00_initial_assessment"
+    initial_assessment_folder = config.output_folder / "01_initial_assessment"
     if initial_assessment:
         initial_assessment_folder.mkdir(exist_ok=True)
 
