@@ -115,6 +115,8 @@ class ZoneTranslator(BaseZoneHandler):
     def merge_data(
         self, 
         by_data: pd.DataFrame,
+        by_column: Optional[str]=None,
+        fy_columns: Optional[list[str]]=None,
         new_hh_data: Optional[pd.DataFrame]=None,
         new_pop_data: Optional[pd.DataFrame]=None,
         new_job_data: Optional[pd.DataFrame]=None,
@@ -170,13 +172,28 @@ class ZoneTranslator(BaseZoneHandler):
         
         # Merge zonal data
         if model_zone_data:
-            zonal_household, zonal_population, zonal_job= self._model_zone_data(
+            zonal_household_growth, zonal_population_growth, zonal_job_growth= self._model_zone_data(
                 by_data,
                 new_hh_data,
                 new_pop_data,
                 new_job_data,
                 group_by_column,
                 zone_gdf_id_col,
+            )
+            zonal_household = self._cumulative_yearly_totals(
+                zonal_household_growth,
+                by_column,
+                fy_columns,
+            )
+            zonal_population = self._cumulative_yearly_totals(
+                zonal_population_growth,
+                by_column,
+                fy_columns,
+            )
+            zonal_job = self._cumulative_yearly_totals(
+                zonal_job_growth,
+                by_column,
+                fy_columns,
             )
             return zonal_household, zonal_population, zonal_job
 
@@ -241,7 +258,7 @@ class ZoneTranslator(BaseZoneHandler):
                 by_data[prop_column], axis=0
             )
             by_data = by_data.reset_index(drop=False)
-        return by_data
+        return by_data.fillna(0)
 
 
     def _aggregate_by_zone(
@@ -1413,6 +1430,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     
     zonal_household, zonal_population, zonal_job = zone_translator.merge_data(
         by_data_tot,
+        base_year,
+        build_out_columns,
         new_hh_data=hh_zone, 
         new_pop_data=pop_zone, 
         new_job_data=job_zone,
