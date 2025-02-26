@@ -6,9 +6,9 @@ import numpy as np
 import pathlib
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import zscore
-from typing import Tuple, List
-import jenkspy
+
+
+
 
 
 def plot_distribution(
