@@ -99,13 +99,17 @@ class InfillConfig:
 class SummaryInputs:
     """Lookup file and shapefile for creating output summaries."""
 
-    summary_zone_name: str
+    summary_lad: str
+    summary_region: str
+    lad_name: pydantic.FilePath
+    region_name: pydantic.FilePath
+    lad_to_region_file: pydantic.FilePath
     normits_to_lad_file: pydantic.FilePath
     lsoa_to_lad_file: pydantic.FilePath
     msoa_to_lad_file: pydantic.FilePath
     norms_to_lad_file: pydantic.FilePath
     noham_to_lad_file: pydantic.FilePath
-    shapefile: pydantic.FilePath
+    lad_shapefile: pydantic.FilePath
     ddg_pop: pydantic.FilePath
     ddg_emp: pydantic.FilePath
     shapefile_id_column: str
@@ -236,6 +240,7 @@ class DevPatnConfig:
     summary_data: SummaryInputs | None = None
 
 
+
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.
 
@@ -270,6 +275,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
     run_infill: bool
     run_land_use: bool
     run_dev_pattern: bool
+    run_constraints: bool
+    run_tripends: bool
 
     output_folder: pathlib.Path
     proposed_luc_split_path: pathlib.Path
