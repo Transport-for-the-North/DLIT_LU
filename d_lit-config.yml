@@ -78,10 +78,10 @@ dev_pattern:
   msoa_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_emp_centroids.csv
   msoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_pop_centroids.csv
   # lookup paths
-  lsoa_to_normits: I:\Data\D-Log\DLIT\Inputs\lsoa2021_normits_v3.3\lsoa2021_normits_v3.3_spatial.csv
-  lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa_2021_noham_v3.7\lsoa_2021_noham_v3.7_spatial.csv
-  lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa_2021_norms_v3.3\lsoa_2021_norms_v3.3_spatial.csv
-  lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
+  lsoa_to_normits: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_normits_v3.3\lsoa2021_normits_v3.3_spatial.csv
+  lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_noham_v3.7\lsoa_2021_noham_v3.7_spatial.csv
+  lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_norms_v3.3\lsoa_2021_norms_v3.3_spatial.csv
+  lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
   summary_data:
     summary_zone_name: lad2013 # lad2013
     ###### 2011 LAD #######
