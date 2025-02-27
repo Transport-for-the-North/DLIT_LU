@@ -108,8 +108,6 @@ class SummaryInputs:
     norms_to_lad_file: pydantic.FilePath
     noham_to_lad_file: pydantic.FilePath
     lad_shapefile: pydantic.FilePath
-    ddg_pop: pydantic.FilePath
-    ddg_emp: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
 
@@ -241,7 +239,16 @@ class DevPatnConfig:
     emp_sic_soc_site_data: Optional[pathlib.Path] = None
     summary_data: SummaryInputs | None = None
 
+@dataclasses.dataclass
+class ConstraintConfig:
 
+    lad_name: pydantic.FilePath
+    region_name: pydantic.FilePath
+    ddg_pop: pydantic.FilePath
+    ddg_emp: pydantic.FilePath
+    dlog_household: pydantic.FilePath
+    dlog_employment: pydantic.FilePath
+    dlog_population: pydantic.FilePath
 
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.
@@ -277,8 +284,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
     run_infill: bool
     run_land_use: bool
     run_dev_pattern: bool
-    run_constraints: bool
-    run_tripends: bool
+    run_constraint: bool
+    run_tripend: bool
 
     output_folder: pathlib.Path
     proposed_luc_split_path: pathlib.Path
@@ -289,6 +296,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     infill: Optional[InfillConfig] = None
     land_use: Optional[LandUseConfig] = None
     dev_pattern: Optional[DevPatnConfig] = None
+    constraint: Optional[ConstraintConfig] = None
 
     @pydantic.validator("infill")
     def check_running_infill(  # pylint: disable=no-self-argument
@@ -338,6 +346,27 @@ class DLitConfig(caf.toolkit.BaseConfig):
             )
 
         return value
+    
+    @pydantic.validator("constraint")
+    def constraint_input_check(  # pylint: disable=no-self-argument
+        cls, value: ConstraintConfig | None, values: dict[str, Any]
+    ) -> ConstraintConfig:
+        """Check contraints is given if running module."""
+        if not values["run_constraint"]:
+            # Don't need to check if we aren't running constraints module
+            return value
+
+        if value is None:
+            raise ValueError("constraints is required if run_constraints is true")
+
+        if not values.get("run_dev_pattern") and not all(
+            [value.dlog_household, value.dlog_employment, value.dlog_population]
+        ):
+            raise ValueError(
+                "dlog_household, dlog_employment, and dlog_population at LAD level are required if not running dev_pattern module"
+            )
+
+        return value
 
     @pydantic.root_validator
     def check_running(  # pylint: disable=no-self-argument
@@ -349,6 +378,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
                 values.get("run_infill"),
                 values.get("run_land_use"),
                 values.get("run_dev_pattern"),
+                values.get("run_constraints"),
             ]
         ):
             raise ValueError(

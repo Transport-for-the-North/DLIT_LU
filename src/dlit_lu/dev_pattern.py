@@ -19,8 +19,6 @@ import os
 from dlit_lu import stats, utilities, global_classes, parser, inputs
 from dlit_lu import land_use as lu
 
-from dlit_lu.growth_comparison import calculate_growth_rate, merge_datasets, visualize_results
-
 # constants
 LOG = logging.getLogger(__name__)
 
@@ -1222,8 +1220,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     key_agg_path = config.output_folder / f"05_aggregation"
     key_agg_path.mkdir(exist_ok=True)
 
-    ddg_pop_lad = pd.read_csv(config.dev_pattern.summary_data.ddg_pop, index_col=False)
-    ddg_emp_lad = pd.read_csv(config.dev_pattern.summary_data.ddg_emp, index_col=False)
+    
 
     key_columns = ["site_reference_id", "easting", "northing", "web_tag_certainty"]
     build_out_columns = np.arange(base_year_int + 1, 2067, 1).tolist()
@@ -1678,32 +1675,5 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_agg_path / region_job_file_name, region_job
     )
     LOG.info("Ending Development Pattern Module")
-
-    ######## Growth Rate ######
-
-    LOG.info("Calculating Growth Rate and Visualising results")
-
-    # Determine year columns from lad_population or lad_job
-    year_columns = [col for col in lad_population.columns if col.isdigit()]
-
-    # Subset DDG datasets to match LAD datasets
-    ddg_pop_lad = ddg_pop_lad[['LAD13CD'] + year_columns]
-    ddg_emp_lad = ddg_emp_lad[['LAD13CD'] + year_columns]
-
-    #ddg_pop_lad.to_csv(os.path.join(key_output_path, "ddg_pop_lad.csv"))
-
-    # Calculate growth rates
-    ddg_pop_growth = calculate_growth_rate(ddg_pop_lad, year_columns)
-    lad_population_growth = calculate_growth_rate(lad_population, year_columns)
-    lad_job_growth = calculate_growth_rate(lad_job, year_columns)
-    ddg_emp_growth = calculate_growth_rate(ddg_emp_lad, year_columns)
-
-    merged_growth_data_pop = merge_datasets(lad_population_growth, ddg_pop_growth,key_column1='lad2013_id', key_column2='LAD13CD',suffix1='_lad', suffix2='_ddg',keep_key='right' ) 
-    #merged_growth_data_pop.to_csv(os.path.join(key_output_path, "merged_growth_data_pop.csv"))
-    merged_growth_data_job = merge_datasets(lad_job_growth, ddg_emp_growth,key_column1='lad2013_id', key_column2='LAD13CD',suffix1='_lad', suffix2='_ddg',keep_key='right')
-
-    #os.makedirs(output_directory, exist_ok=True)
-    visualize_results(merged_growth_data_pop, os.path.join(key_output_path, "growth_rate_visualization_pop.html"))
-    visualize_results(merged_growth_data_job, os.path.join(key_output_path, "growth_rate_visualization_job.html"))
 
 # if __name__ == "__main__":

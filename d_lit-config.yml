@@ -2,8 +2,8 @@
 run_infill: False
 run_land_use: False
 run_dev_pattern: True
-run_constraints: False
-run_tripends: False
+run_constraint: False
+run_tripend: False
 
 #Mandatory Parameters
 #--str
@@ -87,7 +87,6 @@ dev_pattern:
   summary_data:
     summary_lad: lad2013 # lad2013
     summary_region: ntem_region
-
     lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
     ###### 2011 LAD #######
     # lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\lsoa2021_lad2011\lsoa_2021_lad2011_spatial.csv
@@ -105,10 +104,8 @@ dev_pattern:
     lad_shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2013\LAD_DEC_2013_GB_BFC_-119125151109105358\LAD_DEC_2013_GB_BFC.shp
     shapefile_id_column: LAD13CD 
     geometry_simplify_tolerance: 100
-    ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
-    ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
 
-constraints:
+constraint:
   # Zone names
   lad_name: I:\Data\D-Log\DLIT\Inputs\zone_name\lad_2013\zoning.csv
   region_name: I:\Data\D-Log\DLIT\Inputs\zone_name\ntem_region\zoning.csv
@@ -116,11 +113,9 @@ constraints:
   ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
   ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
   # Inputs from previous module dev_pattern
-  lad_household: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\lad_household.csv
-  lad_employment: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\lad_employment.csv
-  lad_population: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\lad_population.csv
-  region_household: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\region_household.csv
-  region_employment: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\region_employment.csv
-  region_population: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\region_population.csv
-  
-
+  dlog_household: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\lad_household.csv
+  dlog_employment: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\lad_employment.csv
+  dlog_population: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\lad_population.csv
+  # region_household: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\region_household.csv
+  # region_employment: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\region_employment.csv
+  # region_population: I:\Data\D-Log\DLIT\Outputs\test10\05_aggregation\region_population.csv
