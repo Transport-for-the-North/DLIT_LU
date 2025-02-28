@@ -280,7 +280,7 @@ class ZoneTranslator(BaseZoneHandler):
             region_id,
             lad_to_region_prop_col
         )
-        region_data = region_data_annual.set_index(lad_id, region_id)
+        region_data = region_data_annual
 
         return region_data
 

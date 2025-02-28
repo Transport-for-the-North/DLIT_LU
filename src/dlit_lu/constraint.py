@@ -6,181 +6,277 @@
 # visualise(): pop and emp 4 visuals 
 # save in 06>visuals , 06>output 
 
-
-
 # lad_population and lad_job call these 
 
 import pandas as pd
-import plotly.graph_objects as go
-import os
-
-import logging
 import pathlib
-from typing import Optional, Dict, Any
-
-# third party imports
-import pandas as pd
-import geopandas as gpd
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from scipy.spatial import cKDTree
+import logging
 import os
 
-# local imports
-from dlit_lu import inputs
-from dlit_lu import land_use as lu
+# Local imports
+from dlit_lu import inputs, utilities
+import numpy as np
+
 
 LOG = logging.getLogger(__name__)
 
-class GrowthRate:
+class ConstraintProcessor():
+
     def __init__(self, config: inputs.DLitConfig):
-        
-        self.constraints_config = config.constraint
-        LOG.info("Initialising Constraints Module")
-
-    def load_data(self, config: inputs.SummaryInputs):
-        LOG.info("Loading DDG Employment data...")
-        ddg_pop = pd.read_csv(self.constraints_config.ddg_pop)
-        ddg_emp = pd.read_csv(self.constraints_config.ddg_emp)
-        dlog_population = pd.read_csv(self.constraints_config.dlog_population)
-        dlog_employment = pd.read_csv(self.constraints_config.dlog_employment)
-        lad_to_region_file = pd.read_csv(config.lad_to_region_file)
-        
-        return ddg_pop, ddg_emp, dlog_population, dlog_employment, lad_to_region_file
-
-    def _lad_to_region(        
-            self,
-            data: pd.DataFrame,
-            lookup_path: pathlib.Path,
-            lad_id: str,
-            base_year_column: str,
-            future_year_columns: list,
-            region_id: str,
-            lad_to_region_prop_col: str,
+        self.config: inputs.DLitConfig = config
+            
+    def region(self,
+           data: pd.DataFrame,
+           base_year_column: str,
+           future_year_columns: list, 
     ) -> pd.DataFrame:
         """
-        Aggregate LAD data to region level using a lookup file with proportional mapping.
+        Aggregate LAD data to region.
 
         Parameters
         ----------
         data : pd.DataFrame
-            DataFrame containing LAD-level data.
-        lookup_path : Path
-            Path to the lookup CSV file containing LAD-to-region mapping and proportion columns.
-        lad_id : str
-            Column name in data representing the LAD identifier.
-        future_year_columns : list
-            List of columns in data with future year values to be aggregated.
-        region_id : str
-            Column name in lookup representing the region identifier.
-        lad_to_region_prop_col : str
-            Column in lookup representing the proportion of LAD value allocated to each region.
-
+            Input data containing LAD-level information.
         Returns
         -------
         pd.DataFrame
-            Aggregated region-level DataFrame with the summed values.
+            Region data.
         """
-        lookup_df = pd.read_csv(lookup_path)
-
-        # Check initial totals for all val_cols
-        val_cols = [base_year_column] + future_year_columns
-        totals_before = {col: data[col].sum() for col in val_cols}
-
-        # Merge data with lookup to assign regions and proportions
-        merged_df = data.merge(
-            lookup_df[[lad_id, region_id, lad_to_region_prop_col]],
-            on=lad_id,
-            how='left'
-        )
-
-        # Apply proportions to each value column
-        for col in val_cols:
-            merged_df[col] = merged_df[col] * merged_df[lad_to_region_prop_col]
-
-        # Group by region and sum the values
-        region_agg = merged_df.groupby(region_id, as_index=False)[val_cols].sum()
-
-        # Check totals after aggregation
-        totals_after = {col: region_agg[col].sum() for col in val_cols}
-
-        for col in val_cols:
-            if not np.isclose(totals_before[col], totals_after[col]):
-                raise ValueError(
-                    f"Total of '{col}' changed after aggregation: before={totals_before[col]}, after={totals_after[col]}"
-                )
-
-        return region_agg
-
-    def aggregate(self, ddg_pop, ddg_emp, dlog_population, dlog_employment, lad_to_region_file):
-        
-        year_columns = [col for col in dlog_population.columns if col.isdigit()]
-
-        # Subset DDG datasets to match LAD datasets (using LAD13CD and year columns)
-        ddg_pop = ddg_pop[['LAD13CD'] + year_columns]
-        ddg_emp = ddg_emp[['LAD13CD'] + year_columns]
-
-        LOG.info(f"ddg_pop and ddg_emp subsets to LAD13CD and years: {year_columns}")
-
-       
+        lookup_path = self.config.dev_pattern.summary_data.lad_to_region_file
         lad_id = "lad2013_id"
+        base_year_column = "2023"
         region_id = "ntem_region_id"
         lad_to_region_prop_col = "lad2013_to_ntem_region"
 
-        # Aggregating from LAD to Region for DDG datasets
-        region_ddg_pop = self._lad_to_region(
-            ddg_pop, 
-            lad_to_region_file, 
-            lad_id, 
-            "2023",  
-            year_columns,  
-            region_id,  
-            lad_to_region_prop_col  
-        )
-
-        region_ddg_emp = self._lad_to_region(
-            ddg_emp, 
-            lad_to_region_file, 
-            lad_id, 
-            "2023",  
-            year_columns,  
-            region_id,  
-            lad_to_region_prop_col 
-        )
-
-        LOG.info(f"Aggregated DDG population and employment data to region format.")
-
-        # Aggregating from LAD to Region for DLOG datasets (population and employment)
-
-        region_dlog_pop = self._lad_to_region(
-            dlog_population, 
-            lad_to_region_file, 
-            lad_id, 
-            "2023",  
-            year_columns,  
-            region_id,  
+        region_data_annual = self.aggregate_to_region(
+            data,
+            lookup_path,
+            lad_id,
+            base_year_column,
+            future_year_columns,
+            region_id,
             lad_to_region_prop_col
         )
 
-        region_dlog_emp = self._lad_to_region(
-            dlog_employment, 
-            lad_to_region_file, 
-            lad_id, 
-            "2023", 
-            year_columns,  
-            region_id,  
-            lad_to_region_prop_col 
+        region_data = region_data_annual
+
+        return region_data
+
+    def aggregate_to_region(self, 
+                            data, 
+                            lookup_path, 
+                            lad_id, 
+                            base_year_column, 
+                            future_year_columns, 
+                            region_id, 
+                            lad_to_region_prop_col):
+        
+        lookup_df = pd.read_csv(lookup_path)  
+
+        val_cols = [base_year_column] + future_year_columns
+        totals_before = {col: data[col].sum() for col in val_cols}
+
+        merged_df = data.merge(lookup_df[[lad_id, region_id, lad_to_region_prop_col]], on=lad_id, how='left')
+        
+        for col in val_cols:
+            merged_df[col] = merged_df[col] * merged_df[lad_to_region_prop_col]
+
+        region_agg = merged_df.groupby(region_id, as_index=False)[val_cols].sum()
+        
+        totals_after = {col: region_agg[col].sum() for col in val_cols}
+
+        for col in val_cols:
+            if not np.all(pd.np.isclose(totals_before[col], totals_after[col])):
+                raise ValueError(f"Total of '{col}' changed after aggregation: before={totals_before[col]}, after={totals_after[col]}")
+
+        return region_agg
+
+    def add_names_to_data(self, 
+                      data, 
+                      id_column, 
+                      name_column, 
+                      use_region_name=False,
+                      use_region_cols=False):
+        
+        # Determine which name file to use
+        if use_region_name:
+            name_file = self.config.constraint.region_name
+        else:
+            name_file = self.config.constraint.lad_name
+
+        # Read the name file
+        name_df = pd.read_csv(name_file)
+
+        # Convert zone_id to string to match lad2013_id
+        #name_df['zone_id'] = name_df['zone_id'].astype(str)
+
+        if use_region_cols:
+        # Merge
+            data_with_name = data.merge(name_df, left_on=id_column, right_on='zone_id', how='left')
+            data_with_name = data_with_name.drop(columns=['zone_id']) 
+            data_with_name = data_with_name.rename(columns={id_column: 'REGIONCD', 'zone_name': 'REGIONNM'})
+            columns = list(data_with_name.columns)
+            columns.remove('REGIONNM')
+            columns.insert(1, 'REGIONNM')  
+            data_with_name = data_with_name[columns]
+        else:
+            data_with_name = data.merge(name_df, left_on=id_column, right_on='zone_name', how='left')
+            data_with_name = data_with_name.drop(columns=['zone_id', 'zone_name'])
+            data_with_name = data_with_name.rename(columns={id_column: 'LAD13CD', 'descriptions': 'LADNM'})
+            columns = list(data_with_name.columns)
+            columns.remove('LADNM')
+            columns.insert(1, 'LADNM')
+            data_with_name = data_with_name[columns]
+
+        LOG.info(f"Added {name_column} to dataset with shape {data_with_name.shape}")
+
+        return data_with_name
+    
+def calculate_growth_rate(data, year_columns):
+    """
+    Calculate the annual growth rate for the given DataFrame.
+
+    Args:
+        data (DataFrame): The DataFrame containing year columns with data to calculate growth rate.
+        year_columns (list): List of year columns to calculate growth rate.
+
+    Returns:
+        DataFrame: A DataFrame with only the LAD column and CAGR values.
+    """
+    growth_rate = data.copy()
+    year_columns = sorted([int(year) for year in year_columns])
+
+    # List to keep track of created CAGR columns
+    cagr_columns = []
+
+    # Calculate CAGR for each period
+    for i in range(1, len(year_columns)):
+        start_year = year_columns[i - 1]
+        end_year = year_columns[i]
+        years = end_year - start_year
+
+        # Calculate CAGR for the period and store it in the end year's column
+        def calculate_row_growth(row):
+            start_value = row[str(start_year)]
+            end_value = row[str(end_year)]
+            if start_value == 0:
+                return None  # Skip calculation and return None for zero start value
+            return ((end_value / start_value) ** (1 / years) - 1) * 100
+
+        cagr_column_name = f'CAGR_{end_year}'
+        growth_rate[cagr_column_name] = data.apply(calculate_row_growth, axis=1)
+        cagr_columns.append(cagr_column_name)
+
+    # Select only the first column and existing CAGR columns
+    result = growth_rate.iloc[:, [0,1] + [growth_rate.columns.get_loc(col) for col in cagr_columns]]
+
+    return result
+
+def run(config: inputs.DLitConfig):
+
+    if config.dev_pattern is None:
+        raise ValueError("Cannot run development pattern without any dev_pattern parameters")
+
+    LOG.info("Initialising GrowthRate Module")
+
+    config.output_folder.mkdir(exist_ok=True)
+
+    # Load data
+    ddg_pop = pd.read_csv(config.constraint.ddg_pop)
+    ddg_emp = pd.read_csv(config.constraint.ddg_emp)
+    dlog_population = pd.read_csv(config.constraint.dlog_population)
+    dlog_employment = pd.read_csv(config.constraint.dlog_employment)
+
+    key_constraint_path = config.output_folder / f"06_constraint"
+    key_constraint_path.mkdir(exist_ok=True)
+
+    # Process data
+    year_columns = [col for col in dlog_population.columns if col.isdigit()]
+    ddg_col = 'LAD13CD'
+    ddg_pop = ddg_pop[[ddg_col] + year_columns]
+    ddg_emp = ddg_emp[[ddg_col] + year_columns]
+
+    ddg_pop = ddg_pop[~ddg_pop[ddg_col].str.startswith('LON')]
+    ddg_emp = ddg_emp[~ddg_emp[ddg_col].str.startswith('LON')]
+
+    ddg_pop = ddg_pop.rename(columns={'LAD13CD': 'lad2013_id'})
+    ddg_emp = ddg_emp.rename(columns={'LAD13CD': 'lad2013_id'})
+
+    processor = ConstraintProcessor(config)
+
+    lad_id = "lad2013_id"
+    name_column = "descriptions"
+    base_year_column = "2023"
+    base_year_int = int(base_year_column)
+    region_id = "ntem_region_id"
+    name_column_region = "zone_id"
+
+    build_out_columns = np.arange(base_year_int + 1, 2067, 1).tolist()
+    build_out_columns = [str(year) for year in build_out_columns]
+
+    # Aggregate data
+    region_dlog_pop = processor.region(
+        dlog_population, 
+        base_year_column, 
+        build_out_columns)
+    
+    region_ddg_pop = processor.region(
+        ddg_pop, 
+        base_year_column, 
+        build_out_columns)
+    
+    region_ddg_emp = processor.region(
+        ddg_emp, 
+        base_year_column, 
+        build_out_columns)
+    
+    region_dlog_emp = processor.region(
+        dlog_employment,
+        base_year_column, 
+        build_out_columns)
+
+    # Add names
+    datasets = [
+        (ddg_pop, lad_id, name_column, False, False),
+        (ddg_emp, lad_id, name_column, False, False),
+        (dlog_population, lad_id, name_column, False, False),
+        (dlog_employment, lad_id, name_column, False, False),
+        (region_ddg_pop, region_id, name_column_region, True, True),
+        (region_ddg_emp, region_id, name_column_region, True, True),
+        (region_dlog_pop, region_id, name_column_region, True, True),
+        (region_dlog_emp, region_id, name_column_region, True, True)
+    ]
+    
+    processed_datasets = []
+
+    for data, id_col, name_col, use_region_name, use_region_cols in datasets:
+        processed_data = processor.add_names_to_data(
+            data, id_col, name_col, use_region_name=use_region_name, use_region_cols=use_region_cols
         )
+        processed_datasets.append(processed_data)
 
-        LOG.info(f"Aggregated DLOG population and employment data to region format.")
+    # Calculate growth rates
+    growth_rate_results = []
+    for data in processed_datasets:
+        growth_rate_result = calculate_growth_rate(data, year_columns)
+        growth_rate_results.append(growth_rate_result)
 
-        return region_ddg_pop, region_ddg_emp, region_dlog_pop, region_dlog_emp
+    # Save results
+    filenames = [
+        "ddg_pop.csv", 
+        "ddg_emp.csv", 
+        "dlog_population.csv",
+        "dlog_employment.csv",
+        "region_ddg_pop.csv", 
+        "region_ddg_emp.csv", 
+        "region_dlog_pop.csv", 
+        "region_dlog_emp.csv"
+    ]
 
-# def id_to_name():
-#     return
+    for filename, data in zip(filenames, growth_rate_results):
+        utilities.write_to_csv(key_constraint_path / filename, data)
 
-# def calculate_growth_rate(data, year_columns):
-#     return
+    LOG.info("Data processing and aggregation completed")
 
 # def merge():
 #     return
@@ -190,45 +286,7 @@ class GrowthRate:
 # def run(config:inputs.ConstraintsConfig):
 #     return
 
-# def calculate_growth_rate(data, year_columns):
-#     """
-#     Calculate the annual growth rate for the given DataFrame.
 
-#     Args:
-#         data (DataFrame): The DataFrame containing year columns with data to calculate growth rate.
-#         year_columns (list): List of year columns to calculate growth rate.
-
-#     Returns:
-#         DataFrame: A DataFrame with only the LAD column and CAGR values.
-#     """
-#     growth_rate = data.copy()
-#     year_columns = sorted([int(year) for year in year_columns])
-    
-#     # List to keep track of created CAGR columns
-#     cagr_columns = []
-    
-#     # Calculate CAGR for each period
-#     for i in range(1, len(year_columns)):
-#         start_year = year_columns[i - 1]
-#         end_year = year_columns[i]
-#         years = end_year - start_year
-        
-#         # Calculate CAGR for the period and store it in the end year's column
-#         def calculate_row_growth(row):
-#             start_value = row[str(start_year)]
-#             end_value = row[str(end_year)]
-#             if start_value == 0:
-#                 return None  # Skip calculation and return None for zero start value
-#             return ((end_value / start_value) ** (1 / years) - 1) * 100
-        
-#         cagr_column_name = f'cagr_{end_year}'
-#         growth_rate[cagr_column_name] = data.apply(calculate_row_growth, axis=1)
-#         cagr_columns.append(cagr_column_name)
-    
-#     # Select only the first column and existing CAGR columns
-#     result = growth_rate.iloc[:, [0] + [growth_rate.columns.get_loc(col) for col in cagr_columns]]
-    
-#     return result
 
 # def merge_datasets(dataset1, dataset2, key_column1, key_column2, suffix1='_1', suffix2='_2', keep_key='left'):
 #     """
