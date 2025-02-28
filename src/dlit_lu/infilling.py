@@ -149,28 +149,28 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         "res_distribution",
         "units_(dwellings)",
         res_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data_dict["employment"] = data_repair.infill_year_units(
         infilled_fixed_data_dict["employment"],
         "emp_distribution",
         "units_(floorspace)",
         emp_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data_dict["mixed"] = data_repair.infill_year_units(
         infilled_fixed_data_dict["mixed"],
         "res_distribution",
         "units_(dwellings)",
         res_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data_dict["mixed"] = data_repair.infill_year_units(
         infilled_fixed_data_dict["mixed"],
         "emp_distribution",
         "units_(floorspace)",
         emp_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data = utilities.to_dlog_data(
         infilled_fixed_data_dict, infilled_fixed_data.lookup

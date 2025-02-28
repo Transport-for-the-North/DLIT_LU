@@ -1458,7 +1458,8 @@ def infill_year_units(
     distribution_column: str,
     unit_column: str,
     unit_year_column: list[str],
-    years_lookup: pd.DataFrame,
+    lookup: global_classes.DLogValueLookup,
+    assumed_distribution: int = 2,
 ) -> pd.DataFrame:
     """infills build out profile
 
@@ -1475,8 +1476,10 @@ def infill_year_units(
         column that contains total units
     unit_year_column : list[str]
         columns to infill
-    years_lookup : pd.DataFrame
-        years lookup from unit
+    lookup : global_classes.DLogValueLookup
+            D-Log lookup data.
+    assumed_distribution : str
+        the distribution to use when no compatibile distribution is provided
 
     Returns
     -------
@@ -1496,16 +1499,22 @@ def infill_year_units(
     years_defined = data[data[distribution_column] == 1]
 
     if len(not_specified) != 0 or len(years_defined) != 0:
-        raise ValueError("distrubtion contains not specified or defined years values")
+        # raise ValueError("distrubtion contains not specified or defined years values")
+        ad_str = lookup.distribution_profile.loc[assumed_distribution, 'distribution_profile']
+        LOG.warning(  # pylint: disable=logging-fstring-interpolation
+                    f"{len(not_specified) + len(years_defined)} undefined or invalid distributions"
+                    f" found in '{distribution_column}'\n"
+                    f"Assuming '{ad_str}' distribution.")
+        data.loc[data[distribution_column].isin([0, 1]), distribution_column] = assumed_distribution
 
     flat = data[data[distribution_column] == 2]
-    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], years_lookup)
+    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], lookup.years)
     early = data[data[distribution_column] == 3]
-    early_years = strip_year(early["start_year_id"], early["end_year_id"], years_lookup)
+    early_years = strip_year(early["start_year_id"], early["end_year_id"], lookup.years)
     late = data[data[distribution_column] == 4]
-    late_years = strip_year(late["start_year_id"], late["end_year_id"], years_lookup)
+    late_years = strip_year(late["start_year_id"], late["end_year_id"], lookup.years)
     mid = data[data[distribution_column] == 5]
-    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], years_lookup)
+    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], lookup.years)
 
     for column in unit_year_column:
         year = int(column.split("_")[2])
