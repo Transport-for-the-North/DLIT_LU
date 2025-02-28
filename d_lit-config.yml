@@ -6,7 +6,7 @@ run_land_use: True
 #--str
 lookups_sheet_name: "Lookups"
 #--Read file paths
-dlog_input_file: I:\Data\D-Log\DLIT\Inputs\DLog21_v8_issued_v1.xlsx
+dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v4.xlsx
 #--Write file paths
 output_folder: I:\Data\D-Log\DLIT\Outputs\Test
 proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\proposed_luc_split_path.csv
