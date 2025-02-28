@@ -54,18 +54,20 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
     loaded_sheet = cols_to_list(df=loaded_sheet, col_group="existing_land_use")
     loaded_sheet = cols_to_list(df=loaded_sheet, col_group="proposed_land_use")
     loaded_sheet = cols_to_list(df=loaded_sheet, col_group="expected_land_use")
-    loaded_sheet[("All", "expected_split")] = loaded_sheet[("All", "Revised_landuse_split")].fillna("").str.lower()
-    loaded_sheet[("All", "expected_split")] = loaded_sheet[("All", "expected_split")].str.split(";").apply(lambda x: list(filter(None, x)))
+    splt_col = ("All", "expected_split")
+    loaded_sheet[splt_col] = loaded_sheet[("All", "Revised_landuse_split")].fillna("").str.lower()
+    loaded_sheet[splt_col] = loaded_sheet[splt_col].str.split(";").apply(lambda x: list(filter(None, x)))
+    loaded_sheet[splt_col] = loaded_sheet[splt_col].apply(lambda x: {i.split(" ")[0]: f"{i} ".split(" ")[1] for i in x})
 
     # Emp
     temp = loaded_sheet["Employment + mixed"].rename(columns={"Total Area/Floorspace": "Units_(floorspace)"})
-    temp.columns = [f"emp_year_{x}" if isinstance(x, int) else f"emp_{x}" for x in temp.columns]
+    temp.columns = [f"emp_year_{x}" if isinstance(x, int) else f"emp_{x.lower()}" for x in temp.columns]
     loaded_sheet = loaded_sheet.drop(columns=["Employment + mixed"])
     for col in temp.columns:
         loaded_sheet[("All", col)] = temp[col]
     # Pop
     temp = loaded_sheet["Housing and mixed"].rename(columns={"Units/Dwellings": "Units_(dwellings)"})
-    temp.columns = [f"res_year_{x}" if isinstance(x, int) else f"res_{x}" for x in temp.columns]
+    temp.columns = [f"res_year_{x}" if isinstance(x, int) else f"res_{x.lower()}" for x in temp.columns]
     loaded_sheet = loaded_sheet.drop(columns=["Housing and mixed"])
     for col in temp.columns:
         loaded_sheet[("All", col)] = temp[col]
@@ -77,9 +79,8 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
     loaded_sheet[("All", "mix_distribution_profile_id")] = loaded_sheet[("Mixed", "distribution_profile_id-3")]
     loaded_sheet[("All", "mix_distribution_profile")] = loaded_sheet[("Mixed", "distribution_profile")]
 
-    loaded_sheet[("All", "units_(dwellings)")] = loaded_sheet[("All", "res_Units_(dwellings)")]
-    loaded_sheet[("All", "units_(floorspace)")] = loaded_sheet[("All", "emp_Units_(floorspace)")]
-    loaded_sheet[("All", "units_(dwellings)")] = loaded_sheet[("All", "res_Units_(dwellings)")]
+    loaded_sheet[("All", "units_(dwellings)")] = loaded_sheet[("All", "res_units_(dwellings)")]
+    loaded_sheet[("All", "units_(floorspace)")] = loaded_sheet[("All", "emp_units_(floorspace)")]
     loaded_sheet[("All", "emp_sector_type_id")] = loaded_sheet[("Employment", "sector_type_id")]
     loaded_sheet[("All", "mix_sector_type_id")] = loaded_sheet[("Mixed", "sector_type_id-2")]
 
