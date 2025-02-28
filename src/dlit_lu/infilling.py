@@ -69,9 +69,9 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         initial_assessment,
     )
 
-    syntax_fixed_data = data_repair.correct_inavlid_syntax(
-        data_filter_columns, auxiliary_data
-    )
+    syntax_fixed_data = data_repair.correct_inavlid_syntax(data_filter_columns, auxiliary_data)
+    syntax_fixed_data = data_repair.infill_expected_landuse(syntax_fixed_data)
+    syntax_fixed_data = data_repair.fix_expected_split(syntax_fixed_data)
 
     syntax_fixed_data = analyse.data_report(
         syntax_fixed_data,
@@ -81,16 +81,11 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         False,
         False,
     )
-    proposed_luc_split = analyse.luc_ratio(
-        utilities.to_dict(syntax_fixed_data), auxiliary_data, "proposed_land_use"
-    )
 
-    utilities.write_to_csv(config.proposed_luc_split_path, proposed_luc_split)
+    expected_luc_split = analyse.luc_ratio(utilities.to_dict(syntax_fixed_data), auxiliary_data, "expected_land_use")
+    utilities.write_to_csv(config.proposed_luc_split_path, expected_luc_split)
 
-    existing_luc_split = analyse.luc_ratio(
-        utilities.to_dict(syntax_fixed_data), auxiliary_data, "existing_land_use"
-    )
-
+    existing_luc_split = analyse.luc_ratio(utilities.to_dict(syntax_fixed_data), auxiliary_data, "existing_land_use")
     utilities.write_to_csv(config.existing_luc_split_path, existing_luc_split)
 
     # user fixes
@@ -209,6 +204,6 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         post_fix_data_filter_columns.employment_data,
         post_fix_data_filter_columns.mixed_data,
         post_fix_data_filter_columns.lookup,
-        proposed_luc_split,
+        expected_luc_split,
         existing_luc_split,
     )
