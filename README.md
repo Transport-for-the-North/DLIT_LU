@@ -107,7 +107,7 @@ These parameters are all mandatory with no default values.
 | demolition_dampener            | Real 0 - 1.0 (default 1.0) | Factor to apply to GFA when calculating demolitions of existing land use values, 0 indicates no implied demolitions.                                   |
 
 
-## Land Use
+## Dev Pattern
 
 | Parameter                      |            Type            | Description                                                                                                                                            |
 | :----------------------------- | :------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
