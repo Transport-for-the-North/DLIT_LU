@@ -118,7 +118,6 @@ These parameters are all mandatory with no default values.
 | res_site_data                  |    File Path (optional)    | Path to inputs exported from previous land use module,site level total dwellings from D-log| 
 | lsoa_data_path                 |    File Path (optional)    | Path to CSV containing TfN’s base year total population,household and jobs                 | 
 | pop_tt_site_data               |    File Path (optional)    | Path to inputs exported from previous land use module,site level population by tt          |
-
 | emp_sic_soc_site_data          |    File Path (optional)    | Path to inputs exported from previous land use module,site level jobs by SIC, SOC          |
 | normits_shapefile_path         |         File Path          | Path to normits zone shape file                                                            |
 | noham_shapefile_path           |         File Path          | Path to normits zone shape file                                                            |
