@@ -112,9 +112,6 @@ class SummaryInputs:
     geometry_simplify_tolerance: int | None = None
 
 
-    # Add this to contraints class
-    # lad_name: pydantic.FilePath
-    # region_name: pydantic.FilePath
     
 @dataclasses.dataclass
 class LandUseConfig:
@@ -164,7 +161,7 @@ class LandUseConfig:
     # which properly checks run_land_use before verifying the file path
     land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
-    # summary_data: SummaryInputs | None = None
+
 
 
 @dataclasses.dataclass
@@ -246,9 +243,9 @@ class ConstraintConfig:
     region_name: pydantic.FilePath
     ddg_pop: pydantic.FilePath
     ddg_emp: pydantic.FilePath
-    dlog_household: pydantic.FilePath
-    dlog_employment: pydantic.FilePath
-    dlog_population: pydantic.FilePath
+    dlog_household: Optional[pathlib.Path] = None
+    dlog_employment: Optional[pathlib.Path] = None
+    dlog_population: Optional[pathlib.Path] = None
 
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.

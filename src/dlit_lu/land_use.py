@@ -380,43 +380,6 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     LOG.info("Ending Land Use Module")
 
 
-def compare_existing_proposed_jobs(
-    existing_data: pd.DataFrame,
-    proposed_data: pd.DataFrame,
-    build_out_profile_cols: list[str],
-    file_path: pathlib.Path,
-) -> None:
-    """compares the number of existing jobsto the number of proposed jobs
-
-    outputs a comparion the number of existing jobs from an external input,
-    to the number of proposed jobs infered from the D-Log
-
-    Parameters
-    ----------
-    existing_data : pd.DataFrame
-        data containing the number of existing jobs (TfN land use data)
-    proposed_data : pd.DataFrame
-        data containing the number of proposed jobs (from D-Log)
-    build_out_profile_cols : list[str]
-        build-out profiles columns
-    file_path : pathlib.Path
-        path to save comparison output
-    """
-    existing_jobs = (existing_data.groupby("lsoa21_id")["jobs"].sum()).to_frame(
-        name="total_existing_jobs"
-    )
-    proposed_data["total_proposed_jobs"] = proposed_data[build_out_profile_cols].sum(
-        axis=1
-    )
-    proposed_jobs = proposed_data.groupby("lsoa2021_id")["total_proposed_jobs"].sum()
-    comparison = existing_jobs.merge(
-        proposed_jobs, how="outer", left_index=True, right_index=True
-    )
-    comparison["ratio (percentage)"] = (
-        100 * comparison["total_proposed_jobs"] / comparison["total_existing_jobs"]
-    )
-    utilities.write_to_csv(file_path, comparison)
-
 
 
 def gb_traveller_type_distribution(data: pd.DataFrame) -> pd.DataFrame:
@@ -482,18 +445,8 @@ def gb_soc_over_sic_distribution(data: pd.DataFrame) -> pd.DataFrame:
     ].drop_duplicates()  # Unique (lsoa, sic_2d, soc) combinations
     lsoa_ratios = lsoa_sic_soc.merge(
         ratios, on=["sic_2d", "soc"], how="left"
-    )  # Assign correct ratios
-    # lsoa_ratios = []
-    # for id_ in data["lsoa2021_id"].unique():
-    #     temp = ratios.copy()
-    #     temp["lsoa2021_id"] = (
-    #         pd.Series([id_]).repeat(len(ratios)).reset_index(drop=True)
-    #     )
-    #     lsoa_ratios.append(temp)
-    # all_lsoa_ratios = pd.concat(lsoa_ratios, axis=0).set_index(
-    #     ["lsoa2021_id", "sic_2d", "soc"]
-    # )
-    # all_lsoa_ratios.columns = ["ratio_soc_over_sic"]
+    )  
+
     return lsoa_ratios
 
 
@@ -617,48 +570,6 @@ def tot_by_pop_dwel_emp(
     return all_data
 
 
-def compare_existing_proposed_dwellings(
-    exisiting_data: pd.DataFrame,
-    proposed_data: pd.DataFrame,
-    build_out_profile_cols: list[str],
-    file_path: pathlib.Path,
-) -> None:
-    """produces a comparison of existing and proposed dwelling types
-
-    outputs a csvfile at a defined location with the total existing and proposed
-    dwellings by lsoa. existing jobs are taken from a defined external data
-    source (TfN landuse)
-
-    Parameters
-    ----------
-    exisiting_data : pd.DataFrame
-        TfN land use data contain the number of dwellings by lsoa
-    proposed_data : pd.DataFrame
-        Dlog data
-    build_out_profile_cols : list[str]
-        build-out profile data in proposed data
-    file_path : pathlib.Path
-        path to save outputted csv
-    """
-    existing_dwellings = (
-        exisiting_data.groupby("lsoa2021_id")["household"].sum()
-    ).to_frame(name="total_existing_dwellings")
-    proposed_data["total_proposed_dwellings"] = proposed_data[
-        build_out_profile_cols
-    ].sum(axis=1)
-    proposed_dwellings = proposed_data.groupby("LSOA21CD")[
-        "total_proposed_dwellings"
-    ].sum()
-    comparison = existing_dwellings.merge(
-        proposed_dwellings, how="outer", left_index=True, right_index=True
-    )
-    comparison["ratio (percentage)"] = (
-        100
-        * comparison["total_proposed_dwellings"]
-        / comparison["total_existing_dwellings"]
-    )
-    utilities.write_to_csv(file_path, comparison)
-
 
 def convert_to_gfa(
     data: pd.DataFrame,
@@ -698,45 +609,6 @@ def convert_to_gfa(
         .multiply(data_to_gfa[unit_col], axis=0)
     )
     return data_to_gfa
-
-
-# def convert_gfa_to_jobs(
-#     data: pd.DataFrame, matrix_path: pathlib.Path, unit_cols
-# ) -> pd.DataFrame:
-#     """Converts GFA build-out profile to jobs
-
-#     Parameters
-#     ----------
-#     data : pd.DataFrame
-#         DataFrame with GFA build out profiles
-#     matrix_path : pathlib.Path
-#         Path to the job density matrix
-#     unit_cols : list[str]
-#         Columns in the data that contain build-out profile data
-
-#     Returns
-#     -------
-#     pd.DataFrame
-#         DataFrame containing job build-out profiles
-#     """
-#     matrix = pd.read_csv(matrix_path).loc[:, ["land_use_code", "fte_floorspace"]]
-#     matrix.loc[:, "land_use_code"] = matrix["land_use_code"].str.lower()
-#     data_jobs = data.reset_index().merge(
-#         matrix, how="left", left_on="land_use", right_on="land_use_code"
-#     )
-#     data_jobs.loc[:, unit_cols] = data_jobs.loc[:, unit_cols].divide(
-#         data_jobs.loc[:, "fte_floorspace"], axis=0
-#     )
-#     data_jobs.loc[data_jobs["fte_floorspace"].isnull(), unit_cols] = 0
-#     has_jobs = (
-#         ~pd.DataFrame([data_jobs[col] == 0 for col in unit_cols])
-#         .transpose()
-#         .all(axis=1)
-#     )
-#     data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
-#     data_jobs = data_jobs[has_jobs]
-#     data_jobs.set_index(["lsoa2021_id", "land_use"], inplace=True)
-#     return data_jobs
 
 
 def convert_gfa_to_jobs_site(
@@ -780,36 +652,6 @@ def convert_gfa_to_jobs_site(
     # )
     return data_jobs
 
-
-# def convert_luc_to_sic(
-#     data: pd.DataFrame, conversion_path: pathlib.Path
-# ) -> pd.DataFrame:
-#     """Convert the land use codes (LUC) to standard industrial classification (SIC) codes.
-
-#     Parameters
-#     ----------
-#     data : pd.DataFrame
-#         The DataFrame containing the land use codes.
-#     conversion_path : pathlib.Path
-#         The path to a csv file that maps the LUC codes to the SIC codes.
-
-#     Returns
-#     -------
-#     pd.DataFrame
-#         The DataFrame with the SIC codes
-
-#     """
-#     conversion = pd.read_csv(conversion_path).loc[:, ["land_use_code", "sic_code"]]
-#     conversion["land_use_code"] = conversion["land_use_code"].str.lower()
-#     data_sic_code = data.reset_index(drop=False).merge(
-#         conversion,
-#         how="left",
-#         left_on="land_use",
-#         right_on="land_use_code",
-#     )
-#     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
-#     data_sic_code.set_index(["lsoa2021_id", "sic_code"], inplace=True)
-#     return data_sic_code
 
 
 def convert_luc_to_sic_site(
