@@ -1,6 +1,6 @@
 #Set Up Parameters
-run_infill: False
-run_land_use: False
+run_infill: True
+run_land_use: True
 run_dev_pattern: True
 run_constraint: False
 run_tripend: False
@@ -30,7 +30,7 @@ infill:
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
   user_input_path: I:\Data\D-Log\DLIT\Outputs\test11_Mean\user_input.xlsx
-  gfa_infill_method: mean # regression_no_negatives, mean, regression
+  gfa_infill_method: regression_no_negatives # regression_no_negatives, mean, regression
 
 land_use:
   land_use_input: I:\Data\D-Log\DLIT\Outputs\test11_Mean\03_post_fixes\post_fix_data.xlsx
