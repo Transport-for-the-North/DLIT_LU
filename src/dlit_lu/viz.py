@@ -25,7 +25,6 @@ class GrowthRateVisualizer:
             data_dict (dict): Dictionary of DataFrames for DDG and DLOG.
             category (str): The category of the data (e.g., LAD_Population).
         """
-        # Define the specific LADs to include
         specific_lads = [
             "Bury", "Manchester", "Oldham", "Rochdale",
             "Salford", "Stockport", "Tameside", "Trafford"
@@ -79,7 +78,6 @@ class GrowthRateVisualizer:
             yaxis_title="CAGR (%)", yaxis_tickformat=",d"
         )
 
-        # Construct a descriptive file name
         output_file_html = os.path.join(self.output_dir, f"{category}_Growth_Trend.html")
         fig.write_html(output_file_html)
         print(f"Visualization saved as: {output_file_html}")
