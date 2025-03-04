@@ -294,8 +294,34 @@ class ZoneTranslator(BaseZoneHandler):
         Returns
         -------
         pd.DataFrame
-            Processed DataFrame with translated and adjusted values, filling missing data with 0.
+            Region data.
         """
+        lookup_path = self.config.dev_pattern.summary_data.lad_to_region_file
+        lad_id = self.zone_info["lad_id_col"]
+        region_id = self.zone_info["region_id_col"]
+        lad_to_region_prop_col = self.zone_info["lad_to_region_prop"]
+        region_data_annual = self._lad_to_region(
+            data,
+            lookup_path,
+            lad_id,
+            base_year_column,
+            future_year_columns,
+            region_id,
+            lad_to_region_prop_col
+        )
+        region_data = region_data_annual.set_index(lad_id, region_id)
+
+        return region_data
+
+    def _merge_translation_data(
+        self,
+        by_data: pd.DataFrame,
+        translation_path: str,
+        columns_to_process: list,
+        prop_column: str,
+        group_by_column: str,
+    ) -> pd.DataFrame:
+        """Merge the zone translation data with the input dataframe."""
         if translation_path:
             # Load translation data
             zone_translation = pd.read_csv(translation_path)

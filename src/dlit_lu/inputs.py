@@ -238,7 +238,7 @@ class DevPatnConfig:
 
 @dataclasses.dataclass
 class ConstraintConfig:
-
+ 
     lad_name: pydantic.FilePath
     region_name: pydantic.FilePath
     ddg_pop: pydantic.FilePath
@@ -354,7 +354,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
             return value
 
         if value is None:
-            raise ValueError("constraints is required if run_constraints is true")
+            raise ValueError("constraint is required if run_constraint is true")
 
         if not values.get("run_dev_pattern") and not all(
             [value.dlog_household, value.dlog_employment, value.dlog_population]
@@ -375,12 +375,12 @@ class DLitConfig(caf.toolkit.BaseConfig):
                 values.get("run_infill"),
                 values.get("run_land_use"),
                 values.get("run_dev_pattern"),
-                values.get("run_constraints"),
+                values.get("run_constraint"),
             ]
         ):
             raise ValueError(
                 "At least one of run_infill, run_land_use, "
-                "or run_dev_pattern must be set to True"
+                "run_dev_pattern, or run_constraints must be set to True"
             )
 
         return values

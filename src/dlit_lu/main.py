@@ -63,4 +63,4 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
         dev_pattern.run(assess_data, config)
 
     if config.run_constraint:
-        constraint.run(config)
+       constraint.run(config)
