@@ -25,6 +25,12 @@ class GrowthRateVisualizer:
             data_dict (dict): Dictionary of DataFrames for DDG and DLOG.
             category (str): The category of the data (e.g., LAD_Population).
         """
+        # Define the specific LADs to include
+        specific_lads = [
+            "Bury", "Manchester", "Oldham", "Rochdale",
+            "Salford", "Stockport", "Tameside", "Trafford"
+        ]
+
         fig = go.Figure()
         trace_names = []
 
@@ -34,104 +40,46 @@ class GrowthRateVisualizer:
             new_column_names = {col: col.split('_')[1] for col in year_columns}
             data.rename(columns=new_column_names, inplace=True)
 
-            # Determine id_vars based on the presence of REGIONNM
-            if 'LAD' in category:
-                id_var = 'LADNM'
-                id_vars = [id_var, 'REGIONNM', 'Source']
-            else:
-                id_var = 'REGIONNM'
-                id_vars = [id_var, 'Source']
-
             # Reshape data
-            data_melted = data.melt(id_vars=id_vars,
+            id_var = 'LADNM' if 'LAD' in category else 'REGIONNM'
+            data_melted = data.melt(id_vars=[id_var, 'Source'],
                                     value_vars=new_column_names.values(), var_name='Year', value_name='CAGR')
 
-            # Determine zones and regions
+            # Filter data to include only specific LADs
             if 'LAD' in category:
-                regions = sorted(data_melted['REGIONNM'].unique())
-                zones = sorted(data_melted['LADNM'].unique())
-            else:
-                zones = sorted(data_melted['REGIONNM'].unique())
+                data_melted = data_melted[data_melted[id_var].isin(specific_lads)]
+
+            zones = data_melted[id_var].unique()
 
             for zone in zones:
                 zone_data = data_melted[data_melted[id_var] == zone]
                 trace = go.Scatter(
                     x=zone_data['Year'], y=zone_data['CAGR'], mode='lines+markers',
-                    name=f"{zone} - {sheet_name}", visible=False, hovertemplate='%{y:.2f}%')
+                    name=f"{zone} - {sheet_name}", visible=(sheet_name == 'DDG'), hovertemplate='%{y:.2f}%')
                 fig.add_trace(trace)
-                trace_names.append((zone, sheet_name))
+                trace_names.append(f"{zone} - {sheet_name}")
 
-        if 'LAD' in category:
-            # Create dropdowns for regions and LADs
-            region_buttons = []
-            lad_buttons_dict = {region: [] for region in regions}
+        # Dropdown options
+        buttons = [
+            dict(method='update', label='All',
+                 args=[{'visible': [True] * len(fig.data)},
+                       {'title': f"{category} - All Zones"}])
+        ]
+        for zone in zones:
+            visibility = [(trace.startswith(zone)) for trace in trace_names]
+            buttons.append(dict(method='update', label=zone,
+                                args=[{'visible': visibility},
+                                      {'title': f"{category} - {zone}"}]))
 
-            for region in regions:
-                region_visibility = [(trace[0] in data_melted[data_melted['REGIONNM'] == region]['LADNM'].values) for trace in trace_names]
-                region_buttons.append(dict(method='update', label=region,
-                                           args=[{'visible': region_visibility},
-                                                 {'title': f"{category} - {region}"}]))
+        fig.update_layout(
+            updatemenus=[{'buttons': buttons, 'direction': 'down',
+                          'showactive': True, 'x': 1, 'xanchor': 'left',
+                          'y': 1.10, 'yanchor': 'top'}],
+            title=f"{category}", xaxis_title="Year",
+            yaxis_title="CAGR (%)", yaxis_tickformat=",d"
+        )
 
-                # Create LAD buttons for each region
-                region_lads = data_melted[data_melted['REGIONNM'] == region]['LADNM'].unique()
-                for lad in region_lads:
-                    lad_visibility = [(trace[0] == lad) for trace in trace_names]
-                    lad_buttons_dict[region].append(dict(method='update', label=lad,
-                                                         args=[{'visible': lad_visibility},
-                                                               {'title': f"{category} - {lad}"}]))
-
-            # Default LAD buttons (all visible)
-            default_lad_buttons = [
-                dict(method='update', label='All LADs',
-                     args=[{'visible': [True] * len(fig.data)},
-                           {'title': f"{category} - All LADs"}])
-            ]
-
-            fig.update_layout(
-                updatemenus=[
-                    {'buttons': region_buttons, 'direction': 'down',
-                     'showactive': True, 'x': 0.17, 'xanchor': 'left',
-                     'y': 1.15, 'yanchor': 'top', 'pad': {'r': 10, 't': 10}},
-                    {'buttons': default_lad_buttons, 'direction': 'down',
-                     'showactive': True, 'x': 0.37, 'xanchor': 'left',
-                     'y': 1.15, 'yanchor': 'top', 'pad': {'r': 10, 't': 10}}
-                ],
-                title=f"{category}", xaxis_title="Year",
-                yaxis_title="CAGR (%)", yaxis_tickformat=",d"
-            )
-
-            # Add LAD buttons for each region
-            for region, lad_buttons in lad_buttons_dict.items():
-                fig.update_layout(
-                    updatemenus=list(fig.layout.updatemenus) + [
-                        {'buttons': lad_buttons, 'direction': 'down',
-                         'showactive': True, 'x': 0.37, 'xanchor': 'left',
-                         'y': 1.15, 'yanchor': 'top', 'pad': {'r': 10, 't': 10}}
-                    ]
-                )
-        else:
-            # Single dropdown for Region graphs
-            buttons = [
-                dict(method='update', label='All Regions',
-                     args=[{'visible': [True] * len(fig.data)},
-                           {'title': f"{category} - All Regions"}])
-            ]
-            for zone in zones:
-                visibility = [(trace[0] == zone) for trace in trace_names]
-                buttons.append(dict(method='update', label=zone,
-                                    args=[{'visible': visibility},
-                                          {'title': f"{category} - {zone}"}]))
-
-            fig.update_layout(
-                updatemenus=[
-                    {'buttons': buttons, 'direction': 'down',
-                     'showactive': True, 'x': 0.17, 'xanchor': 'left',
-                     'y': 1.15, 'yanchor': 'top', 'pad': {'r': 10, 't': 10}}
-                ],
-                title=f"{category}", xaxis_title="Year",
-                yaxis_title="CAGR (%)", yaxis_tickformat=",d"
-            )
-
-        output_file_html = os.path.join(self.output_dir, f"{category}_Growth_Trend_v1.html")
+        # Construct a descriptive file name
+        output_file_html = os.path.join(self.output_dir, f"{category}_Growth_Trend.html")
         fig.write_html(output_file_html)
         print(f"Visualization saved as: {output_file_html}")
