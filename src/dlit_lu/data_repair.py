@@ -141,13 +141,43 @@ def infill_expected_landuse(
     return global_classes.DLogData.from_data_dict(filled_expecations, auxiliary_data.lookup)
 
 
+# def fix_expected_split(
+#     auxiliary_data: global_classes.AuxiliaryData
+# ) -> global_classes.DLogData:
+#     """Infill expected landuse columns using known land use columns.
+
+#     Infills with full list of valid land use codes if no
+#     known lookups are found.
+
+#     Returns
+#     -------
+#     global_classes.DLogData
+#         A new instance of DLogData with expected landuse column infilled.
+#     """
+
+#     split_expecations = {}
+#     for k in _LAND_USE_COLUMNS:
+#         v = getattr(auxiliary_data, f"{k}_data").copy()
+
+#         v["compatible_splits"] = v.apply(lambda x:
+#             ((set(x["expected_split"].keys()) <= set(x["expected_land_use"])) | (x["expected_land_use"] == ["unknown"]))
+#             & (len(x["expected_split"]) != 0), axis=1)
+#         v["divisor"] = v['expected_land_use'].str.len().clip(lower=1)
+#         v.loc[~v["compatible_splits"], "expected_split"] = v.apply(lambda x: {i: f"{1/x['divisor']}" for i in x["expected_land_use"]}, axis=1)
+#         v["divisor"] = v['expected_split'].str.len().clip(lower=1)
+#         v["expected_split"] = v.apply(lambda x: {i: float(f"{1/x['divisor']}") if j == "" else float(j.replace("%", "e-2")) for i, j in x["expected_split"].items()}, axis=1)
+#         v["expected_land_use"] = v["expected_split"].apply(lambda x: list(x.keys()))
+#         v = v.drop(columns=["compatible_splits", "divisor"])
+#         split_expecations[k] = v.copy()
+#     return global_classes.DLogData.from_data_dict(split_expecations, auxiliary_data.lookup)
+
 def fix_expected_split(
     auxiliary_data: global_classes.AuxiliaryData
 ) -> global_classes.DLogData:
     """Infill expected landuse columns using known land use columns.
 
-    Infills with full list of valid land use codes if no
-    known lookups are found.
+    If no known lookups are found, it assigns {'unknown': 1.0} 
+    instead of distributing equal proportions.
 
     Returns
     -------
@@ -159,17 +189,42 @@ def fix_expected_split(
     for k in _LAND_USE_COLUMNS:
         v = getattr(auxiliary_data, f"{k}_data").copy()
 
+        # Check if expected_split is valid
         v["compatible_splits"] = v.apply(lambda x:
             ((set(x["expected_split"].keys()) <= set(x["expected_land_use"])) | (x["expected_land_use"] == ["unknown"]))
             & (len(x["expected_split"]) != 0), axis=1)
-        v["divisor"] = v['expected_land_use'].str.len().clip(lower=1)
-        v.loc[~v["compatible_splits"], "expected_split"] = v.apply(lambda x: {i: f"{1/x['divisor']}" for i in x["expected_land_use"]}, axis=1)
-        v["divisor"] = v['expected_split'].str.len().clip(lower=1)
-        v["expected_split"] = v.apply(lambda x: {i: float(f"{1/x['divisor']}") if j == "" else float(j.replace("%", "e-2")) for i, j in x["expected_split"].items()}, axis=1)
-        v["expected_land_use"] = v["expected_split"].apply(lambda x: list(x.keys()))
-        v = v.drop(columns=["compatible_splits", "divisor"])
+
+        # If not compatible, set expected_split to {'unknown': 1.0}
+        v.loc[~v["compatible_splits"], "expected_split"] = [{'unknown': 1.0}] * (~v["compatible_splits"]).sum()
+
+        # Convert expected_split values to float if they are in percentage format
+        # Convert expected_split values to float, handling empty strings safely
+        def clean_split(x):
+            new_split = {}
+            for i, j in x.items():
+                if isinstance(j, str):
+                    j = j.strip()
+                    if j.endswith("%"):  # Convert percentages
+                        j = float(j.replace("%", "e-2"))
+                    elif j == "":  # Handle empty strings safely
+                        j = 0.0
+                    else:
+                        j = float(j)
+                new_split[i] = j
+            return new_split
+
+        v["expected_split"] = v["expected_split"].apply(clean_split)
+
+        # # Ensure expected_land_use matches keys of expected_split
+        # v["expected_land_use"] = v["expected_split"].apply(lambda x: list(x.keys()))
+
+        # Drop intermediate column
+        v = v.drop(columns=["compatible_splits"])
+        
         split_expecations[k] = v.copy()
+
     return global_classes.DLogData.from_data_dict(split_expecations, auxiliary_data.lookup)
+
 
 
 def infill_data(

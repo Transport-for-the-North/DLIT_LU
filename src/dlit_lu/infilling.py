@@ -56,7 +56,7 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
     )
 
     # implement syntax fixes
-    initial_assessment_folder = config.output_folder / "00_initial_assessment"
+    initial_assessment_folder = config.output_folder / "01_initial_assessment"
     if initial_assessment:
         initial_assessment_folder.mkdir(exist_ok=True)
 
@@ -81,6 +81,16 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         False,
         False,
     )
+
+    temp_residential = syntax_fixed_data.residential_data
+    temp_employment = syntax_fixed_data.employment_data
+
+    # Yan to export temp file
+    temp_residential_file = config.output_folder / "temp_residential.csv"
+    temp_employment_file = config.output_folder / "temp_employment.csv"
+    utilities.write_to_csv(temp_residential_file, temp_residential)
+    utilities.write_to_csv(temp_employment_file, temp_employment)
+
 
     expected_luc_split = analyse.luc_ratio(utilities.to_dict(syntax_fixed_data), auxiliary_data, "expected_land_use")
     utilities.write_to_csv(config.proposed_luc_split_path, expected_luc_split)

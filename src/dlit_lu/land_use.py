@@ -116,7 +116,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Disaggregating employment proposed LUCs")
     construction_land_use_data = data.copy()
-    construction_land_use_data["employment"] = disagg_land_use_codes(
+    construction_land_use_data["employment"] = disagg_expected_land_use_codes(
         construction_land_use_data["employment"],
         "proposed_land_use",
         build_out_columns,
@@ -970,6 +970,76 @@ def disagg_land_use_codes(
         suffixes=["", "_denom"],
     )
     ratio = site_luc["total_floorspace"] / site_luc["total_floorspace_denom"]
+    ratio.index = disagg.index
+    disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis=0)
+    return disagg
+
+def disagg_expected_land_use_codes(
+    data: pd.DataFrame,
+    luc_column: str,
+    unit_columns: list[str],
+    lcl_luc_split_column: str,
+    land_use_split: pd.DataFrame,
+    ratio_column: str,
+) -> pd.DataFrame:
+    """disaggregates land use into seperate rows
+
+    calculates the split of the GFA using total GFA for each land use as a input
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to disaggregate
+    luc_column : str
+        columns to disaggregate
+    unit_columns : dict[str, str]
+        unit column to disagregate
+    lcl_luc_split_column : str
+        The column in the `data` DataFrame containing the proportions (expected splits) of the land use 
+        codes, which are used to determine how the GFA should be split between land uses.
+    land_use_split : pd.DataFrame
+        A DataFrame that contains the total GFA for each land use code. This will be used to calculate 
+        the total floor area for each land use category across all sites.
+    ratio_column : str
+        The column name in `site_luc` DataFrame where the calculated ratio for each land use will be stored.
+
+
+    Returns
+    -------
+    pd.DataFrame
+        disaggregated expected land use
+    """
+
+    disagg = data.explode(luc_column).reset_index(drop=True)
+    # Extract proportion values if category exists in expected_split
+    disagg[ratio_column] = disagg.apply(
+        lambda row: row[lcl_luc_split_column].get(row[luc_column], '') 
+        if "unknown" not in row[lcl_luc_split_column] else '', axis=1
+    )
+
+    site_luc = disagg.loc[:, ["site_reference_id", luc_column, ratio_column]]
+    site_luc = site_luc.merge(
+        land_use_split,
+        how="left",
+        left_on=luc_column,
+        right_on="land_use_codes",
+    )
+    ratio_demonitator = (
+        site_luc.groupby(["site_reference_id"])["total_floorspace"]
+        .sum()
+        .rename({"total_floorspace": "denom"})
+    )
+    site_luc = site_luc.merge(
+        ratio_demonitator,
+        how="left",
+        left_on="site_reference_id",
+        right_index=True,
+        suffixes=["", "_denom"],
+    )
+    site_luc[ratio_column] = site_luc.apply(
+        lambda row: row["total_floorspace"] / row["total_floorspace_denom"] if pd.isna(row[ratio_column]) or row[ratio_column] == '' else row[ratio_column], axis=1
+    )    
+    ratio = site_luc[ratio_column]
     ratio.index = disagg.index
     disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis=0)
     return disagg

@@ -1,6 +1,6 @@
 #Set Up Parameters
 run_infill: True
-run_land_use: True
+run_land_use: False
 
 #Mandatory Parameters
 #--str
@@ -8,9 +8,9 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v4.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\Test
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\Test13_Dlog24_Rnn
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test13_Dlog24_Rnn\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test13_Dlog24_Rnn\existing_luc_split_path.csv
 
 infill:
   user_infill: False
@@ -26,11 +26,11 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test\user_input.xlsx
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test13_Dlog24_Rnn\user_input.xlsx
   gfa_infill_method: regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test\03_post_fixes\post_fix_data.xlsx
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test13_Dlog24_Rnn\03_post_fixes\post_fix_data.xlsx
   zone_shapefile_path: I:\Data\D-Log\DLIT\Inputs\zone_shapefile\NorMITsZoneV3.3\NorMITs_zoning_v3.3.shp
   zone_data_path: I:\Data\D-Log\DLIT\Inputs\NorMITs2023\totals.csv
   msoa_shapefile_path: I:\Data\D-Log\DLIT\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
