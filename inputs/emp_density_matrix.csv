@@ -4,9 +4,7 @@ B8,80,GEA
 C1,50,specified per bed (estimated)
 C2,100,not specified (estimated)
 C2A,100,not specified (estimated)
-C3(a),,not specified (assumed to produce no jobs)
-C3(b),,not specified (assumed to produce no jobs)
-C3(c),,not specified (assumed to produce no jobs)
+C3,,not specified (assumed to produce no jobs)
 C4,,not specified (assumed to produce no jobs)
 E(a),20,NIA needs modifing
 E(b),17,NIA needs modifing

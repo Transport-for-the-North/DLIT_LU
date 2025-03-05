@@ -55,6 +55,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     lsoa_hh_pop_column_names = [
         "lsoa2021_id",
+
         "dwelling_type",
         "household",
         "population",
@@ -116,6 +117,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     build_out_columns = np.arange(2000, 2067, 1).tolist()
     build_out_columns = [str(year) for year in build_out_columns]    
     
+
     LOG.info("Disaggregating mixed into residential and employment")
     data = disagg_mixed(utilities.to_dict(input_data))
 
@@ -152,7 +154,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Disaggregating employment proposed LUCs")
     construction_land_use_data = data.copy()
-    construction_land_use_data["employment"] = disagg_land_use_codes(
+    construction_land_use_data["employment"] = disagg_expected_land_use_codes(
         construction_land_use_data["employment"],
         "proposed_land_use",
         build_out_columns,
@@ -235,7 +237,6 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         ignore_index=True,
     )
 
-
     res_sites = residential_build_out.loc[
         :,
         res_key_columns + build_out_columns,
@@ -299,6 +300,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     emp_lsoa_sites_jobs = convert_luc_to_sic_site(
         emp_lsoa_sites_jobs, config.land_use.luc_sic_conversion_path
     )
+
 
     emp_lsoa_sites_jobs_segmented = apply_soc_over_sic_ratio(
         emp_lsoa_sites_jobs, build_out_columns, common_key_columns, ratio_soc_over_sic
@@ -375,7 +377,6 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     )
     year_tot_df_file_name = "year_totals.csv"
     utilities.write_to_csv(lu_output_path / year_tot_df_file_name, year_tot_df)
-
 
     LOG.info("Ending Land Use Module")
 
@@ -610,7 +611,6 @@ def convert_to_gfa(
     )
     return data_to_gfa
 
-
 def convert_gfa_to_jobs_site(
     data: pd.DataFrame, matrix_path: pathlib.Path, unit_cols
 ) -> pd.DataFrame:
@@ -686,6 +686,7 @@ def convert_luc_to_sic_site(
     #     ["site_reference_id", "easting", "northing", "lsoa2021_id", "sic_2d"],
     #     inplace=True,
     # )
+
     return data_sic_code
 
 
@@ -860,7 +861,6 @@ def disagg_dwelling(
 
     return data
 
-
 def lsoa_site_geospatial_lookup(
     data: pd.DataFrame,
     lsoa: gpd.GeoDataFrame,
@@ -892,11 +892,11 @@ def calc_lsoa_proportion(by_hh_pop: pd.DataFrame) -> pd.DataFrame:
     """calculates the lsoa population by dwelling type
 
 
+
     Parameters
     ----------
     lsoa_hh: pd.DataFrame
         TfN population land use
-
 
     Returns
     -------
@@ -961,6 +961,76 @@ def disagg_land_use_codes(
         suffixes=["", "_denom"],
     )
     ratio = site_luc["total_floorspace"] / site_luc["total_floorspace_denom"]
+    ratio.index = disagg.index
+    disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis=0)
+    return disagg
+
+def disagg_expected_land_use_codes(
+    data: pd.DataFrame,
+    luc_column: str,
+    unit_columns: list[str],
+    lcl_luc_split_column: str,
+    land_use_split: pd.DataFrame,
+    ratio_column: str,
+) -> pd.DataFrame:
+    """disaggregates land use into seperate rows
+
+    calculates the split of the GFA using total GFA for each land use as a input
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to disaggregate
+    luc_column : str
+        columns to disaggregate
+    unit_columns : dict[str, str]
+        unit column to disagregate
+    lcl_luc_split_column : str
+        The column in the `data` DataFrame containing the proportions (expected splits) of the land use 
+        codes, which are used to determine how the GFA should be split between land uses.
+    land_use_split : pd.DataFrame
+        A DataFrame that contains the total GFA for each land use code. This will be used to calculate 
+        the total floor area for each land use category across all sites.
+    ratio_column : str
+        The column name in `site_luc` DataFrame where the calculated ratio for each land use will be stored.
+
+
+    Returns
+    -------
+    pd.DataFrame
+        disaggregated expected land use
+    """
+
+    disagg = data.explode(luc_column).reset_index(drop=True)
+    # Extract proportion values if category exists in expected_split
+    disagg[ratio_column] = disagg.apply(
+        lambda row: row[lcl_luc_split_column].get(row[luc_column], '') 
+        if "unknown" not in row[lcl_luc_split_column] else '', axis=1
+    )
+
+    site_luc = disagg.loc[:, ["site_reference_id", luc_column, ratio_column]]
+    site_luc = site_luc.merge(
+        land_use_split,
+        how="left",
+        left_on=luc_column,
+        right_on="land_use_codes",
+    )
+    ratio_demonitator = (
+        site_luc.groupby(["site_reference_id"])["total_floorspace"]
+        .sum()
+        .rename({"total_floorspace": "denom"})
+    )
+    site_luc = site_luc.merge(
+        ratio_demonitator,
+        how="left",
+        left_on="site_reference_id",
+        right_index=True,
+        suffixes=["", "_denom"],
+    )
+    site_luc[ratio_column] = site_luc.apply(
+        lambda row: row["total_floorspace"] / row["total_floorspace_denom"] if pd.isna(row[ratio_column]) or row[ratio_column] == '' else row[ratio_column], axis=1
+    )    
+    ratio = site_luc[ratio_column]
     ratio.index = disagg.index
     disagg.loc[:, unit_columns] = disagg.loc[:, unit_columns].multiply(ratio, axis=0)
     return disagg

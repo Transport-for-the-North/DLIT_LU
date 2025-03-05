@@ -31,6 +31,7 @@ class GFAInfillMethod(enum.Enum):
 
 class GeoBoundary(enum.Enum):
     """Geography boundary options for processing site data."""
+
     LSOA = "lsoa"
     NORMITS = "normits"
     NOHAM = "noham"
@@ -41,7 +42,8 @@ class GeoBoundary(enum.Enum):
     def list_boundaries(cls) -> list[str]:
         """Returns a list of all available geography boundary options as strings."""
         return [boundary.value for boundary in cls]
-    
+
+
 class Sector(enum.Enum):
     REGION = "region"
     COMBINED_LAD = "combined_lad"
@@ -50,6 +52,7 @@ class Sector(enum.Enum):
     def list_sectors(cls) -> list[str]:
         """Returns a list of all available sectors options as strings."""
         return [sector.value for sector in cls]
+
 
 @dataclasses.dataclass
 class InfillConfig:
@@ -117,20 +120,20 @@ class SummaryInputs:
     lad_shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
-    
+
+
 # @dataclasses.dataclass
 # class SectorInputs:
 #     """Lookup file and shapefile for creating output summaries."""
 
 
-
-    
 @dataclasses.dataclass
 class LandUseConfig:
     """Manages reading / writing the tool's config file.
 
     Parameters
     ----------
+
     lsoa_shapefile_path: pathlib.Path
         path to msoa shape file
     lsoa_dwelling_pop_path: pathlib.Path
@@ -175,7 +178,6 @@ class LandUseConfig:
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
 
 
-
 @dataclasses.dataclass
 class DevPatnConfig:
     """Manages reading / writing the tool's config file.
@@ -215,6 +217,7 @@ class DevPatnConfig:
     emp_sic_soc_site_data: pathlib.Path
         path to jobs segmented by sic 2 digit and soc
     """
+
     base_year: str
     geo_boundary: GeoBoundary
     normits_shapefile_path: pydantic.FilePath
@@ -247,6 +250,7 @@ class DevPatnConfig:
     pop_tt_site_data: Optional[pathlib.Path] = None
     emp_sic_soc_site_data: Optional[pathlib.Path] = None
     summary_data: SummaryInputs | None = None
+
 
 @dataclasses.dataclass
 class ConstraintConfig:
@@ -358,7 +362,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
             )
 
         return value
-    
+
     @pydantic.validator("constraint")
     def constraint_input_check(  # pylint: disable=no-self-argument
         cls, value: ConstraintConfig | None, values: dict[str, Any]
