@@ -9,6 +9,7 @@
 
     Kieran Fishwick: kieran.fishwick@wsp.com
 """
+
 # standard imports
 import pathlib
 import logging
@@ -18,7 +19,7 @@ import argparse
 from tqdm.contrib import logging as tqdm_log
 
 # local imports
-from dlit_lu import infilling, inputs, utilities, land_use, parser
+from dlit_lu import constraint, infilling, inputs, utilities, land_use, parser, dev_pattern
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -56,3 +57,10 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
 
     if config.run_land_use and infilled_data is not None:
         land_use.run(infilled_data, config)
+
+    assess_data = parser.parse_dev_pattern_input(config)
+    if config.run_dev_pattern and assess_data is not None:
+        dev_pattern.run(assess_data, config)
+
+    if config.run_constraint:
+        constraint.run(config)

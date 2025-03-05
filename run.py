@@ -1,6 +1,7 @@
 """
 runs the DLIT_LU tool
 """
+
 import sys
 import argparse
 
@@ -28,6 +29,8 @@ parser.add_argument(
     type=bool,
     default=True,
 )
+
+
 args = parser.parse_args()
 
 if __name__ == "__main__":

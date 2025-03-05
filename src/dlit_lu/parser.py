@@ -1,5 +1,6 @@
 """parses the DLog data and auxiliary data
 """
+
 # standard imports
 import pathlib
 import logging
@@ -134,6 +135,42 @@ def parse_land_use_input(config: inputs.DLitConfig) -> global_classes.DLogData:
         lookup=lookup,
         existing_land_use_split=existing_split,
         proposed_land_use_split=proposed_split,
+    )
+    return data_output
+
+def parse_dev_pattern_input(config: inputs.DLitConfig) -> global_classes.AssessData:
+    """Parse land use input data from a given input path.
+
+    Parameters:
+    ----------
+    config (inputs.DLitConfig): Input configuration object
+
+    Returns:
+    ----------
+    data_output (global_classes.DLogData): Parsed land use data in a DLogData object
+
+    """
+    LOG.info(f"Parsing {str(config.dev_pattern.assessment_input)}")
+    # parse sheets
+    LOG.info("Parsing Residential sheet")
+    residential_data = parse_sheet(config.dev_pattern.assessment_input, "Residential")
+    LOG.info("Parsing Employment sheet")
+    employment_data = parse_sheet(config.dev_pattern.assessment_input, "Employment")
+    LOG.info("Parsing Mixed sheet")
+    mixed_data = parse_sheet(config.dev_pattern.assessment_input, "Mixed")
+
+    for frame in [
+        residential_data,
+        employment_data,
+        mixed_data,
+    ]:
+        if "unnamed: 0" in frame.columns:
+            frame.drop(columns=["unnamed: 0"], inplace=True)
+
+    data_output = global_classes.AssessData(
+        residential_data=residential_data,
+        employment_data=employment_data,
+        mixed_data=mixed_data,
     )
     return data_output
 
@@ -376,7 +413,42 @@ def read_auxiliary_data(
     )
 
 
-def parse_msoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
+# def parse_msoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
+#     """parse msoa shape file
+
+
+#     Parameters
+#     ----------
+#     file_path : pathlib.Path
+#         file path for msoa shapefile
+
+#     Returns
+#     -------
+#     gpd.GeoDataFrame
+#         msoa
+#     """
+#     msoa = gpd.read_file(file_path)
+#     north_msoa = msoa[~msoa["north_msoa"].isna()]
+#     return north_msoa
+
+# def parse_lsoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
+#     """parse msoa shape file
+
+
+#     Parameters
+#     ----------
+#     file_path : pathlib.Path
+#         file path for msoa shapefile
+
+#     Returns
+#     -------
+#     gpd.GeoDataFrame
+#         msoa
+#     """
+#     lsoa = gpd.read_file(file_path)
+#     return lsoa
+
+def parse_zone(file_path: pathlib.Path) -> gpd.GeoDataFrame:
     """parse msoa shape file
 
 
@@ -390,6 +462,5 @@ def parse_msoa(file_path: pathlib.Path) -> gpd.GeoDataFrame:
     gpd.GeoDataFrame
         msoa
     """
-    msoa = gpd.read_file(file_path)
-    north_msoa = msoa[~msoa["north_msoa"].isna()]
-    return north_msoa
+    zone = gpd.read_file(file_path)
+    return zone

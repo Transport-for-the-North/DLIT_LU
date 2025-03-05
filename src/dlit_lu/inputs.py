@@ -1,5 +1,6 @@
 """handles reading config file
 """
+
 # standard imports
 from __future__ import annotations
 
@@ -26,6 +27,21 @@ class GFAInfillMethod(enum.Enum):
     def regression_methods(cls) -> list[GFAInfillMethod]:
         """List of methods which use HistGradientBoostingRegressor."""
         return [cls.REGRESSION, cls.REGRESSION_NO_NEGATIVES]
+
+
+class GeoBoundary(enum.Enum):
+    """Geography boundary options for processing site data."""
+    LSOA = "lsoa"
+    NORMITS = "normits"
+    NOHAM = "noham"
+    NORMS = "norms"
+    MSOA = "msoa"
+
+    @classmethod
+    def list_boundaries(cls) -> list[str]:
+        """Returns a list of all available geography boundary options as strings."""
+        return [boundary.value for boundary in cls]
+    
 
 
 @dataclasses.dataclass
@@ -83,26 +99,33 @@ class InfillConfig:
 class SummaryInputs:
     """Lookup file and shapefile for creating output summaries."""
 
-    summary_zone_name: str
-    lookup_file: pydantic.FilePath
-    shapefile: pydantic.FilePath
+    summary_lad: str
+    summary_region: str
+    lad_to_region_file: pydantic.FilePath
+    normits_to_lad_file: pydantic.FilePath
+    lsoa_to_lad_file: pydantic.FilePath
+    msoa_to_lad_file: pydantic.FilePath
+    norms_to_lad_file: pydantic.FilePath
+    noham_to_lad_file: pydantic.FilePath
+    lad_shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
 
 
+    
 @dataclasses.dataclass
 class LandUseConfig:
     """Manages reading / writing the tool's config file.
 
     Parameters
     ----------
-    msoa_shapefile_path: pathlib.Path
+    lsoa_shapefile_path: pathlib.Path
         path to msoa shape file
-    msoa_dwelling_pop_path: pathlib.Path
+    lsoa_dwelling_pop_path: pathlib.Path
         path to msoa dwelling population file
-    msoa_traveller_type_path: pathlib.Path
+    lsoa_traveller_type_path: pathlib.Path
         path to msoa split of traveller type
-    msoa_jobs_path: pathlib.Path
+    lsoa_jobs_path: pathlib.Path
         path to msoa split of jobs
     employment_density_matrix_path: pathlib.Path
         path to employment density matrix
@@ -120,17 +143,109 @@ class LandUseConfig:
         at a different zone system.
     """
 
-    msoa_shapefile_path: pydantic.FilePath
-    msoa_dwelling_pop_path: pydantic.FilePath
-    msoa_traveller_type_path: pydantic.FilePath
-    msoa_jobs_path: pydantic.FilePath
+    lsoa_shapefile_path: pydantic.FilePath
+    lsoa_dwelling_pop_path: pydantic.FilePath
+    lsoa_traveller_type_path: pydantic.FilePath
+    lsoa_jobs_path: pydantic.FilePath
+    # msoa_shapefile_path: pydantic.FilePath
+    # msoa_dwelling_pop_path: pydantic.FilePath
+    # msoa_traveller_type_path: pydantic.FilePath
+    # msoa_jobs_path: pydantic.FilePath
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
 
-    land_use_input: Optional[pydantic.FilePath] = None
+    # land_use_input: Optional[pydantic.FilePath] = None
+    # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]
+    # as pydantic.FilePath immediately validates whether the file exists when parsing the YAML
+    # while using pathlib.Path (or str), the validation will only happen inside the custom validator,
+    # which properly checks run_land_use before verifying the file path
+    land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
+
+
+
+@dataclasses.dataclass
+class DevPatnConfig:
+    """Manages reading / writing the tool's config file.
+
+    Parameters
+    ----------
+    base_year: str
+        base year str
+    geo_boundary: str
+        specify model zone
+    normits_shapefile_path: pathlib.Path
+        path to normits zone shape file
+    noham_shapefile_path: pathlib.Path
+        path to noham zone shape file
+    norms_shapefile_path: pathlib.Path
+        path to norms zone shape file
+    msoa_shapefile_path: pathlib.Path
+        path to msoa shape file
+    lsoa_to_normits: pydantic.FilePath:
+        translation file from lsoa to normits
+    lsoa_to_noham: pydantic.FilePath
+        translation file from lsoa to noham
+    lsoa_to_norms: pydantic.FilePath
+        translation file from lsoa to norms
+    lsoa_to_msoa: pydantic.FilePath
+        translation file from lsoa to msoa
+    lsoa_data_path: pathlib.Path
+        path to zonal totals on population, dwelling (household) and employment file
+    assessment_input: pathlib.Path
+        path to sites assessment input to determine the land use values are estimated or not
+    emp_site_data: pathlib.Path
+        path to employmwnt sites
+    res_site_data: pathlib.Path
+        path to residential sites
+    pop_tt_site_data: pathlib.Path
+        path to population segmented by tt
+    emp_sic_soc_site_data: pathlib.Path
+        path to jobs segmented by sic 2 digit and soc
+    """
+    base_year: str
+    geo_boundary: GeoBoundary
+    normits_shapefile_path: pydantic.FilePath
+    noham_shapefile_path: pydantic.FilePath
+    norms_shapefile_path: pydantic.FilePath
+    msoa_shapefile_path: pydantic.FilePath
+    lsoa_hh_centroids: pydantic.FilePath
+    lsoa_emp_centroids: pydantic.FilePath
+    lsoa_pop_centroids: pydantic.FilePath
+    normits_hh_centroids: pydantic.FilePath
+    normits_emp_centroids: pydantic.FilePath
+    normits_pop_centroids: pydantic.FilePath
+    noham_hh_centroids: pydantic.FilePath
+    noham_emp_centroids: pydantic.FilePath
+    noham_pop_centroids: pydantic.FilePath
+    norms_hh_centroids: pydantic.FilePath
+    norms_emp_centroids: pydantic.FilePath
+    norms_pop_centroids: pydantic.FilePath
+    msoa_hh_centroids: pydantic.FilePath
+    msoa_emp_centroids: pydantic.FilePath
+    msoa_pop_centroids: pydantic.FilePath
+    lsoa_to_normits: pydantic.FilePath
+    lsoa_to_noham: pydantic.FilePath
+    lsoa_to_norms: pydantic.FilePath
+    lsoa_to_msoa: pydantic.FilePath
+    lsoa_data_path: Optional[pathlib.Path] = None
+    assessment_input: Optional[pathlib.Path] = None
+    emp_site_data: Optional[pathlib.Path] = None
+    res_site_data: Optional[pathlib.Path] = None
+    pop_tt_site_data: Optional[pathlib.Path] = None
+    emp_sic_soc_site_data: Optional[pathlib.Path] = None
     summary_data: SummaryInputs | None = None
 
+@dataclasses.dataclass
+class ConstraintConfig:
+
+    lad_name: pydantic.FilePath
+    region_name: pydantic.FilePath
+    ddg_pop: pydantic.FilePath
+    ddg_emp: pydantic.FilePath
+    dlog_household: Optional[pathlib.Path] = None
+    dlog_employment: Optional[pathlib.Path] = None
+    dlog_population: Optional[pathlib.Path] = None
 
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.
@@ -165,6 +280,9 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     run_infill: bool
     run_land_use: bool
+    run_dev_pattern: bool
+    run_constraint: bool
+    run_tripend: bool
 
     output_folder: pathlib.Path
     proposed_luc_split_path: pathlib.Path
@@ -174,6 +292,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     infill: Optional[InfillConfig] = None
     land_use: Optional[LandUseConfig] = None
+    dev_pattern: Optional[DevPatnConfig] = None
+    constraint: Optional[ConstraintConfig] = None
 
     @pydantic.validator("infill")
     def check_running_infill(  # pylint: disable=no-self-argument
@@ -199,7 +319,49 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
         if not values["run_infill"] and value.land_use_input is None:
             # Need land use input path if not running infill module
-            raise ValueError("land_use_input value required if not running infilling")
+            raise ValueError("land_use_input required if not running land_use")
+
+        return value
+
+    @pydantic.validator("dev_pattern")
+    def dev_pattern_input_check(  # pylint: disable=no-self-argument
+        cls, value: DevPatnConfig | None, values: dict[str, Any]
+    ) -> DevPatnConfig:
+        """Check dev pattern is given if running module."""
+        if not values["run_dev_pattern"]:
+            # Don't need to check if we aren't running dev_pattern module
+            return value
+
+        if value is None:
+            raise ValueError("dev_pattern is required if run_dev_pattern is true")
+
+        if not values.get("run_land_use") and not all(
+            [value.lsoa_data_path, value.emp_site_data, value.res_site_data]
+        ):
+            raise ValueError(
+                "lsoa_data_path, emp_site_data, and res_site_data are required if not running infill module"
+            )
+
+        return value
+    
+    @pydantic.validator("constraint")
+    def constraint_input_check(  # pylint: disable=no-self-argument
+        cls, value: ConstraintConfig | None, values: dict[str, Any]
+    ) -> ConstraintConfig:
+        """Check contraints is given if running module."""
+        if not values["run_constraint"]:
+            # Don't need to check if we aren't running constraints module
+            return value
+
+        if value is None:
+            raise ValueError("constraints is required if run_constraints is true")
+
+        if not values.get("run_dev_pattern") and not all(
+            [value.dlog_household, value.dlog_employment, value.dlog_population]
+        ):
+            raise ValueError(
+                "dlog_household, dlog_employment, and dlog_population at LAD level are required if not running dev_pattern module"
+            )
 
         return value
 
@@ -207,11 +369,18 @@ class DLitConfig(caf.toolkit.BaseConfig):
     def check_running(  # pylint: disable=no-self-argument
         cls, values: dict[str, Any]
     ) -> dict[str, Any]:
-        """Raise error if neither module has running set to True."""
-        if not values["run_infill"] and not values["run_land_use"]:
+        """Ensure at least one module is set to run."""
+        if not any(
+            [
+                values.get("run_infill"),
+                values.get("run_land_use"),
+                values.get("run_dev_pattern"),
+                values.get("run_constraints"),
+            ]
+        ):
             raise ValueError(
-                "run_infill and run_land_use cannot both be "
-                "false because there is nothing to run"
+                "At least one of run_infill, run_land_use, "
+                "or run_dev_pattern must be set to True"
             )
 
         return values
