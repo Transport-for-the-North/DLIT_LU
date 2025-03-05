@@ -131,44 +131,40 @@ class SummaryInputs:
 class LandUseConfig:
     """Manages reading / writing the tool's config file.
 
-    Parameters
+    Attributes
     ----------
-
-    lsoa_shapefile_path: pathlib.Path
-        path to msoa shape file
-    lsoa_dwelling_pop_path: pathlib.Path
-        path to msoa dwelling population file
-    lsoa_traveller_type_path: pathlib.Path
-        path to msoa split of traveller type
-    lsoa_jobs_path: pathlib.Path
-        path to msoa split of jobs
-    employment_density_matrix_path: pathlib.Path
-        path to employment density matrix
-    luc_sic_conversion_path: pathlib.Path
-        path to land use code to SIC code conversion matrix
-    land_use_input: pathlib.Path, optional
-        path to land use input (output of infill),
-        not required if running infilling module.
-    demolition_dampener: float, default 1.0
-        Factor to apply when calculating number of demolitions,
-        0 would mean no demolitions and 1 would mean maximum
-        demolitions.
-    summary_data: SummaryData, optional
-        Lookup file and shapefile for creating output summaries
-        at a different zone system.
+    lsoa_shapefile_path : pydantic.FilePath
+        Path to the LSOA shapefile.
+    lsoa_dwelling_pop_path : pydantic.FilePath
+        Path to the LSOA dwelling population file.
+    lsoa_traveller_type_path : pydantic.FilePath
+        Path to the LSOA traveller type split file.
+    lsoa_jobs_path : pydantic.FilePath
+        Path to the LSOA jobs data file.
+    luti_zone_shapefile_path : pydantic.FilePath
+        Path to the LUTI (Land Use and Transport Interaction) zone shapefile.
+    employment_density_matrix_path : pydantic.FilePath
+        Path to the employment density matrix file.
+    luc_sic_conversion_path : pydantic.FilePath
+        Path to the land use code to SIC (Standard Industrial Classification) code conversion matrix.
+    luti : bool
+        Flag indicating whether the LUTI module is enabled.
+    land_use_input : Optional[pathlib.Path], default=None
+        Path to the land use input file (output of the infill process). This is not required
+        if the infilling module is not being used.
+    demolition_dampener : pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False), default=1.0
+        Factor applied when calculating the number of demolitions.
+        A value of 0 means no demolitions, while 1 represents the maximum demolitions allowed.
     """
 
     lsoa_shapefile_path: pydantic.FilePath
     lsoa_dwelling_pop_path: pydantic.FilePath
     lsoa_traveller_type_path: pydantic.FilePath
     lsoa_jobs_path: pydantic.FilePath
-    # msoa_shapefile_path: pydantic.FilePath
-    # msoa_dwelling_pop_path: pydantic.FilePath
-    # msoa_traveller_type_path: pydantic.FilePath
-    # msoa_jobs_path: pydantic.FilePath
+    luti_zone_shapefile_path: pydantic.FilePath
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
-
+    luti: bool 
     # land_use_input: Optional[pydantic.FilePath] = None
     # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]
     # as pydantic.FilePath immediately validates whether the file exists when parsing the YAML
@@ -178,48 +174,84 @@ class LandUseConfig:
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
 
 
+
 @dataclasses.dataclass
 class DevPatnConfig:
     """Manages reading / writing the tool's config file.
 
-    Parameters
+    Attributes
     ----------
-    base_year: str
-        base year str
-    geo_boundary: str
-        specify model zone
-    normits_shapefile_path: pathlib.Path
-        path to normits zone shape file
-    noham_shapefile_path: pathlib.Path
-        path to noham zone shape file
-    norms_shapefile_path: pathlib.Path
-        path to norms zone shape file
-    msoa_shapefile_path: pathlib.Path
-        path to msoa shape file
-    lsoa_to_normits: pydantic.FilePath:
-        translation file from lsoa to normits
-    lsoa_to_noham: pydantic.FilePath
-        translation file from lsoa to noham
-    lsoa_to_norms: pydantic.FilePath
-        translation file from lsoa to norms
-    lsoa_to_msoa: pydantic.FilePath
-        translation file from lsoa to msoa
-    lsoa_data_path: pathlib.Path
-        path to zonal totals on population, dwelling (household) and employment file
-    assessment_input: pathlib.Path
-        path to sites assessment input to determine the land use values are estimated or not
-    emp_site_data: pathlib.Path
-        path to employmwnt sites
-    res_site_data: pathlib.Path
-        path to residential sites
-    pop_tt_site_data: pathlib.Path
-        path to population segmented by tt
-    emp_sic_soc_site_data: pathlib.Path
-        path to jobs segmented by sic 2 digit and soc
+    base_year : str
+        The base year for the model.
+    geo_boundary : GeoBoundary
+        Specifies the model zone boundary.
+    viz_distribution : bool
+        Flag indicating whether to visualize distribution.
+    normits_shapefile_path : pydantic.FilePath
+        Path to the Normits zone shapefile.
+    noham_shapefile_path : pydantic.FilePath
+        Path to the Noham zone shapefile.
+    norms_shapefile_path : pydantic.FilePath
+        Path to the Norms zone shapefile.
+    msoa_shapefile_path : pydantic.FilePath
+        Path to the MSOA (Middle Layer Super Output Area) shapefile.
+    lsoa_hh_centroids : pydantic.FilePath
+        Path to LSOA household centroids.
+    lsoa_emp_centroids : pydantic.FilePath
+        Path to LSOA employment centroids.
+    lsoa_pop_centroids : pydantic.FilePath
+        Path to LSOA population centroids.
+    normits_hh_centroids : pydantic.FilePath
+        Path to Normits household centroids.
+    normits_emp_centroids : pydantic.FilePath
+        Path to Normits employment centroids.
+    normits_pop_centroids : pydantic.FilePath
+        Path to Normits population centroids.
+    noham_hh_centroids : pydantic.FilePath
+        Path to Noham household centroids.
+    noham_emp_centroids : pydantic.FilePath
+        Path to Noham employment centroids.
+    noham_pop_centroids : pydantic.FilePath
+        Path to Noham population centroids.
+    norms_hh_centroids : pydantic.FilePath
+        Path to Norms household centroids.
+    norms_emp_centroids : pydantic.FilePath
+        Path to Norms employment centroids.
+    norms_pop_centroids : pydantic.FilePath
+        Path to Norms population centroids.
+    msoa_hh_centroids : pydantic.FilePath
+        Path to MSOA household centroids.
+    msoa_emp_centroids : pydantic.FilePath
+        Path to MSOA employment centroids.
+    msoa_pop_centroids : pydantic.FilePath
+        Path to MSOA population centroids.
+    lsoa_to_normits : pydantic.FilePath
+        Path to the translation file from LSOA to Normits.
+    lsoa_to_noham : pydantic.FilePath
+        Path to the translation file from LSOA to Noham.
+    lsoa_to_norms : pydantic.FilePath
+        Path to the translation file from LSOA to Norms.
+    lsoa_to_msoa : pydantic.FilePath
+        Path to the translation file from LSOA to MSOA.
+    lsoa_data_path : Optional[pathlib.Path], default=None
+        Path to the zonal totals file containing population, dwelling, and employment data.
+    assessment_input : Optional[pathlib.Path], default=None
+        Path to the site assessment input file, used to determine if land use values are estimated.
+    emp_site_data : Optional[pathlib.Path], default=None
+        Path to employment site data.
+    res_site_data : Optional[pathlib.Path], default=None
+        Path to residential site data.
+    pop_tt_site_data : Optional[pathlib.Path], default=None
+        Path to population data segmented by travel time.
+    emp_sic_soc_site_data : Optional[pathlib.Path], default=None
+        Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
+    summary_data : SummaryInputs, optional
+        Lookup file and shapefile for creating output summaries at different zone levels.
     """
 
     base_year: str
     geo_boundary: GeoBoundary
+    viz_distribution: bool
     normits_shapefile_path: pydantic.FilePath
     noham_shapefile_path: pydantic.FilePath
     norms_shapefile_path: pydantic.FilePath

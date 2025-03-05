@@ -445,13 +445,10 @@ def parse_zone(file_path: pathlib.Path) -> gpd.GeoDataFrame:
     file_path : pathlib.Path
         file path for msoa shapefile
 
-
     Returns
     -------
     gpd.GeoDataFrame
         msoa
     """
     zone = gpd.read_file(file_path)
-    if north_only:
-        zone = zone[~zone["north_msoa"].isna()]
     return zone

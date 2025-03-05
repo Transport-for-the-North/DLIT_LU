@@ -46,6 +46,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     LOG.info("Initialising Land Use Module")
 
     config.output_folder.mkdir(exist_ok=True)
+    LUTI = config.land_use.luti
     lu_output_path = config.output_folder / "04_land_use_outputs"
     lu_output_path.mkdir(exist_ok=True)
     
@@ -158,8 +159,12 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         construction_land_use_data["employment"],
         "proposed_land_use",
         build_out_columns,
+        "expected_split",
         input_data.proposed_land_use_split,
+        "ratio",
     )
+    temp = construction_land_use_data["employment"][["site_reference_id", "proposed_land_use", "ratio"]]
+    print(temp)
 
     msg = "Demolitions calculated with dampener = %.2f"
     if config.land_use.demolition_dampener == 1:
@@ -248,12 +253,12 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     ]
 
     LOG.info("performing LSOA geospatial lookup")
-    res_lsoa_sites = lsoa_site_geospatial_lookup(res_sites, lsoa)
+    res_lsoa_sites = zone_site_geospatial_lookup(res_sites, lsoa)
     res_lsoa_sites = res_lsoa_sites.loc[
         :,
         build_out_columns + res_key_columns + ["LSOA21CD"],
     ]
-    emp_lsoa_sites = lsoa_site_geospatial_lookup(emp_sites, lsoa)
+    emp_lsoa_sites = zone_site_geospatial_lookup(emp_sites, lsoa)
     emp_lsoa_sites = emp_lsoa_sites.loc[
         :,
         build_out_columns + emp_key_columns + ["LSOA21CD"],
@@ -281,11 +286,35 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         lu_output_path / emp_sites_uncertainty_file, emp_sites_uncerntainty
     )
 
-    #LOG.info("Creating LUTI zonal data")
+    LOG.info("Creating LUTI zonal data")
     # Files needed by LUTI
-    luti_output_path = config.output_folder / "LUTI_outputs"
-    luti_output_path.mkdir(exist_ok=True)
-    # Need LUTI zone system and shapefile here to convert site data into luti zonal data
+    if LUTI: 
+        luti_output_path = config.output_folder / "LUTI_outputs"
+        luti_output_path.mkdir(exist_ok=True)
+        # Need LUTI zone system and shapefile here to convert site data into luti zonal data
+        luti_zones = parser.parse_zone(config.land_use.luti_zone_shapefile_path)
+        res_luti_sites = zone_site_geospatial_lookup(res_sites, luti_zones)
+        res_luti_sites = res_luti_sites.loc[
+            :,
+            build_out_columns + res_key_columns + ["zone_id"],
+        ]
+        res_luti = res_luti_sites.groupby(["zone_id", "web_tag_certainty"])[build_out_columns].sum()
+        emp_luti_sites = zone_site_geospatial_lookup(emp_sites, luti_zones)
+        emp_luti_sites = emp_luti_sites.loc[
+            :,
+            build_out_columns + emp_key_columns + ["zone_id"],
+        ]
+        emp_luti = emp_luti_sites.groupby(["zone_id", "web_tag_certainty", "land_use"])[build_out_columns].sum()
+
+        res_luti_file = "dwelling_luti_build_out.csv"
+        emp_luti_file = "floorspace_luti_build_out.csv"
+
+        utilities.write_to_csv(
+            luti_output_path / res_luti_file, res_luti
+        )
+        utilities.write_to_csv(
+            luti_output_path / emp_luti_file, emp_luti
+        )
 
     LOG.info("Convert site development to jobs")
     emp_lsoa_sites = emp_lsoa_sites.rename(
@@ -861,31 +890,34 @@ def disagg_dwelling(
 
     return data
 
-def lsoa_site_geospatial_lookup(
+def zone_site_geospatial_lookup(
     data: pd.DataFrame,
-    lsoa: gpd.GeoDataFrame,
+    zone: gpd.GeoDataFrame,
 ) -> gpd.GeoDataFrame:
-    """spatially joins LSOA shapefile to DLOG sites
+    """spatially joins zone shapefile to DLOG sites
 
 
     Parameters
     ----------
     data : pd.DataFrame
-        data to join to lsoa
-    lsoa : gpd.GeoDataFrame
-        lsoa data
+        data to join to zone
+    zone : gpd.GeoDataFrame
+        zone data
 
     Returns
     -------
     gpd.GeoDataFrame
         spatially joined data
     """
-
+    drop_cols = {"easting", "northing"} & set(zone.columns)
+    if drop_cols:
+        zone = zone.drop(columns=list(drop_cols))
+        
     dlog_geom = gpd.GeoDataFrame(
         data, geometry=gpd.points_from_xy(data["easting"], data["northing"])
     )
-    dlog_lsoa = gpd.sjoin(dlog_geom, lsoa, how="left")
-    return dlog_lsoa
+    dlog_zone = gpd.sjoin(dlog_geom, zone, how="left")
+    return dlog_zone
 
 
 def calc_lsoa_proportion(by_hh_pop: pd.DataFrame) -> pd.DataFrame:
@@ -1005,9 +1037,9 @@ def disagg_expected_land_use_codes(
     # Extract proportion values if category exists in expected_split
     disagg[ratio_column] = disagg.apply(
         lambda row: row[lcl_luc_split_column].get(row[luc_column], '') 
-        if "unknown" not in row[lcl_luc_split_column] else '', axis=1
+        if isinstance(row[lcl_luc_split_column], dict) and "unknown" not in row[lcl_luc_split_column] 
+        else '', axis=1
     )
-
     site_luc = disagg.loc[:, ["site_reference_id", luc_column, ratio_column]]
     site_luc = site_luc.merge(
         land_use_split,
@@ -1028,7 +1060,9 @@ def disagg_expected_land_use_codes(
         suffixes=["", "_denom"],
     )
     site_luc[ratio_column] = site_luc.apply(
-        lambda row: row["total_floorspace"] / row["total_floorspace_denom"] if pd.isna(row[ratio_column]) or row[ratio_column] == '' else row[ratio_column], axis=1
+        lambda row: row["total_floorspace"] / row["total_floorspace_denom"] 
+        if pd.isna(row[ratio_column]) or row[ratio_column] == '' 
+        else row[ratio_column], axis=1
     )    
     ratio = site_luc[ratio_column]
     ratio.index = disagg.index

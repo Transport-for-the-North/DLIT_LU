@@ -1476,14 +1476,11 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
     utilities.write_to_csv(key_output_path / emp_stats_file, emp_stats)
 
-    enable_visualization = False  # Set to False to skip plotting
-    plot_path = config.output_folder / "05_plot_distribution_attributes"
-    plot_path.mkdir(exist_ok=True)
-    if enable_visualization:
+    visualization = config.dev_pattern.viz_distribution
+
+    if visualization:
         LOG.info("Attribute value distribution plot")
-        plot_path = (
-            config.output_folder / f"{model_zone}_plot_distribution_attributes"
-        )
+        plot_path = config.output_folder / "05_plot_distribution_attributes"
         plot_path.mkdir(exist_ok=True)
 
         LOG.info(f"Visualizing the distribution of residential site attributes")
