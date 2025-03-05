@@ -2,6 +2,7 @@ import pandas as pd
 import pathlib
 import logging
 import os
+from typing import Optional, Dict, Any
 
 # Local imports
 from dlit_lu import inputs, utilities
@@ -14,8 +15,20 @@ LOG = logging.getLogger(__name__)
 class ConstraintProcessor():
 
     def __init__(self, config: inputs.DLitConfig):
+        self.sector: inputs.Sector = config.constraint.sector
         self.config: inputs.DLitConfig = config
-            
+        self.sector_info_map: Dict[inputs.Sector, Dict[str, Any]] = {
+            inputs.Sector.REGION: {
+                "lookup_path": self.config.constraint.lad_to_region_file,
+                "lad_id": "lad2013_id",
+                "base_year_column": "2023",
+                "region_id": "ntem_region_id",  
+                "lad_to_region_prop_col": "lad2013_to_ntem_region"
+            }
+        }
+
+        self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
+
     def region(self,
            data: pd.DataFrame,
            base_year_column: str,
@@ -33,11 +46,11 @@ class ConstraintProcessor():
         pd.DataFrame
             Region data.
         """
-        lookup_path = self.config.dev_pattern.summary_data.lad_to_region_file
-        lad_id = "lad2013_id"
-        base_year_column = "2023"
-        region_id = "ntem_region_id"
-        lad_to_region_prop_col = "lad2013_to_ntem_region"
+        lookup_path = self.sector_info["lookup_path"]  
+        lad_id = self.sector_info["lad_id"]
+        base_year_column = self.sector_info["base_year_column"]
+        region_id = self.sector_info["region_id"]
+        lad_to_region_prop_col = self.sector_info["lad_to_region_prop_col"]
 
         region_data_annual = self.aggregate_to_region(
             data,
@@ -182,44 +195,115 @@ class ConstraintProcessor():
             'Region_Employment': {'DDG': region_ddg_emp, 'DLOG': region_dlog_emp}
         }
     
-def calculate_growth_rate(data, year_columns):
-    """
-    Calculate the annual growth rate for the given DataFrame.
+class GrowthCalculator:
+    
+    def __init__(self):
+        pass
+        
+    def calculate_absolute_growth(self, data, base_year, year_columns):
+        """
+        Calculate absolute growth for each year.
 
-    Args:
-        data (DataFrame): The DataFrame containing year columns with data to calculate growth rate.
-        year_columns (list): List of year columns to calculate growth rate.
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing year columns.
+        year_columns : list
+            List of year columns to calculate absolute growth.
 
-    Returns:
-        DataFrame: A DataFrame with only the LAD column and CAGR values.
-    """
-    growth_rate = data.copy()
-    year_columns = sorted([int(year) for year in year_columns])
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with absolute growth for each year.
+        """
+        abs_growth = data.copy()
+        # base_year = base_year_int
+        for i in range(1, len(year_columns)):
+            # base_year = year_columns[i - 1] 
+            future_year = year_columns[i] # build out years
+            abs_growth[f'AbsGrowth_{future_year}'] = data[future_year] - data[base_year]
+        
+        return abs_growth
+        
+    def calculate_growth_ratio(self, data, year_columns): 
 
-    cagr_columns = []
+        """
+        Calculate growth ratio for each year.
 
-    # Calculate CAGR for each period
-    for i in range(1, len(year_columns)):
-        start_year = year_columns[i - 1]
-        end_year = year_columns[i]
-        years = end_year - start_year
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing year columns.
+        year_columns : list
+            List of year columns to calculate growth ratio.
 
-        # Calculate CAGR for the period and store it in the end year's column
-        def calculate_row_growth(row):
-            start_value = row[str(start_year)]
-            end_value = row[str(end_year)]
-            if start_value == 0:
-                return None  
-            return ((end_value / start_value) ** (1 / years) - 1) * 100
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with growth ratio for each year.
+        """
+        growth_ratio = data.copy()
+        for i in range(1, len(year_columns)):
+            base_year = year_columns[i - 1]
+            future_year = year_columns[i]
+            growth_ratio[f'GrowthRatio_{future_year}'] = data[future_year] / data[base_year]
+        
+        return growth_ratio
+    
+    def calculate_target_growth(self, original_data, cagr_data, year_columns):
+        """
+        Calculate target growth using CAGR values.
 
-        cagr_column_name = f'CAGR_{end_year}'
-        growth_rate[cagr_column_name] = data.apply(calculate_row_growth, axis=1)
-        cagr_columns.append(cagr_column_name)
+        Parameters
+        ----------
+        original_data : pd.DataFrame
+            DataFrame containing original year columns.
+        cagr_data : pd.DataFrame
+            DataFrame containing CAGR columns.
+        year_columns : list
+            List of year columns to calculate target growth.
 
-    # Select only the first columns and existing CAGR columns
-    result = growth_rate.iloc[:, [0, 1, 2] + [growth_rate.columns.get_loc(col) for col in cagr_columns]]
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with target growth for each year.
+        """
+        target_growth = original_data.copy()
+        for i in range(1, len(year_columns)):
+            base_year = year_columns[i - 1]
+            future_year = year_columns[i]
+            cagr_column = f'CAGR_{future_year}'
+            target_growth[f'TargetGrowth_{future_year}'] = (original_data[future_year] / original_data[base_year] - 1) * original_data[base_year]
+            # target_growth[f'TargetGrowth_{future_year}'] = (cagr_data[cagr_column]) * original_data[base_year] ??
+            # target_growth[f'TargetGrowth_{future_year}'] = (gr_data[gr_column]) * original_data[base_year]
+        
+        return target_growth
 
-    return result
+    def calculate_growth_rate(self, data, year_columns): #annual gr
+        growth_rate = data.copy()
+        year_columns = sorted([int(year) for year in year_columns])
+
+        cagr_columns = []
+
+        for i in range(1, len(year_columns)):
+            start_year = year_columns[i - 1]
+            end_year = year_columns[i]
+            years = end_year - start_year
+
+            def calculate_row_growth(row):
+                start_value = row[str(start_year)]
+                end_value = row[str(end_year)]
+                if start_value == 0:
+                    return None  
+                return ((end_value / start_value) ** (1 / years) - 1) * 100
+
+            cagr_column_name = f'CAGR_{end_year}'
+            growth_rate[cagr_column_name] = data.apply(calculate_row_growth, axis=1)
+            cagr_columns.append(cagr_column_name)
+
+        result = growth_rate.iloc[:, [0, 1, 2] + [growth_rate.columns.get_loc(col) for col in cagr_columns]]
+
+        return result
 
 def run(config: inputs.DLitConfig):
 
@@ -236,7 +320,7 @@ def run(config: inputs.DLitConfig):
     dlog_population = pd.read_csv(config.constraint.dlog_population)
     dlog_employment = pd.read_csv(config.constraint.dlog_employment)
 
-    key_constraint_path = config.output_folder / f"06_constraint"
+    key_constraint_path = config.output_folder / f"06_constraint_test"
     key_constraint_path.mkdir(exist_ok=True)
 
     # Process data
@@ -252,6 +336,7 @@ def run(config: inputs.DLitConfig):
     ddg_emp = ddg_emp.rename(columns={'LAD13CD': 'lad2013_id'})
 
     processor = ConstraintProcessor(config)
+    growth_calculator = GrowthCalculator()
 
     lad_id = "lad2013_id"
     name_column = "descriptions"
@@ -304,21 +389,55 @@ def run(config: inputs.DLitConfig):
         )
         processed_datasets.append(processed_data)
 
-    # Calculate growth rates
+    # Calculate growth metrics
     growth_rate_results = []
+    abs_growth_results = []
+    growth_ratio_results = []
+    target_growth_results = []
+
+
     for data in processed_datasets:
-        growth_rate_result = calculate_growth_rate(data, year_columns)
+        # Calculate absolute growth
+        abs_growth_result = growth_calculator.calculate_absolute_growth(data, year_columns)
+        abs_growth_results.append(abs_growth_result)
+
+        # Calculate growth ratio
+        growth_ratio_result = growth_calculator.calculate_growth_ratio(data, year_columns)
+        growth_ratio_results.append(growth_ratio_result)
+
+        # Calculate growth rate
+        growth_rate_result = growth_calculator.calculate_growth_rate(data, year_columns)
         growth_rate_results.append(growth_rate_result)
 
-    # Split and prepare datasets
-    prepared_datasets = processor.combine_datasets(growth_rate_results)
+        # Calculate target growth using the growth rate result
+        target_growth_result = growth_calculator.calculate_target_growth(data, growth_rate_result, year_columns)
+        target_growth_results.append(target_growth_result)
 
-    for category, datasets in prepared_datasets.items():
+    # Split and prepare datasets
+    prepared_datasets_gr = processor.combine_datasets(growth_rate_results)
+    prepared_datasets_tg = processor.combine_datasets(target_growth_results)
+    prepared_datasets_ab = processor.combine_datasets(abs_growth_results)
+    prepared_datasets_gra = processor.combine_datasets(growth_ratio_results)
+
+    
+    for category, datasets in prepared_datasets_gr.items():
         excel_output_path = key_constraint_path / f'{category}.xlsx'
+        utilities.write_to_excel(excel_output_path, datasets)
+
+    for category, datasets in prepared_datasets_tg.items():
+        excel_output_path = key_constraint_path / f'{category}_tg.xlsx'
+        utilities.write_to_excel(excel_output_path, datasets)
+
+    for category, datasets in prepared_datasets_ab.items():
+        excel_output_path = key_constraint_path / f'{category}_ab.xlsx'
+        utilities.write_to_excel(excel_output_path, datasets)
+
+    for category, datasets in prepared_datasets_gra.items():
+        excel_output_path = key_constraint_path / f'{category}_gra.xlsx'
         utilities.write_to_excel(excel_output_path, datasets)
 
     # Visualize the data
     visualizer = GrowthRateVisualizer(output_dir=key_constraint_path / 'visualizations')
-    visualizer.generate_visualizations(prepared_datasets)
+    visualizer.generate_visualizations(prepared_datasets_gr)
 
     LOG.info("Data processing, aggregation, and visualization completed")

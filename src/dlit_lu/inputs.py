@@ -42,7 +42,14 @@ class GeoBoundary(enum.Enum):
         """Returns a list of all available geography boundary options as strings."""
         return [boundary.value for boundary in cls]
     
+class Sector(enum.Enum):
+    REGION = "region"
+    COMBINED_LAD = "combined_lad"
 
+    @classmethod
+    def list_sectors(cls) -> list[str]:
+        """Returns a list of all available sectors options as strings."""
+        return [sector.value for sector in cls]
 
 @dataclasses.dataclass
 class InfillConfig:
@@ -110,6 +117,11 @@ class SummaryInputs:
     lad_shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
+    
+# @dataclasses.dataclass
+# class SectorInputs:
+#     """Lookup file and shapefile for creating output summaries."""
+
 
 
     
@@ -238,7 +250,9 @@ class DevPatnConfig:
 
 @dataclasses.dataclass
 class ConstraintConfig:
- 
+
+    sector: Sector
+    lad_to_region_file: pydantic.FilePath
     lad_name: pydantic.FilePath
     region_name: pydantic.FilePath
     ddg_pop: pydantic.FilePath
@@ -246,6 +260,7 @@ class ConstraintConfig:
     dlog_household: Optional[pathlib.Path] = None
     dlog_employment: Optional[pathlib.Path] = None
     dlog_population: Optional[pathlib.Path] = None
+
 
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.

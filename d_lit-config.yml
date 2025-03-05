@@ -111,6 +111,6 @@ constraint:
   dlog_household: I:\Data\D-Log\DLIT\Outputs\test12\05_aggregation\lad_household.csv
   dlog_employment: I:\Data\D-Log\DLIT\Outputs\test12\05_aggregation\lad_job.csv
   dlog_population: I:\Data\D-Log\DLIT\Outputs\test12\05_aggregation\lad_population.csv
-  # region_household: I:\Data\D-Log\DLIT\Outputs\test12\05_aggregation\region_household.csv
-  # region_employment: I:\Data\D-Log\DLIT\Outputs\test12\05_aggregation\region_employment.csv
-  # region_population: I:\Data\D-Log\DLIT\Outputs\test12\05_aggregation\region_population.csv
+  sector: region #region, combined_lad 
+  lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
+
