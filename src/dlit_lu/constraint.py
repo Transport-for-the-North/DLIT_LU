@@ -1,13 +1,10 @@
 import pandas as pd
-import pathlib
 import logging
-import os
-from typing import Optional, Dict, Any
+from typing import Dict, Any
+import numpy as np
 
 # Local imports
 from dlit_lu import inputs, utilities
-import numpy as np
-
 from dlit_lu.viz import GrowthRateVisualizer
 
 LOG = logging.getLogger(__name__)
@@ -74,6 +71,40 @@ class ConstraintProcessor():
                             future_year_columns, 
                             region_id, 
                             lad_to_region_prop_col):
+        """
+        Aggregate data from Local Authority District (LAD) level to region level.
+
+        This function aggregates data from the LAD level to the region level using a lookup table
+        that maps LADs to regions. It adjusts the values based on a proportional column and ensures
+        that the total values before and after aggregation remain consistent.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing LAD-level data with columns for the base year and future years.
+        lookup_path : str
+            Path to the CSV file containing the lookup table that maps LADs to regions.
+        lad_id : str
+            Column name in the data and lookup table representing the LAD identifier.
+        base_year_column : str
+            Column name in the data representing the base year.
+        future_year_columns : list
+            List of column names in the data representing future years.
+        region_id : str
+            Column name in the lookup table representing the region identifier.
+        lad_to_region_prop_col : str
+            Column name in the lookup table representing the proportion of each LAD that belongs to a region.
+
+        Returns
+        ------
+        pd.DataFrame
+            DataFrame containing aggregated region-level data with columns for the base year and future years.
+
+        Raises
+        ------
+        ValueError
+            If the total values before and after aggregation do not match, indicating a discrepancy in the aggregation process.
+        """
         
         lookup_df = pd.read_csv(lookup_path)  
 
@@ -161,13 +192,13 @@ class ConstraintProcessor():
         dict
             Dictionary containing datasets split into DDG and DLOG.
         """
-    # Define the source names based on the order of datasets
+        # Define the source names based on the order of datasets
         source_names = ['DDG', 'DDG', 'DLOG', 'DLOG', 'DDG', 'DDG', 'DLOG', 'DLOG']
     
-    # Add Source column to each dataset and reorder columns
+        # Add Source column to each dataset and reorder columns
         for i, data in enumerate(growth_rate_results):
             data['Source'] = source_names[i]
-        # Reorder columns to place 'Source' after 'LADNM' or 'REGIONNM'
+            # Reorder columns to place 'Source' after 'LADNM' or 'REGIONNM'
             if 'LADNM' in data.columns:
                 cols = list(data.columns)
                 cols.insert(cols.index('LADNM') + 1, cols.pop(cols.index('Source')))
@@ -178,7 +209,7 @@ class ConstraintProcessor():
                 data = data[cols]
             growth_rate_results[i] = data
 
-    # Split datasets into DDG and DLOG
+        # Split datasets into DDG and DLOG
         ddg_pop = growth_rate_results[0]
         dlog_pop = growth_rate_results[2]
         ddg_emp = growth_rate_results[1]
@@ -223,6 +254,7 @@ class GrowthCalculator:
             abs_growth[f'AbsGrowth_{future_year}'] = data[future_year] - data[base_year]
         
         result_columns = list(data.columns[:3]) + [f'AbsGrowth_{year}' for year in build_out_columns]
+        
         return abs_growth[result_columns]
         
     def calculate_growth_ratio(self, data, base_year_int, build_out_columns):
@@ -250,6 +282,7 @@ class GrowthCalculator:
             growth_ratio[f'GrowthRatio_{future_year}'] = data[future_year] / data[base_year]
         
         result_columns = list(data.columns[:3]) + [f'GrowthRatio_{year}' for year in build_out_columns]
+        
         return growth_ratio[result_columns]
     
     def calculate_target_growth(self, original_data, base_year_int, build_out_columns):
@@ -277,9 +310,37 @@ class GrowthCalculator:
             target_growth[f'TargetGrowth_{future_year}'] = (original_data[future_year] / original_data[base_year] - 1) * original_data[base_year]
         
         result_columns = list(original_data.columns[:3]) + [f'TargetGrowth_{year}' for year in build_out_columns]
+        
         return target_growth[result_columns]
 
     def calculate_annual_growth_rate(self, data, year_columns):
+        """
+        Calculate the Compound Annual Growth Rate (CAGR) for each period between consecutive years.
+
+        This method calculates the CAGR for each period between consecutive years in the provided
+        year columns. The CAGR is expressed as a percentage and is added as a new column for each
+        end year in the DataFrame.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame containing data with columns for each year to calculate the growth rate.
+        year_columns : list
+            List of column names representing the years for which to calculate the CAGR.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with CAGR columns of each period
+            between consecutive years.
+
+        Notes
+        -----
+        - The CAGR is calculated using the formula:
+        CAGR = ((end_value / start_value) ** (1 / years) - 1) * 100
+        - If the start value for a period is zero, the CAGR for that period is set to None.
+        """
+
         growth_rate = data.copy()
         year_columns = sorted([int(year) for year in year_columns])
 
