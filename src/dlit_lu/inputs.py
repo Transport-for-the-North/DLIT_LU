@@ -272,6 +272,7 @@ class DevPatnConfig:
 @dataclasses.dataclass
 class ConstraintConfig:
 
+    base_year: str
     sector: Sector
     lad_to_region_file: pydantic.FilePath
     lad_name: pydantic.FilePath

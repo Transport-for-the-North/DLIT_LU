@@ -111,5 +111,6 @@ constraint:
   dlog_employment: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_job.csv
   dlog_population: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_population.csv
   sector: region #region, combined_lad 
+  base_year: 2023
   lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
 
