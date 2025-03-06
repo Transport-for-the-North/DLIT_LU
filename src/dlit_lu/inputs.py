@@ -63,14 +63,6 @@ class InfillConfig:
     ----------
     user_infill: bool
         whether to run user infilling functionality
-    combined_sheet_name: str
-        name of the combined sheet within the D-Log file
-    residential_sheet_name: str
-        name of the residential sheet within the D-log file
-    employment_sheet_name: str
-        name of the employment sheet within the D-log file
-    mixed_sheet_name: str
-        name of the mixed sheet within the D-log file
     dlog_column_names_path: pathlib.Path
         path to column names in the dlog. contains column names for each
         sheet and column names to drop for all sheets
@@ -91,10 +83,6 @@ class InfillConfig:
     """
 
     user_infill: bool
-    combined_sheet_name: str
-    residential_sheet_name: str
-    employment_sheet_name: str
-    mixed_sheet_name: str
     dlog_column_names_path: pydantic.FilePath
     user_input_path: pathlib.Path
     valid_luc_path: pydantic.FilePath
@@ -122,9 +110,6 @@ class SummaryInputs:
     geometry_simplify_tolerance: int | None = None
 
 
-# @dataclasses.dataclass
-# class SectorInputs:
-#     """Lookup file and shapefile for creating output summaries."""
 
 
 @dataclasses.dataclass
