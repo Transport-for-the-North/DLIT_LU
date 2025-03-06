@@ -34,11 +34,11 @@ land_use:
   lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
   lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
   lsoa_jobs_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output E4_3.csv
-  luti_zone_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NLUTI_v4_shapefiles\NLUTI_v4_zones_refactored.shp    
   employment_density_matrix_path: inputs\emp_density_matrix.csv
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
   demolition_dampener: 0
   luti: True
+  luti_zone_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NLUTI_v4_shapefiles\NLUTI_v4_zones_refactored.shp    
 
 
 dev_pattern:
