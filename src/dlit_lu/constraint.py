@@ -479,7 +479,43 @@ class GrowthCalculator:
             updated_data[year] = updated_data[prev_year] + data[year]
 
         return updated_data                           
-    
+
+    def yearly_totals_from_base(
+        self,
+        data: pd.DataFrame,
+        base_year_column: str,
+        build_out_columns: list[str],
+    ) -> pd.DataFrame:
+        """
+        Calculate yearly totals from the base year onwards, where each year's total is
+        the sum of the base year's total and the corresponding year's value.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            DataFrame with a base year column and future year columns.
+        base_year_column : str
+            The base year column from which the totals are calculated.
+        build_out_columns : list of str
+            List of future year columns.
+
+        Returns
+        -------
+        pd.DataFrame
+            Updated DataFrame with new totals for each year.
+        """
+        updated_data = data.copy()
+
+        # Ensure all specified columns exist in the data
+        missing_cols = [col for col in build_out_columns if col not in data.columns]
+        if missing_cols:
+            raise ValueError(f"Missing columns in data: {missing_cols}")
+
+        # Calculate totals by adding the base year column value to each of the years in build_out_columns
+        for year in build_out_columns:
+            updated_data[year] = updated_data[base_year_column] + data[year]
+
+        return updated_data
         
 def run(config: inputs.DLitConfig):
 
@@ -601,13 +637,14 @@ def run(config: inputs.DLitConfig):
     LOG.info("Export datasets for LAD and Region")
     # List of subkeys in the required order
     subkeys = ['YearTotal', 'AbsoluteGrowth', 'GrowthRatio', 'GrowthRate', 'AnnualGrowthRate']
-
+    output_path = key_constraint_path / f"output_for_viz"
+    output_path.mkdir(exist_ok=True)    
     for geography, _ in geographies:  # Ignore geo_data
         for subkey in subkeys:
             for id in ids:
                 # Define Excel file name
                 file_name = f"{geography}_{subkey}_{id}.xlsx"
-                file_path = f'{key_constraint_path}/{file_name}'
+                file_path = f'{output_path}/{file_name}'
 
                 outputs = {}
 
@@ -656,21 +693,25 @@ def run(config: inputs.DLitConfig):
             base_year_int, 
             build_out_columns,
         )
-
+        # Create a list of columns to select (zone_index_columns and base_year_column)
+        # Calculate weight to distribute sector level background into zone level
         zone_index_column_count = zone_target_growth.columns.get_loc(base_year_column)
         zone_index_columns = list(zone_target_growth.columns[:zone_index_column_count])
         agg_zone_target_growth = zone_target_growth.groupby('REGIONNM')[build_out_columns].sum()
         agg_zone_target_growth.columns = [f"{col}_agg" for col in build_out_columns]
-        zone_target_growth = zone_target_growth.merge(agg_zone_target_growth, on='REGIONNM')
+        zone_weight = zone_target_growth.merge(agg_zone_target_growth, on='REGIONNM')
         
         for col in build_out_columns:
-            zone_target_growth[f"{col}_weight"] = zone_target_growth[col] / zone_target_growth[f"{col}_agg"]
+            zone_weight[f"{col}_weight"] = (
+                zone_weight[col] / zone_weight[f"{col}_agg"]
+            )
         
-        zone_weight = zone_target_growth[zone_index_columns + [f"{col}_weight" for col in build_out_columns]]
+        zone_weight = zone_weight[zone_index_columns + [f"{col}_weight" for col in build_out_columns]]
         
         agg_zone_weight = zone_weight.groupby('REGIONNM')[[f"{col}_weight" for col in build_out_columns]].sum()
         print("agg zone weight", agg_zone_weight)
-        
+
+        # Get lower geographical level background growth    
         zone_bg_growth = zone_weight.merge(sector_bg_growth, on='REGIONNM')
         for col in build_out_columns:
             zone_bg_growth[col] = zone_bg_growth[col] * zone_bg_growth[f"{col}_weight"]
@@ -678,21 +719,30 @@ def run(config: inputs.DLitConfig):
    
         agg_zone_bg_growth = zone_bg_growth.groupby('REGIONNM')[build_out_columns].sum()
 
+        # Dlog estimated growth at lower geographical level
         zone_estimated_growth = results[f"lad_dlog_{id}"]["AbsoluteGrowth"]
+
         # Create a list of columns to select (zone_index_columns and base_year_column)
         columns_to_select = zone_index_columns + [base_year_column]
         zone_adjusted_growth = zone_target_growth[columns_to_select]
-        for col in build_out_columns:
-            zone_adjusted_growth[col] = zone_estimated_growth[col] + zone_bg_growth[col]
-        
-        zone_forecast = growth_calculator.cumulative_yearly_totals(zone_adjusted_growth, base_year_column, build_out_columns)
-        # zone_forecast_tot = zone_target_growth[columns_to_select].add(zone_forecast, fill_value=0)
 
-       
+        # Create a list of columns to select (zone_index_columns and base_year_column)
+        zone_estimated_growth = zone_estimated_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
+        zone_bg_growth = zone_bg_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
+        zone_adjusted_growth = zone_adjusted_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
+
+        for col in build_out_columns:
+            zone_adjusted_growth[col] = (
+                zone_estimated_growth[col].values + zone_bg_growth[col].values
+            )
+        agg_zone_adj_growth = zone_adjusted_growth.groupby('REGIONNM')[build_out_columns].sum()
+        # Create target year total        
+        zone_forecast = growth_calculator.yearly_totals_from_base(zone_adjusted_growth, base_year_column, build_out_columns)
+        # zone_forecast_tot = zone_target_growth[columns_to_select].add(zone_forecast, fill_value=0)
+ 
         agg_zone_forecast = zone_forecast.groupby('REGIONNM')[build_out_columns].sum()
         agg_zone_forecast = agg_zone_forecast.reset_index()
-
-        
+    
         sector_target_tot = growth_calculator.target_yeartot(
             results[f"{sector}_dlog_{id}"]["YearTotal"], 
             results[f"{sector}_ddg_{id}"]["YearTotal"], 
@@ -703,9 +753,12 @@ def run(config: inputs.DLitConfig):
         sector_target_growth_file = f"{sector}_target_growth_{id}.csv"
         sector_estimated_growth_file = f"{sector}_estimated_growth_{id}.csv"
         sector_bg_growth_file = f"{sector}_background_growth_{id}.csv"
+        zone_target_growth_file = f"lad_target_growth_{id}.csv"
         zone_bg_growth_file = f"lad_background_growth_{id}.csv"
         agg_zone_bg_growth_file = f"agg_lad_background_growth_{id}.csv"
+        zone_estimated_growth_file = f"lad_estimated_growth_{id}.csv"
         zone_adjusted_growth_file = f"lad_adjusted_growth_{id}.csv"
+        agg_zone_adj_growth_file = f"agg_lad_adjusted_growth_{id}.csv"
         zone_forecast_file = f"lad_forecast_{id}.csv"
         agg_zone_forecast_file = f"agg_lad_forecast_{id}.csv"
         sector_target_tot_file = f"{sector}_target_tot_{id}.csv"
@@ -713,9 +766,12 @@ def run(config: inputs.DLitConfig):
         utilities.write_to_csv(key_constraint_path / sector_target_growth_file, sector_target_growth)
         utilities.write_to_csv(key_constraint_path / sector_estimated_growth_file, sector_estimated_growth)
         utilities.write_to_csv(key_constraint_path / sector_bg_growth_file, sector_bg_growth)
+        utilities.write_to_csv(key_constraint_path / zone_target_growth_file, zone_target_growth)
         utilities.write_to_csv(key_constraint_path / zone_bg_growth_file, zone_bg_growth)
         utilities.write_to_csv(key_constraint_path / agg_zone_bg_growth_file, agg_zone_bg_growth)
+        utilities.write_to_csv(key_constraint_path / zone_estimated_growth_file, zone_estimated_growth)
         utilities.write_to_csv(key_constraint_path / zone_adjusted_growth_file, zone_adjusted_growth)
+        utilities.write_to_csv(key_constraint_path / agg_zone_adj_growth_file, agg_zone_adj_growth)
         utilities.write_to_csv(key_constraint_path / zone_forecast_file, zone_forecast)
         utilities.write_to_csv(key_constraint_path / agg_zone_forecast_file, agg_zone_forecast)
         utilities.write_to_csv(key_constraint_path / sector_target_tot_file, sector_target_tot)
