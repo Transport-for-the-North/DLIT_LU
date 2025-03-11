@@ -267,51 +267,6 @@ class ZoneTranslator(BaseZoneHandler):
         )
         return lad_data_annualgrowth, lad_data_annualtot
 
-    def _merge_translation_data(
-        self,
-        by_data: pd.DataFrame,
-        translation_path: str,
-        columns_to_process: list,
-        prop_column: str,
-        group_by_column: str,
-    ) -> pd.DataFrame:
-        """
-        Merge the zone translation data with the input dataframe and fill missing values.
-
-        Parameters
-        ----------
-        by_data : pd.DataFrame
-            Input data containing zone-level information.
-        translation_path : str
-            Path to the translation CSV file.
-        columns_to_process : List[str]
-            List of column names to process.
-        prop_column : str
-            Column name containing proportions to apply to the data.
-        group_by_column : str
-            Column used for grouping.
-
-        Returns
-        -------
-        pd.DataFrame
-            Region data.
-        """
-        lookup_path = self.config.dev_pattern.summary_data.lad_to_region_file
-        lad_id = self.zone_info["lad_id_col"]
-        region_id = self.zone_info["region_id_col"]
-        lad_to_region_prop_col = self.zone_info["lad_to_region_prop"]
-        region_data_annual = self._lad_to_region(
-            data,
-            lookup_path,
-            lad_id,
-            base_year_column,
-            future_year_columns,
-            region_id,
-            lad_to_region_prop_col
-        )
-        region_data = region_data_annual.set_index(lad_id, region_id)
-
-        return region_data
 
     def _merge_translation_data(
         self,
@@ -1363,8 +1318,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Processing site data for year 2024 upwards")
     probability_dict = {
             "Near certain": 0.9,
-            "More than likely": 0.65,
-            "Reasonably forseeable": 0.4,
+            "More than likely": 0.4,
+            "Reasonably forseeable": 0.2,
             "Hypothetical": 0.0,
             "Not specified": 0.0,
     }

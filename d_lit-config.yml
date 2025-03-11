@@ -1,8 +1,8 @@
 #Set Up Parameters
 run_infill: True
 run_land_use: True
-run_dev_pattern: False
-run_constraint: False
+run_dev_pattern: True
+run_constraint: True
 run_tripend: False
 
 #Mandatory Parameters
@@ -11,9 +11,9 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v4.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\existing_luc_split_path.csv
 
 infill:
   user_infill: False
@@ -25,11 +25,11 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\user_input.xlsx
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\user_input.xlsx
   gfa_infill_method: regression # mean, regression, regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\03_post_fixes\post_fix_data.xlsx
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\03_post_fixes\post_fix_data.xlsx
   lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
   lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
   lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
@@ -45,12 +45,12 @@ dev_pattern:
   # Key input paths
   base_year: 2023
   geo_boundary: normits # lsoa, normits, noham, norms, mosa
-  assessment_input: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
-  emp_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
-  res_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
-  lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\tot_by_data_out.csv
-  pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
-  emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
+  assessment_input: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
+  emp_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
+  res_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
+  lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\tot_by_data_out.csv
+  pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
+  emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
   # shape file paths
   normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
   noham_shapefile_path: P:\02_NorTMS Rebase\01_Highway\03.Data\06. Confirmed Zone Structure\2.NoHAM_zone_updates-TfN\NoHAM_zones_v3.7\NoHAM_Zones_v3.7.shp
@@ -107,9 +107,9 @@ constraint:
   ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
   ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
   # Inputs from previous module dev_pattern
-  dlog_household: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_household.csv
-  dlog_employment: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_job.csv
-  dlog_population: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_population.csv
+  dlog_hh: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\05_aggregation\lad_household.csv
+  dlog_emp: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\05_aggregation\lad_job.csv
+  dlog_pop: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\05_aggregation\lad_population.csv
   sector: region #region, combined_lad 
   base_year: 2023
   lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv

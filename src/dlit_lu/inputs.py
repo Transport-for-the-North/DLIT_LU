@@ -38,20 +38,20 @@ class GeoBoundary(enum.Enum):
     NORMS = "norms"
     MSOA = "msoa"
 
-    @classmethod
-    def list_boundaries(cls) -> list[str]:
-        """Returns a list of all available geography boundary options as strings."""
-        return [boundary.value for boundary in cls]
+    # @classmethod
+    # def list_boundaries(cls) -> list[str]:
+    #     """Returns a list of all available geography boundary options as strings."""
+    #     return [boundary.value for boundary in cls]
 
 
 class Sector(enum.Enum):
     REGION = "region"
     COMBINED_LAD = "combined_lad"
 
-    @classmethod
-    def list_sectors(cls) -> list[str]:
-        """Returns a list of all available sectors options as strings."""
-        return [sector.value for sector in cls]
+    # @classmethod
+    # def list_sectors(cls) -> list[str]:
+    #     """Returns a list of all available sectors options as strings."""
+    #     return [sector.value for sector in cls]
 
 
 @dataclasses.dataclass
@@ -279,9 +279,9 @@ class ConstraintConfig:
     region_name: pydantic.FilePath
     ddg_pop: pydantic.FilePath
     ddg_emp: pydantic.FilePath
-    dlog_household: Optional[pathlib.Path] = None
-    dlog_employment: Optional[pathlib.Path] = None
-    dlog_population: Optional[pathlib.Path] = None
+    dlog_hh: Optional[pathlib.Path] = None
+    dlog_emp: Optional[pathlib.Path] = None
+    dlog_pop: Optional[pathlib.Path] = None
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -394,7 +394,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("constraint is required if run_constraint is true")
 
         if not values.get("run_dev_pattern") and not all(
-            [value.dlog_household, value.dlog_employment, value.dlog_population]
+            [value.dlog_hh, value.dlog_emp, value.dlog_pop]
         ):
             raise ValueError(
                 "dlog_household, dlog_employment, and dlog_population at LAD level are required if not running dev_pattern module"
