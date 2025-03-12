@@ -546,7 +546,8 @@ def run(config: inputs.DLitConfig):
     year_columns = [col for col in lad_data["ntem_pop"].columns if col.isdigit()]
     base_year_column = config.constraint.base_year
     base_year_int = int(base_year_column)
-    build_out_columns = [str(year) for year in range(base_year_int + 1, 2067)]
+    build_out_columns = np.arange(base_year_int + 1, 2062, 1).tolist()
+    build_out_columns = [str(year) for year in build_out_columns]
 
     ddg_col = 'LAD13CD'
 
