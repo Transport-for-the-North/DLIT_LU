@@ -1,7 +1,7 @@
 #Set Up Parameters
-run_infill: False
-run_land_use: False
-run_dev_pattern: False
+run_infill: True
+run_land_use: True
+run_dev_pattern: True
 run_constraint: True
 run_tripend: False
 
@@ -9,7 +9,7 @@ run_tripend: False
 #--str
 lookups_sheet_name: "Lookups"
 #--Read file paths
-dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v4.xlsx
+dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v5.xlsx
 #--Write file paths
 output_folder: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression
 proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_regression\proposed_luc_split_path.csv

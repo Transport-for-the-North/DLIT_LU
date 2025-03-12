@@ -84,12 +84,12 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
     loaded_sheet[("All", "emp_sector_type_id")] = loaded_sheet[("Employment", "sector_type_id")]
     loaded_sheet[("All", "mix_sector_type_id")] = loaded_sheet[("Mixed", "sector_type_id-2")]
 
-    loaded_sheet[("All", "total_site_area_size_hectares")] = loaded_sheet[("Housing", "total_site_area_size_hectares")]
-    loaded_sheet[("All", "total_units")] = loaded_sheet[("Housing", "total_units")]
-    loaded_sheet[("All", "total_area_sqm")] = loaded_sheet[("Employment", "total_area_sqm")]
-    loaded_sheet[("All", "site_area_ha")] = loaded_sheet[("Employment", "site_area_ha")]
+    loaded_sheet[("All", "total_site_area_size_hectares")] = loaded_sheet[("Housing", "Total site area size hectares")]
+    loaded_sheet[("All", "total_units")] = loaded_sheet[("Housing", "Total Units")]
+    loaded_sheet[("All", "total_area_sqm")] = loaded_sheet[("Employment", "Total area sqm")]
+    loaded_sheet[("All", "site_area_ha")] = loaded_sheet[("Employment", "Site area ha")]
     loaded_sheet[("All", "total_area_ha")] = loaded_sheet[("Mixed", "total_area_ha")]
-    loaded_sheet[("All", "floorspace_sqm")] = loaded_sheet[("Mixed", "floorspace_sqm")]
+    loaded_sheet[("All", "floorspace_sqm")] = loaded_sheet[("Mixed", "Floorspace sqm")]
     loaded_sheet[("All", "dwellings")] = loaded_sheet[("Mixed", "dwellings")]
     loaded_sheet = loaded_sheet["All"]
 

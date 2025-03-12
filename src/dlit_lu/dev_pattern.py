@@ -1318,8 +1318,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Processing site data for year 2024 upwards")
     probability_dict = {
             "Near certain": 0.9,
-            "More than likely": 0.4,
-            "Reasonably forseeable": 0.2,
+            "More than likely": 0.65,
+            "Reasonably forseeable": 0.4,
             "Hypothetical": 0.0,
             "Not specified": 0.0,
     }
