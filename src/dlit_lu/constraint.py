@@ -538,12 +538,12 @@ def run(config: inputs.DLitConfig):
         "ddg_emp": pd.read_csv(config.constraint.ddg_emp),
         "dlog_pop": pd.read_csv(config.constraint.dlog_pop),
         "dlog_emp": pd.read_csv(config.constraint.dlog_emp),
-        "ntem_pop" = pd.read_csv(config.constraint.ntem_pop),
-        "ntem_emp" = pd.read_csv(config.constraint.ntem_employment)
+        "ntem_pop" : pd.read_csv(config.constraint.ntem_pop),
+        "ntem_emp" : pd.read_csv(config.constraint.ntem_emp)
     }
 
     # Process data
-    year_columns = [col for col in lad_data["dlog_pop"].columns if col.isdigit()]
+    year_columns = [col for col in lad_data["ntem_pop"].columns if col.isdigit()]
     base_year_column = config.constraint.base_year
     base_year_int = int(base_year_column)
     build_out_columns = [str(year) for year in range(base_year_int + 1, 2067)]
@@ -583,6 +583,8 @@ def run(config: inputs.DLitConfig):
         "ddg_emp": processor.sector_agg(lad_data["ddg_emp"], base_year_column, build_out_columns),
         "dlog_pop": processor.sector_agg(lad_data["dlog_pop"], base_year_column, build_out_columns),
         "dlog_emp": processor.sector_agg(lad_data["dlog_emp"], base_year_column, build_out_columns),
+        "ntem_pop": processor.sector_agg(lad_data["ntem_pop"], base_year_column, build_out_columns),
+        "ntem_emp": processor.sector_agg(lad_data["ntem_emp"], base_year_column, build_out_columns),
     }
     LOG.info("Process to get datasets for LAD and Region completed")
     # Define dataset mappings dynamically by looping through pop and emp keys
@@ -590,7 +592,7 @@ def run(config: inputs.DLitConfig):
 
     # Define purposes for looping
     ids = ["pop", "emp"]
-    sources = ["ddg", "dlog"]
+    sources = ["ddg", "dlog", "ntem"]
 
     # Define geographies dynamically
     geographies = [("lad", lad_data), (sector, sector_data)]  

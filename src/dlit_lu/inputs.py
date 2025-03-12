@@ -279,6 +279,9 @@ class ConstraintConfig:
     region_name: pydantic.FilePath
     ddg_pop: pydantic.FilePath
     ddg_emp: pydantic.FilePath
+    ntem_hh: pydantic.FilePath
+    ntem_pop: pydantic.FilePath
+    ntem_emp: pydantic.FilePath
     dlog_hh: Optional[pathlib.Path] = None
     dlog_emp: Optional[pathlib.Path] = None
     dlog_pop: Optional[pathlib.Path] = None
