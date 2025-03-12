@@ -13,6 +13,7 @@ Conversion process involves disagregating by:
 # standard imports
 import logging
 import pathlib
+import itertools
 
 # third party imports
 import pandas as pd
@@ -163,8 +164,8 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         input_data.proposed_land_use_split,
         "ratio",
     )
-    temp = construction_land_use_data["employment"][["site_reference_id", "proposed_land_use", "ratio"]]
-    print(temp)
+    # temp = construction_land_use_data["employment"][["site_reference_id", "proposed_land_use", "ratio"]]
+    # print(temp)
 
     msg = "Demolitions calculated with dampener = %.2f"
     if config.land_use.demolition_dampener == 1:
@@ -247,18 +248,24 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         res_key_columns + build_out_columns,
     ]
 
+    res_sites = expand_site_certainty(
+        res_sites,
+        config.land_use.web_tag_certainty_path
+    )
+    print(res_sites)
+
     emp_sites = employment_build_out.loc[
         :,
         emp_key_columns + build_out_columns
     ]
 
     LOG.info("performing LSOA geospatial lookup")
-    res_lsoa_sites = zone_site_geospatial_lookup(res_sites, lsoa)
+    res_lsoa_sites = zone_site_geospatial_lookup(residential_build_out, lsoa)
     res_lsoa_sites = res_lsoa_sites.loc[
         :,
         build_out_columns + res_key_columns + ["LSOA21CD"],
     ]
-    emp_lsoa_sites = zone_site_geospatial_lookup(emp_sites, lsoa)
+    emp_lsoa_sites = zone_site_geospatial_lookup(employment_build_out, lsoa)
     emp_lsoa_sites = emp_lsoa_sites.loc[
         :,
         build_out_columns + emp_key_columns + ["LSOA21CD"],
@@ -367,7 +374,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         + res_key_columns + ["lsoa2021_id", "dwelling_type"],
     ]
 
-    LOG.info("Disaggregating site level population furhter by traveller type")
+    LOG.info("Disaggregating site level population further by traveller type")
     res_lsoa_sites_pop = res_lsoa_sites_pop.groupby(
         res_key_columns + ["lsoa2021_id"]
     )[build_out_columns].sum()
@@ -639,6 +646,54 @@ def convert_to_gfa(
         .multiply(data_to_gfa[unit_col], axis=0)
     )
     return data_to_gfa
+
+def expand_site_certainty(
+    data: pd.DataFrame,
+    certainty_path: pathlib.Path
+) -> pd.DataFrame:
+    """Expand to have full combination between site (with easting/northing) and certainty types.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The DataFrame containing site information.
+    certainty_path : pathlib.Path
+        The path to a CSV file that provides all web tag certainty types.
+
+    Returns
+    -------
+    pd.DataFrame
+        The expanded DataFrame with all unique site-reference ID, easting, and northing combinations.
+    """
+
+    # Load certainty types
+    certainty = pd.read_csv(certainty_path).loc[:, ["web_tag_certainty"]]
+
+    # Get unique site_reference_id, easting, and northing combinations
+    unique_sites = data.loc[:, ["site_reference_id", "easting", "northing"]].drop_duplicates()
+
+    # Create all combinations of (site_reference_id, easting, northing) with certainty types
+    expanded_df = pd.DataFrame(
+        itertools.product(unique_sites.itertuples(index=False, name=None), certainty["web_tag_certainty"]),
+        columns=["site_info", "web_tag_certainty"]
+    )
+
+    # Split site_info tuple back into separate columns
+    expanded_df[["site_reference_id", "easting", "northing"]] = pd.DataFrame(expanded_df["site_info"].tolist())
+
+    # Drop the temporary tuple column
+    expanded_df.drop(columns=["site_info"], inplace=True)
+
+    # Merge with the original data to preserve existing values while keeping new combinations
+    expanded_data = expanded_df.merge(
+        data, on=["site_reference_id", "easting", "northing", "web_tag_certainty"], how="left"
+    )
+
+    # Fill NaN values with 0
+    expanded_data.fillna(0, inplace=True)
+
+    return expanded_data
+
 
 def convert_gfa_to_jobs_site(
     data: pd.DataFrame, matrix_path: pathlib.Path, unit_cols

@@ -149,6 +149,7 @@ class LandUseConfig:
     luti_zone_shapefile_path: pydantic.FilePath
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
+    web_tag_certainty_path: pydantic.FilePath
     luti: bool 
     # land_use_input: Optional[pydantic.FilePath] = None
     # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]

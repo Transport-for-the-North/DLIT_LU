@@ -306,7 +306,7 @@ class GrowthCalculator:
                 end_value = row[str(end_year)]
                 return None if start_value == 0 else ((end_value / start_value) ** (1 / years) - 1) * 100
 
-            cagr_column_name = f'CAGR_{end_year}'
+            cagr_column_name = str(end_year)
             growth_rate[cagr_column_name] = data.apply(calculate_row_growth, axis=1)
             cagr_columns.append(cagr_column_name)
 
