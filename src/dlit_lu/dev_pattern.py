@@ -1554,12 +1554,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_output_path / zonal_job_file_name, zonal_job
     )
 
-    # utilities.write_to_csv(
-    #     key_output_path / pop_tt_zone_file_name, pop_tt_zone
-    # )
-    # utilities.write_to_csv(
-    #     key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
-    # )
+    utilities.write_to_csv(
+        key_output_path / pop_tt_zone_file_name, pop_tt_zone
+    )
+    utilities.write_to_csv(
+        key_output_path / job_sic_soc_zone_file_name, job_sic_soc_zone
+    )
 
     LOG.info("Aggregating zonal household, population and jobs to LAD")
     lad_household_ab_growth, lad_household = zone_translator.lad_summary(

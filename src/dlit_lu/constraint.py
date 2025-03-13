@@ -249,6 +249,9 @@ class GrowthCalculator:
         ValueError
             If `growth_type` is not one of the allowed values.
         """
+        # Filter build_out_columns to only include years present in the data
+        available_years = [year for year in build_out_columns if year in data.columns]
+    
         valid_growth_types = {'absolute', 'ratio', 'rate'}
         if growth_type not in valid_growth_types:
             raise ValueError(
@@ -271,10 +274,10 @@ class GrowthCalculator:
 
         # # Set specified columns as index for both DataFrames
         # growth_indexed = growth.set_index(index_columns)
-        for future_year in build_out_columns:
+        for future_year in available_years:
             growth[future_year] = growth_funcs[growth_type](future_year)
 
-        return growth[index_columns + build_out_columns]
+        return growth[index_columns + available_years]
 
     def calculate_annual_growth_rate(self, data, year_columns):
         """
@@ -292,13 +295,13 @@ class GrowthCalculator:
         pd.DataFrame
             DataFrame with CAGR columns of each period between consecutive years.
         """
+        available_years = sorted([int(year) for year in year_columns if year in data.columns])
         growth_rate = data.copy()
-        year_columns = sorted([int(year) for year in year_columns])
         cagr_columns = []
 
-        for i in range(1, len(year_columns)):
-            start_year = year_columns[i - 1]
-            end_year = year_columns[i]
+        for i in range(1, len(available_years)):
+            start_year = available_years[i - 1]
+            end_year = available_years[i]
             years = end_year - start_year
 
             def calculate_row_growth(row):
@@ -543,18 +546,19 @@ def run(config: inputs.DLitConfig):
     }
 
     # Process data
-    year_columns = [col for col in lad_data["ntem_pop"].columns if col.isdigit()]
+    year_columns = [col for col in lad_data["dlog_pop"].columns if col.isdigit()] 
     base_year_column = config.constraint.base_year
     base_year_int = int(base_year_column)
-    build_out_columns = np.arange(base_year_int + 1, 2062, 1).tolist()
-    build_out_columns = [str(year) for year in build_out_columns]
+    build_out_columns = [str(year) for year in range(base_year_int + 1, 2067)]
+    year_cols_ntem = [str(year) for year in range(base_year_int + 1, 2062)]
+
 
     ddg_col = 'LAD13CD'
 
     # Process data: Rename columns, filter, and drop "LON" rows
     for key in ["ddg_pop", "ddg_emp"]:
         df = lad_data[key]
-        df.drop(columns=[col for col in df.columns if col not in [ddg_col] + year_columns], inplace=True)
+        df.drop(columns=[col for col in df.columns if col not in [ddg_col] + [base_year_column] + build_out_columns], inplace=True)
         df.rename(columns={ddg_col: "lad2013_id"}, inplace=True)
         df.drop(df[df["lad2013_id"].str.startswith("LON")].index, inplace=True)
         # Sort the DataFrame by 'lad2013_id' (you can replace 'lad2013_id' with 'ddg_col' if needed)
@@ -584,8 +588,8 @@ def run(config: inputs.DLitConfig):
         "ddg_emp": processor.sector_agg(lad_data["ddg_emp"], base_year_column, build_out_columns),
         "dlog_pop": processor.sector_agg(lad_data["dlog_pop"], base_year_column, build_out_columns),
         "dlog_emp": processor.sector_agg(lad_data["dlog_emp"], base_year_column, build_out_columns),
-        "ntem_pop": processor.sector_agg(lad_data["ntem_pop"], base_year_column, build_out_columns),
-        "ntem_emp": processor.sector_agg(lad_data["ntem_emp"], base_year_column, build_out_columns),
+        "ntem_pop": processor.sector_agg(lad_data["ntem_pop"], base_year_column, year_cols_ntem),
+        "ntem_emp": processor.sector_agg(lad_data["ntem_emp"], base_year_column, year_cols_ntem),
     }
     LOG.info("Process to get datasets for LAD and Region completed")
     # Define dataset mappings dynamically by looping through pop and emp keys

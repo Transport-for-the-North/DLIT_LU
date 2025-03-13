@@ -54,10 +54,10 @@ class GrowthRateVisualizer:
 
         id_var = 'LADNM' if 'LAD' in category else 'REGIONNM'
         if 'LAD' in category:
-            melted = data.melt(id_vars=[id_var, 'Source', 'REGIONNM', 'Sheet'],
+            melted = data.melt(id_vars=[id_var, 'source', 'REGIONNM', 'Sheet'],
                            value_vars=year_columns, var_name='Year', value_name='Value')
         else:
-            melted = data.melt(id_vars=[id_var, 'Source', 'Sheet'],
+            melted = data.melt(id_vars=[id_var, 'source', 'Sheet'],
                            value_vars=year_columns, var_name='Year', value_name='Value')
 
         melted['Category'] = category
@@ -159,17 +159,17 @@ if __name__ == "__main__":
             "ntem": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_pop.xlsx", sheet_name="region_ntem_pop"),
         },
         "LAD_Employment_GR": {
-            "ddg": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\lad_GrowthRate_emp.xlsx", sheet_name="region_ddg_emp"),
-            "dlog": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\lad_GrowthRate_emp.xlsx", sheet_name="region_dlog_emp"),
-            "ntem": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\lad_GrowthRate_emp.xlsx", sheet_name="region_ntem_emp"),
+            "ddg": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\lad_GrowthRate_emp.xlsx", sheet_name="lad_ddg_emp"),
+            "dlog": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\lad_GrowthRate_emp.xlsx", sheet_name="lad_dlog_emp"),
+            "ntem": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\lad_GrowthRate_emp.xlsx", sheet_name="lad_ntem_emp"),
         },
         "Region_Employment_GR": {
-            "ddg": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_emp.xlsx", sheet_name="lad_ddg_emp"),
-            "dlog": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_emp.xlsx", sheet_name="lad_dlog_emp"),
-            "ntem": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_emp.xlsx", sheet_name="lad_ntem_emp"),
+            "ddg": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_emp.xlsx", sheet_name="region_ddg_emp"),
+            "dlog": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_emp.xlsx", sheet_name="region_dlog_emp"),
+            "ntem": pd.read_excel(r"I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\06_constraint\output_for_viz\region_GrowthRate_emp.xlsx", sheet_name="region_ntem_emp"),
         }
     }
 
     visualizer = GrowthRateVisualizer(output_directory)
-    visualizer.generate_visualizations(combined_datasets_gr)
-    # visualizer.generate_visualizations(combined_datasets_raw)
+    #visualizer.generate_visualizations(combined_datasets_gr)
+    visualizer.generate_visualizations(combined_datasets_raw)
