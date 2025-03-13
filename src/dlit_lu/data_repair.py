@@ -331,6 +331,24 @@ def _average_area_infill(
             "mixed": infill_averages.average_mix_area,
         },
     )
+
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["dwellings", "units_(dwellings)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_averages.average_dwelling_site_area_ratio},
+    )["mixed"]
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["floorspace_sqm", "units_(floorspace)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_averages.average_gfa_site_area_ratio},
+    )["mixed"]
+
     corrected_format = infill_units(
         corrected_format,
         _UNITS_COLUMNS,
@@ -343,13 +361,6 @@ def _average_area_infill(
         },
     )
 
-    corrected_format["mixed"] = infill_units(
-        {"mixed": corrected_format["mixed"]},
-        {"mixed": ["dwellings", "units_(dwellings)"]},
-        {"mixed": "total_area_ha"},
-        ["-", 0],
-        {"mixed": infill_averages.average_dwelling_site_area_ratio},
-    )["mixed"]
 
     return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
 
