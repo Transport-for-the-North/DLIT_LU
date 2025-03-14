@@ -287,6 +287,12 @@ class ConstraintConfig:
     dlog_pop: Optional[pathlib.Path] = None
 
 
+@dataclasses.dataclass
+class TripendsConfig:
+
+    zone_tt_pop: pydantic.FilePath
+    zone_soc_sic_emp: pydantic.FilePath
+
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file.
 
@@ -334,6 +340,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     land_use: Optional[LandUseConfig] = None
     dev_pattern: Optional[DevPatnConfig] = None
     constraint: Optional[ConstraintConfig] = None
+    tripend: Optional[TripendsConfig] = None
 
     @pydantic.validator("infill")
     def check_running_infill(  # pylint: disable=no-self-argument
@@ -404,6 +411,27 @@ class DLitConfig(caf.toolkit.BaseConfig):
             )
 
         return value
+    
+    @pydantic.validator("tripend")
+    def tripend_input_check(  # pylint: disable=no-self-argument
+        cls, value: TripendsConfig | None, values: dict[str, Any]
+    ) -> TripendsConfig:
+        """Check contraints is given if running module."""
+        if not values["run_tripend"]:
+            # Don't need to check if we aren't running constraints module
+            return value
+
+        if value is None:
+            raise ValueError("tripend is required if run_tripend is true")
+
+        if not values.get("run_constraint") and not all(
+            [value.zone_tt_pop, value.zone_soc_sic_emp]
+        ):
+            raise ValueError(
+                "zone_tt_pop, zone_soc_sic_emp are required if not running constraint module"
+            )
+
+        return value
 
     @pydantic.root_validator
     def check_running(  # pylint: disable=no-self-argument
@@ -416,11 +444,12 @@ class DLitConfig(caf.toolkit.BaseConfig):
                 values.get("run_land_use"),
                 values.get("run_dev_pattern"),
                 values.get("run_constraint"),
+                values.get("run_tripend")
             ]
         ):
             raise ValueError(
                 "At least one of run_infill, run_land_use, "
-                "run_dev_pattern, or run_constraints must be set to True"
+                "run_dev_pattern, or run_constraints, run_tripend must be set to True"
             )
 
         return values
