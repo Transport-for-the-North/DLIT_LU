@@ -120,4 +120,4 @@ constraint:
 tripend:
   zone_tt_pop: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_normits\normits_zonal_new_population_by_tt.csv.bz2
   zone_soc_sic_emp: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_normits\normits_zonal_new_job_by_sic_soc.csv.bz2
-
+  nomits_hb: NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
