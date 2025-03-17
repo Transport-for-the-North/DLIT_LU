@@ -41,20 +41,10 @@ class GeoBoundary(enum.Enum):
     NORMS = "norms"
     MSOA = "msoa"
 
-    # @classmethod
-    # def list_boundaries(cls) -> list[str]:
-    #     """Returns a list of all available geography boundary options as strings."""
-    #     return [boundary.value for boundary in cls]
-
 
 class Sector(enum.Enum):
     REGION = "region"
     COMBINED_LAD = "combined_lad"
-
-    # @classmethod
-    # def list_sectors(cls) -> list[str]:
-    #     """Returns a list of all available sectors options as strings."""
-    #     return [sector.value for sector in cls]
 
 
 @dataclasses.dataclass
@@ -176,6 +166,8 @@ class DevPatnConfig:
         Specifies the model zone boundary.
     viz_distribution : bool
         Flag indicating whether to visualize distribution.
+    index_weights_path: pydantic.FilePath
+        Path to the weights defined for variables which will form the final weighted index to determine large sites
     normits_shapefile_path : pydantic.FilePath
         Path to the Normits zone shapefile.
     noham_shapefile_path : pydantic.FilePath
@@ -241,6 +233,7 @@ class DevPatnConfig:
     base_year: str
     geo_boundary: GeoBoundary
     viz_distribution: bool
+    index_weights_path: pydantic.FilePath
     normits_shapefile_path: pydantic.FilePath
     noham_shapefile_path: pydantic.FilePath
     norms_shapefile_path: pydantic.FilePath
@@ -431,7 +424,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
 
 class InfillingAverages(caf.toolkit.BaseConfig):
-    """Averages calculated for use in MEAN infill method."""
+    """Averages calculated for use in glbaverage infill method."""
 
     average_res_area: float
     average_emp_area: float
@@ -441,7 +434,7 @@ class InfillingAverages(caf.toolkit.BaseConfig):
 
 
 class InfillingMeans(caf.toolkit.BaseConfig):
-    """Averages calculated for use in MEAN infill method."""
+    """Means calculated for use in MEAN infill method."""
 
     mean_res_area: float
     mean_emp_area: float
@@ -450,7 +443,7 @@ class InfillingMeans(caf.toolkit.BaseConfig):
     mean_dwelling_site_area_ratio: float
 
 class InfillingMedians(caf.toolkit.BaseConfig):
-    """Averages calculated for use in MEAN infill method."""
+    """Medians calculated for use in medians infill method."""
 
     median_res_area: float
     median_emp_area: float

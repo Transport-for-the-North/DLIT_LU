@@ -189,7 +189,7 @@ class ZoneTranslator(BaseZoneHandler):
         if calculate_density:
             by_data = self._calculate_density(by_data, columns_to_process)
         
-        # Merge zonal data
+        # Merge zonal data if enabled
         if model_zone_data:
             zonal_household_growth, zonal_population_growth, zonal_job_growth= self._model_zone_data(
                 by_data,
@@ -1125,6 +1125,61 @@ def process_site_data(
     sitezone_processor: SiteZoneProcessor,
     use_prob_for_size: bool,
 ):
+    """
+    Processes site data for a given site type (Residential or Employment), calculates various metrics,
+    and merges zonal attributes. This function handles site data by creating new columns, mapping probability values,
+    calculating ratios, and computing centroid shifts for the development sites.
+
+    Parameters:
+    -----------
+    site_data : pd.DataFrame
+        A DataFrame containing site data, including columns for proposed development and other site-related attributes.
+    
+    by_data : pd.DataFrame
+        A DataFrame containing base year zonal attributes to be merged with the site data.
+
+    site_type : str
+        The type of site (e.g., "Residential" or "Employment") to process.
+
+    site_reference_ids : list
+        A list of site reference IDs to identify whether a site is real or estimated.
+
+    key_columns : list[str]
+        A list of key columns to retain in the final processed DataFrame.
+
+    build_out_columns : list[str]
+        A list of columns representing the proposed development for each year.
+
+    probability_dict : dict
+        A dictionary mapping web tag certainty values to probability values, used to adjust the site size.
+
+    sitezone_processor : SiteZoneProcessor
+        An instance of the SiteZoneProcessor class, used to perform geospatial lookups, merge zonal attributes,
+        and compute centroid shifts.
+
+    use_prob_for_size : bool
+        A boolean flag indicating whether to adjust the site size using probability values.
+
+    Returns:
+    --------
+    pd.DataFrame
+        A DataFrame containing the processed site data with calculated ratios, centroid shifts, and merged zonal attributes.
+        The DataFrame includes the following columns:
+        - 'sum_proposed' : Sum of the proposed development for the site across the specified columns.
+        - 'prob_val' : The probability value mapped from the web tag certainty.
+        - 'value_estimated' : Indicates whether the site is estimated or real.
+        - 'ho_den' : household density.
+        - 'po_den' :  populationd density.
+        - 'jo_den' : job density.
+        - 'n_e_ratio' : The ratio of new development to existing development (based on household or job data).
+        - 'centroid_shift' : The shift in centroid location caused by the development.
+        - 'ctrd_shift_ratio' : The ratio of centroid shift to site diameter.
+
+    Raises:
+    -------
+    ValueError
+        If an unknown site type is provided, the function defaults to using jobs for ratio calculations.
+    """
     LOG.info(f"Processing {site_type} site data")
 
     # Create a new column 'sum_proposed' which is the sum of the columns from 2024 to the last year
@@ -1215,6 +1270,17 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     config.output_folder.mkdir(exist_ok=True)
     LOG.info("Loading Key Inputs")
+    # Create probability values for each certainty
+    probability_dict = pd.read_csv(config.land_use.web_tag_certainty_path).to_dict()
+    # Create res_weight_dict directly by loading the relevant columns and converting them into a dictionary
+    res_weight_dict = pd.read_csv(
+        config.dev_pattern.index_weights_path, usecols=['variables', 'residential']
+    ).set_index('variables')['residential'].to_dict()
+    # Create emp_weight_dict directly by loading the relevant columns and converting them into a dictionary
+    emp_weight_dict = pd.read_csv(
+        config.dev_pattern.index_weights_path, usecols=['variables', 'employment']
+    ).set_index('variables')['employment'].to_dict()
+
     site_assessment = lu.disagg_mixed(utilities.to_dict(input_data))
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
     res_sites = pd.read_csv(config.dev_pattern.res_site_data)
@@ -1316,13 +1382,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Processing site data for year 2024 upwards")
-    probability_dict = {
-            "Near certain": 0.9,
-            "More than likely": 0.65,
-            "Reasonably forseeable": 0.4,
-            "Hypothetical": 0.0,
-            "Not specified": 0.0,
-    }
     res_zone_sites = process_site_data(
         res_sites,
         by_data,
@@ -1358,24 +1417,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "ctrd_shift_ratio",
     ]
     zscore_suffix = 'zscore' #'zscore', 'robust_zscore', 'modified_zscore'
-    res_weight_dict = {
-        "sum_proposed_index": 0.35,
-        "ho_den_index": 0.3,
-        "po_den_index": 0,
-        "jo_den_index": 0.05,
-        "n_e_ratio_index": 0.05,
-        "ctrd_shift_ratio_index": 0.3,
-    }
-    emp_weight_dict = {
-        "sum_proposed_index": 0.4,
-        "ho_den_index": 0.05,
-        "po_den_index": 0,
-        "jo_den_index": 0.25,
-        "n_e_ratio_index": 0.1,
-        "ctrd_shift_ratio_index": 0.2,
-    }
-    index_col = "weighted_index"
 
+    index_col = "weighted_index"
     large_sites_res = LargeSites(site_data=res_zone_sites, columns_to_explore=columns_to_explore)
     large_sites_emp = LargeSites(site_data=emp_zone_sites, columns_to_explore=columns_to_explore)
 

@@ -272,6 +272,12 @@ def infill_data(
             distribution_path,
             output_folder / ("after_" + inputs.AVERAGE_INFILLING_VALUES_FILE),
         )
+    elif gfa_method in [
+        inputs.GFAInfillMethod.REGRESSION,
+        inputs.GFAInfillMethod.REGRESSION_NO_NEGATIVES,
+    ]:
+        # Do nothing and avoid raising an error
+        pass
     else:
         raise ValueError(f"Invalid GFA infill method: {gfa_method}")
 
