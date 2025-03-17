@@ -1854,5 +1854,5 @@ def find_inactivate_entries(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataF
     """
     inactive = {}
     for key, value in data.items():
-        inactive[key] = value[value["active"] != "t"]
+        inactive[key] = value[~value["active"].isin(["t", "TRUE"])]  # Corrected filtering
     return inactive

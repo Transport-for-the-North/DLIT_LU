@@ -9,11 +9,13 @@ run_tripend: False
 #--str
 lookups_sheet_name: "Lookups"
 #--Read file paths
-dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v5.xlsx
+dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v6.xlsx
 #--Write file paths
+
 output_folder: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives
 proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\proposed_luc_split_path.csv
 existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\existing_luc_split_path.csv
+
 
 infill:
   user_infill: False
@@ -26,16 +28,18 @@ infill:
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
   user_input_path: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\user_input.xlsx
-  gfa_infill_method: regression_no_negatives # mean, regression, regression_no_negatives
+  gfa_infill_method: regression_no_negatives # mean, median, glbaverage, egression, regression_no_negatives
 
 land_use:
   land_use_input: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\03_post_fixes\post_fix_data.xlsx
+
   lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
   lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
   lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
   lsoa_jobs_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output E4_3.csv
   employment_density_matrix_path: inputs\emp_density_matrix.csv
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
+  web_tag_certainty_path: inputs\web_tag_certainty.csv
   demolition_dampener: 0
   luti: True
   luti_zone_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NLUTI_v4_shapefiles\NLUTI_v4_zones_refactored.shp    
@@ -51,6 +55,7 @@ dev_pattern:
   lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\tot_by_data_out.csv
   pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
   emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
+
   # shape file paths
   normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
   noham_shapefile_path: P:\02_NorTMS Rebase\01_Highway\03.Data\06. Confirmed Zone Structure\2.NoHAM_zone_updates-TfN\NoHAM_zones_v3.7\NoHAM_Zones_v3.7.shp
@@ -107,12 +112,14 @@ constraint:
   ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
   ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
   # Inputs from previous module dev_pattern
+
   dlog_hh: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_aggregation\lad_household.csv
   dlog_emp: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_aggregation\lad_job.csv
   dlog_pop: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_aggregation\lad_population.csv
-  ntem_hh: I:\Data\D-Log\DLIT\Outputs\planning_data_out\translated\LAD13_Households.csv
-  ntem_pop: I:\Data\D-Log\DLIT\Outputs\planning_data_out\translated\LAD13_Jobs.csv
-  ntem_emp: I:\Data\D-Log\DLIT\Outputs\planning_data_out\translated\LAD13_Population.csv
+  ntem_hh: I:\Data\D-Log\DLIT\Inputs\planning_data_out\translated\LAD13_Households.csv
+  ntem_pop: I:\Data\D-Log\DLIT\Inputs\planning_data_out\translated\LAD13_Jobs.csv
+  ntem_emp: I:\Data\D-Log\DLIT\Inputs\planning_data_out\translated\LAD13_Population.csv
+
   sector: region #region, combined_lad 
   base_year: 2023
   lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
