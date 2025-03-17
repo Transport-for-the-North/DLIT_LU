@@ -14,12 +14,15 @@ from pydantic import dataclasses
 import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
-
+MEAN_INFILLING_VALUES_FILE = "infilling_mean_values.yml"
+MEDIAN_INFILLING_VALUES_FILE = "infilling_median_values.yml"
 
 class GFAInfillMethod(enum.Enum):
     """Method for infilling the GFA from the site area."""
 
     MEAN = "mean"
+    MEDIAN = "median"
+    GLBAVERAGE = "glbaverage"
     REGRESSION = "regression"
     REGRESSION_NO_NEGATIVES = "regression_no_negatives"
 
@@ -432,3 +435,22 @@ class InfillingAverages(caf.toolkit.BaseConfig):
     average_mix_area: float
     average_gfa_site_area_ratio: float
     average_dwelling_site_area_ratio: float
+
+
+class InfillingMeans(caf.toolkit.BaseConfig):
+    """Averages calculated for use in MEAN infill method."""
+
+    mean_res_area: float
+    mean_emp_area: float
+    mean_mix_area: float
+    mean_gfa_site_area_ratio: float
+    mean_dwelling_site_area_ratio: float
+
+class InfillingMedians(caf.toolkit.BaseConfig):
+    """Averages calculated for use in MEAN infill method."""
+
+    median_res_area: float
+    median_emp_area: float
+    median_mix_area: float
+    median_gfa_site_area_ratio: float
+    median_dwelling_site_area_ratio: float
