@@ -28,7 +28,7 @@ infill:
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
   user_input_path: I:\Data\D-Log\DLIT\Outputs\Test15_DLog24_rnn\user_input.xlsx
-  gfa_infill_method: regression_no_negatives # mean, median, glbaverage, egression, regression_no_negatives
+  gfa_infill_method: regression_no_negatives # mean, median, glbaverage, regression, regression_no_negatives
 
 land_use:
   land_use_input: I:\Data\D-Log\DLIT\Outputs\Test15_DLog24_rnn\03_post_fixes\post_fix_data.xlsx
@@ -123,6 +123,5 @@ constraint:
   ntem_emp: I:\Data\D-Log\DLIT\Inputs\planning_data_out\translated\LAD13_Population.csv
 
   sector: region #region, combined_lad 
-  base_year: 2023
   lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
 

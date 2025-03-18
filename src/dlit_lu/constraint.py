@@ -32,14 +32,13 @@ class ConstraintProcessor():
             inputs.Sector.REGION: {
                 "lookup_path": self.config.constraint.lad_to_region_file,
                 "zone_id": "lad2013_id",
-                "base_year_column": self.config.constraint.base_year,
+                "base_year_column": self.config.dev_pattern.base_year,
                 "sector_id": "ntem_region_id",  
                 "zone_to_sector_prop_col": "lad2013_to_ntem_region",
                 "sector_name": self.config.constraint.region_name
             }
         }
-        # print(f"Sector: {self.sector}")
-        # print(f"Available Keys: {self.sector_info_map.keys()}")
+
         self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
 
     def sector_agg(self,
@@ -220,7 +219,13 @@ class ConstraintProcessor():
 
 class GrowthCalculator:
 
-    def calculate_growth(self, data, base_year_int, build_out_columns, growth_type='absolute') -> pd.DataFrame:
+    def calculate_growth(
+            self, 
+            data: pd.DataFrame, 
+            base_year_column: str, 
+            build_out_columns: list[str], 
+            growth_type='absolute'
+    ) -> pd.DataFrame:
         """
         General method to calculate absolute growth, growth ratio, or growth rate for each year.
 
@@ -228,7 +233,7 @@ class GrowthCalculator:
         ----------
         data : pd.DataFrame
             DataFrame containing year columns.
-        base_year_int : int
+        base_year_column: str
             The base year for calculations.
         build_out_columns : list
             List of future year columns to calculate the growth type.
@@ -258,7 +263,7 @@ class GrowthCalculator:
                 f"Invalid growth_type '{growth_type}'. Choose from {valid_growth_types}."
             )
 
-        base_year = str(base_year_int)
+        base_year = base_year_column
         growth_funcs = {
             'absolute': lambda future_year: data[future_year] - data[base_year],
             'ratio': lambda future_year: data[future_year] / data[base_year],
@@ -318,7 +323,13 @@ class GrowthCalculator:
 
 
 
-    def target_growth(self, data_base, data_source, base_year_int, build_out_columns):
+    def target_growth(
+            self, 
+            data_base: pd.DataFrame, 
+            data_source: pd.DataFrame, 
+            base_year_column: str, 
+            build_out_columns: list[str],
+    )-> pd.DataFrame:
         """
         Calculate target growth using original data.
 
@@ -328,7 +339,7 @@ class GrowthCalculator:
             DataFrame containing the base year total and dlog future year annual total.
         data_source : pd.DataFrame
             DataFrame containing the source annual total.
-        base_year_int : int
+        base_year_column : str
             The base year for calculations.
         build_out_columns : list
             List of future year columns to calculate target growth.
@@ -366,11 +377,11 @@ class GrowthCalculator:
         data_source_indexed = data_source_indexed.loc[common_index]
 
         # Extract base year data (keeping specified columns as index + base year values)
-        base_year = str(base_year_int)
+        base_year = base_year_column
         target_growth = data_base_indexed[[base_year]].copy()
 
         # Calculate growth rates using _calculate_growth
-        growth_result = self.calculate_growth(data_source_indexed, base_year_int, build_out_columns, growth_type='rate')
+        growth_result = self.calculate_growth(data_source_indexed, base_year_column, build_out_columns, growth_type='rate')
 
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
@@ -382,7 +393,13 @@ class GrowthCalculator:
         return target_growth
     
 
-    def target_yeartot(self, data_base, data_source, base_year_int, build_out_columns):
+    def target_yeartot(
+            self, 
+            data_base: pd.DataFrame, 
+            data_source: pd.DataFrame, 
+            base_year_column: str, 
+            build_out_columns: list[str],
+    )-> pd.DataFrame:
         """
         Calculate target growth using original data.
 
@@ -392,7 +409,7 @@ class GrowthCalculator:
             DataFrame containing the base year data and dlog annual total.
         data_source : pd.DataFrame
             DataFrame containing the source annual total.
-        base_year_int : int
+        base_year_column : str
             The base year for calculations.
         build_out_columns : list
             List of future year columns to calculate target growth.
@@ -430,11 +447,11 @@ class GrowthCalculator:
         data_source_indexed = data_source_indexed.loc[common_index]
 
         # Extract base year data (keeping specified columns as index + base year values)
-        base_year = str(base_year_int)
+        base_year = base_year_column
         target = data_base_indexed[[base_year]].copy()
 
         # Calculate growth rates using _calculate_growth
-        growth_result = self.calculate_growth(data_source_indexed, base_year_int, build_out_columns, growth_type='ratio')
+        growth_result = self.calculate_growth(data_source_indexed, base_year_column, build_out_columns, growth_type='ratio')
 
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
@@ -547,7 +564,7 @@ def run(config: inputs.DLitConfig):
 
     # Process data
     year_columns = [col for col in lad_data["dlog_pop"].columns if col.isdigit()] 
-    base_year_column = config.constraint.base_year
+    base_year_column = config.dev_pattern.base_year
     base_year_int = int(base_year_column)
     build_out_columns = [str(year) for year in range(base_year_int + 1, 2067)]
     year_cols_ntem = [str(year) for year in range(base_year_int + 1, 2062)]
@@ -633,9 +650,9 @@ def run(config: inputs.DLitConfig):
         # Add processed data to results, using data_name as the key
         results[data_name] = {
             "YearTotal": processed_data,
-            "AbsoluteGrowth": growth_calculator.calculate_growth(processed_data, base_year_int, build_out_columns, growth_type='absolute'),
-            "GrowthRatio": growth_calculator.calculate_growth(processed_data, base_year_int, build_out_columns, growth_type='ratio'),
-            "GrowthRate": growth_calculator.calculate_growth(processed_data, base_year_int, build_out_columns, growth_type='rate'),
+            "AbsoluteGrowth": growth_calculator.calculate_growth(processed_data, base_year_column, build_out_columns, growth_type='absolute'),
+            "GrowthRatio": growth_calculator.calculate_growth(processed_data, base_year_column, build_out_columns, growth_type='ratio'),
+            "GrowthRate": growth_calculator.calculate_growth(processed_data, base_year_column, build_out_columns, growth_type='rate'),
             "AnnualGrowthRate": growth_calculator.calculate_annual_growth_rate(processed_data, year_columns)
         }
         # processed_datasets.append(processed_data)
@@ -684,7 +701,7 @@ def run(config: inputs.DLitConfig):
         sector_target_growth = growth_calculator.target_growth(
             results[f"{sector}_dlog_{id}"]["YearTotal"], 
             results[f"{sector}_ddg_{id}"]["YearTotal"], 
-            base_year_int, 
+            base_year_column, 
             build_out_columns,
         )
         
@@ -699,7 +716,7 @@ def run(config: inputs.DLitConfig):
         zone_target_growth = growth_calculator.target_growth(
             results[f"lad_dlog_{id}"]["YearTotal"], 
             results[f"lad_ddg_{id}"]["YearTotal"], 
-            base_year_int, 
+            base_year_column, 
             build_out_columns,
         )
         # Create a list of columns to select (zone_index_columns and base_year_column)
@@ -755,7 +772,7 @@ def run(config: inputs.DLitConfig):
         sector_target_tot = growth_calculator.target_yeartot(
             results[f"{sector}_dlog_{id}"]["YearTotal"], 
             results[f"{sector}_ddg_{id}"]["YearTotal"], 
-            base_year_int, 
+            base_year_column, 
             build_out_columns,
         )
         # Files to be exported
