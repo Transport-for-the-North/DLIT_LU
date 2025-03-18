@@ -293,6 +293,7 @@ class TripendsConfig:
     zone_tt_pop: pydantic.FilePath
     zone_soc_sic_emp: pydantic.FilePath
     pop2023: pydantic.FilePath
+    tfn_tt: pydantic.FilePath
 
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file."""

@@ -1,95 +1,148 @@
 import pandas as pd
 import logging
-from typing import Dict, Any
-import numpy as np
+from typing import Dict, Any, List
 from pathlib import Path
 
 # Local imports
-from dlit_lu import inputs, utilities
-
-# Third-party imports
+from dlit_lu import inputs
 from caf.base.data_structures import DVector
-import caf.tem as ct
+import caf.base as cb
 
 LOG = logging.getLogger(__name__)
 
-class Tripends():
+class Tripends:
+    
+    YEARS = range(2024, 2067)
+    CATEGORIES = ['', '_large', '_small']
+    DATA_CONFIG = {
+        "soc_sic_emp": {
+            "index_cols": ['sic_2_digit', 'soc'],
+            "rename_cols": {'sic_2d': 'sic_2_digit'},
+            "segments": ['sic_2_digit', 'soc']
+        },
+        "tt_pop": {
+            "index_cols": ['tt'],
+            "segments": ['gender_3', 'aws', 'soc', 'ns_sec', 'hh_type'],
+        }
+    }
 
-    def load_data(self, config: inputs.TripendsConfig): 
+    def __init__(self):
+        self.cols_to_merge = ['gender_3', 'aws', 'ns_sec', 'soc', 'hh_type']
+        self.rename_mapping = {
+            'gender': 'gender_3',
+            'aws': 'aws',
+            'ns': 'ns_sec',
+            'soc': 'soc',
+            'hh_type': 'hh_type'
+        }
 
-        soc_sic_emp = pd.read_csv(config.zone_soc_sic_emp)
-        soc_sic_emp.fillna(0, inplace=True)
-        print(soc_sic_emp)
+    def merge_and_rename(self, 
+                         data: pd.DataFrame, 
+                         lookup: pd.DataFrame) -> pd.DataFrame:
+        
+        """Merge and rename columns for tt_pop data."""
 
-        tt_pop = pd.read_csv(config.zone_tt_pop)
-        tt_pop.fillna(0, inplace=True)
-        print(tt_pop)
+        return data.merge(lookup, on='tt', how='left').rename(columns=self.rename_mapping)
 
-        return soc_sic_emp, tt_pop
+    def process_data(self, 
+                    data: pd.DataFrame, 
+                    data_type: str, 
+                    lookup: pd.DataFrame = None) -> Dict[str, pd.DataFrame]:
+        
+        """Process data for a given type and pivot it per year and category."""
 
-    def process_data(self, data: pd.DataFrame, data_type: str) -> Dict[str, pd.DataFrame]:
+        if data_type not in self.DATA_CONFIG:
+            raise ValueError(f"Unknown data type: {data_type}")
 
-        years = range(2024, 2067)
-        categories = ['', '_large', '_small']
+        config = self.DATA_CONFIG[data_type]
+        if "rename_cols" in config:
+            data.rename(columns=config["rename_cols"], inplace=True)
 
-        processed_data = {}
+        index_cols = config["index_cols"]
 
-        if data_type == "soc_sic_emp":
-            index_cols = ['sic_2d', 'soc']
-        elif data_type == "tt_pop":
-            index_cols = ['tt']
-        else:
-            raise ValueError("Unknown data type")
+        if data_type == "tt_pop" and lookup is not None:
+            data = self.merge_and_rename(data, lookup)
+            index_cols = self.cols_to_merge  
 
-        for year in years:
-            for category in categories:
-                year_col = f"{year}{category}"
-                if year_col in data.columns:
-                    pivot_df = data.pivot_table(index=index_cols, columns='normits_id', values=year_col, fill_value=0)
-                    processed_data[f"{year_col}"] = pivot_df
+        processed_data = {
+            f"{year}{category}": data.pivot_table(index=index_cols, columns='normits_id', values=f"{year}{category}", fill_value=0)
+            for year in self.YEARS for category in self.CATEGORIES if f"{year}{category}" in data.columns
+        }
 
         return processed_data
 
+    def prepare_segmentation_input(self, 
+                                   data_type: str) -> cb.SegmentationInput:
+        
+        """Prepare segmentation input based on data type."""
+
+        if data_type not in self.DATA_CONFIG:
+
+            raise ValueError(f"Unknown data type for segmentation: {data_type}")
+        
+        return cb.SegmentationInput(enum_segments=self.DATA_CONFIG[data_type]["segments"], naming_order=self.DATA_CONFIG[data_type]["segments"])
+
+    def perform_segmentation_and_zoning(self, 
+                                        data: pd.DataFrame, 
+                                        data_type: str,
+                                        output_path: Path):
+        
+        """Perform segmentation and zoning, then save the result."""
+
+        seg = cb.Segmentation(self.prepare_segmentation_input(data_type))
+        zoning = cb.ZoningSystem.get_zoning('normits')
+
+        dvec = DVector(import_data=data, zoning_system=zoning, segmentation=seg)
+        if data_type == "tt_pop":
+            dvec = dvec.add_segments(['adult_nssec'])
+
+        dvec.save(output_path)
+
 def run(config: inputs.DLitConfig):
 
+    """Main function to run the Tripends processing."""
+
     if config.run_tripend is None:
-        raise ValueError("Cannot run tripend module without any tripend parameters")
+        raise ValueError("Cannot run tripend module without parameters")
 
-    LOG.info("Initialising Tripend Module")
-
+    LOG.info("Initializing Tripend Module")
     config.output_folder.mkdir(exist_ok=True)
 
-    key_constraint_path = config.output_folder / "07_tripend"
-    key_constraint_path.mkdir(exist_ok=True)
+    data_files = {
+        "soc_sic_emp": config.tripend.zone_soc_sic_emp,
+        "tt_pop": config.tripend.zone_tt_pop,
+        "tfn_tt": config.tripend.tfn_tt
+    }
 
-    soc_sic_base_folder = key_constraint_path / "dlog_soc_sic_emp"
-    tt_base_folder = key_constraint_path / "dlog_tt_pop"
+    data_frames = {key: pd.read_csv(path).fillna(0) for key, path in data_files.items()}
 
-    soc_sic_base_folder.mkdir(exist_ok=True)
-    tt_base_folder.mkdir(exist_ok=True)
+    base_folder = config.output_folder / "07_tripend"
+    base_folder.mkdir(exist_ok=True)
+
+    output_folders = {
+        "soc_sic_emp": base_folder / "dlog_soc_sic_emp",
+        "tt_pop": base_folder / "dlog_tt_pop"
+    }
+
+    for folder in output_folders.values():
+        folder.mkdir(exist_ok=True)
 
     tripend = Tripends()
-    soc_sic_emp, tt_pop = tripend.load_data(config.tripend)
 
-    data_types = ["soc_sic_emp", "tt_pop"]
-    data_frames = [soc_sic_emp, tt_pop]
-    base_folders = [soc_sic_base_folder, tt_base_folder]
-
-    for df, dtype, base_folder in zip(data_frames, data_types, base_folders):
-        processed_data = tripend.process_data(df, dtype)
+    for dtype in ["soc_sic_emp", "tt_pop"]:
+        processed_data = tripend.process_data(
+            data_frames[dtype], 
+            dtype, 
+            data_frames["tfn_tt"] if dtype == "tt_pop" else None
+        )
 
         for year_col, pivot_df in processed_data.items():
-            category = ''
-            if '_large' in year_col:
-                category = '_large'
-            elif '_small' in year_col:
-                category = '_small'
+            category = next((cat for cat in tripend.CATEGORIES if cat in year_col), '')
 
-            output_folder = base_folder / f"{dtype}{category}"
+            output_folder = output_folders[dtype] / f"{dtype}{category}"
             output_folder.mkdir(exist_ok=True)
-            output_file = output_folder / f"dlog_{dtype}_{year_col}.hdf"
-            pivot_df.to_hdf(str(output_file), key='data', mode='w')
 
-            LOG.info(f"Data for {year_col} saved to {output_file}")
+            output_file = output_folder / f"dlog_{dtype}_{year_col}.dvec"
+            tripend.perform_segmentation_and_zoning(pivot_df, dtype, output_file)
 
     LOG.info("Data processing completed")
