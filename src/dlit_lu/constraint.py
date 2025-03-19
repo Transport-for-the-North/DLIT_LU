@@ -200,7 +200,7 @@ class ConstraintProcessor():
 
             # Add region names to LAD data
             if 'LAD13CD' in data_with_name.columns:
-                lad_to_region_df = pd.read_csv(self.config.dev_pattern.summary_data.lad_to_region_file)
+                lad_to_region_df = pd.read_csv(self.config.constraint.lad_to_region_file)
                 region_name_df = pd.read_csv(self.config.constraint.region_name)
                 data_with_name = data_with_name.merge(lad_to_region_df[['lad2013_id', 'ntem_region_id']], 
                                                   left_on='LAD13CD', right_on='lad2013_id', how='left')
@@ -764,7 +764,7 @@ def run(config: inputs.DLitConfig):
         agg_zone_adj_growth = zone_adjusted_growth.groupby('REGIONNM')[build_out_columns].sum()
         # Create target year total        
         zone_forecast = growth_calculator.yearly_totals_from_base(zone_adjusted_growth, base_year_column, build_out_columns)
-        # zone_forecast_tot = zone_target_growth[columns_to_select].add(zone_forecast, fill_value=0)
+  
  
         agg_zone_forecast = zone_forecast.groupby('REGIONNM')[build_out_columns].sum()
         agg_zone_forecast = agg_zone_forecast.reset_index()
@@ -772,6 +772,12 @@ def run(config: inputs.DLitConfig):
         sector_target_tot = growth_calculator.target_yeartot(
             results[f"{sector}_dlog_{id}"]["YearTotal"], 
             results[f"{sector}_ddg_{id}"]["YearTotal"], 
+            base_year_column, 
+            build_out_columns,
+        )
+        zone_target_tot = growth_calculator.target_yeartot(
+            results[f"lad_dlog_{id}"]["YearTotal"], 
+            results[f"lad_ddg_{id}"]["YearTotal"], 
             base_year_column, 
             build_out_columns,
         )
@@ -788,6 +794,7 @@ def run(config: inputs.DLitConfig):
         zone_forecast_file = f"lad_forecast_{id}.csv"
         agg_zone_forecast_file = f"agg_lad_forecast_{id}.csv"
         sector_target_tot_file = f"{sector}_target_tot_{id}.csv"
+        zone_target_tot_file = f"lad_target_tot_{id}.csv"
 
         utilities.write_to_csv(key_constraint_path / sector_target_growth_file, sector_target_growth)
         utilities.write_to_csv(key_constraint_path / sector_estimated_growth_file, sector_estimated_growth)
@@ -801,9 +808,10 @@ def run(config: inputs.DLitConfig):
         utilities.write_to_csv(key_constraint_path / zone_forecast_file, zone_forecast)
         utilities.write_to_csv(key_constraint_path / agg_zone_forecast_file, agg_zone_forecast)
         utilities.write_to_csv(key_constraint_path / sector_target_tot_file, sector_target_tot)
+        utilities.write_to_csv(key_constraint_path / zone_target_tot_file, zone_target_tot)
 
     # # Generate visualizations
     # # visualizer = GrowthRateVisualizer(output_dir=key_constraint_path / 'visualizations')
     # # visualizer.generate_visualizations(combined_datasets["GrowthRate"])
 
-    LOG.info("Data processing, aggregation, and visualization completed")
+    LOG.info("Data processing, aggregation completed")

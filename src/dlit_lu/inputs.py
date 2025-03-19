@@ -90,14 +90,12 @@ class InfillConfig:
 class SummaryInputs:
     """Lookup file and shapefile for creating output summaries."""
 
-    summary_lad: str
-    summary_region: str
-    lad_to_region_file: pydantic.FilePath
-    normits_to_lad_file: pydantic.FilePath
+    # summary_lad: str
     lsoa_to_lad_file: pydantic.FilePath
     msoa_to_lad_file: pydantic.FilePath
     norms_to_lad_file: pydantic.FilePath
     noham_to_lad_file: pydantic.FilePath
+    normits_to_lad_file: pydantic.FilePath
     lad_shapefile: pydantic.FilePath
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
@@ -269,7 +267,6 @@ class DevPatnConfig:
 @dataclasses.dataclass
 class ConstraintConfig:
 
-    base_year: str
     sector: Sector
     lad_to_region_file: pydantic.FilePath
     lad_name: pydantic.FilePath
