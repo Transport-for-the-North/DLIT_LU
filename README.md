@@ -144,13 +144,10 @@ These parameters are all mandatory with no default values.
 | lsoa_to_msoa                   |         File Path          | Path to translation file bewteen lsoa and msoa                                             |
 
 ### Summary Data
-Optional parameters for creating the land use summaries workbooks and heatmaps. MSOA land use data
-will be aggregated to given summary zone system.
+Optional parameters for aggregating zonal data to LAD .
 
 | Parameter                   |        Type        | Description                                                              |
 | :-------------------------- | :----------------: | :----------------------------------------------------------------------- |
-| summary_lad                 |        Text        | Name of LAD version.                                                     |
-| summary_region              |        Text        | Name of Region version.                                                  |
 | lad_to_region_file          |     File Path      | Path to translation file bewteen lad and region                          |
 | lsoa_to_lad_file            |     File Path      | Path to translation file bewteen lsoa and LAD                            |
 | msoa_to_lad_file            |     File Path      | Path to translation file bewteen msoa and LAD                            |
