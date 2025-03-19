@@ -64,6 +64,9 @@ class Tripends:
             data = self.merge_and_rename(data, lookup)
             index_cols = self.cols_to_merge  
 
+        if 'normits_id' in data.columns:
+            data['normits_id'] = data['normits_id'].astype('int64')
+
         processed_data = {
             f"{year}{category}": data.pivot_table(index=index_cols, columns='normits_id', values=f"{year}{category}", fill_value=0)
             for year in self.YEARS for category in self.CATEGORIES if f"{year}{category}" in data.columns

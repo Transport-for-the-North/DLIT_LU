@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 
 from caf.ntem import  ntem_constants
-from dlit_lu import inputs
+from src.dlit_lu import inputs
 import caf.tem as ct
 import caf.base as cb
 
@@ -12,7 +12,7 @@ def tem(config: inputs.DLitConfig):
     tem = ct.TEM(
         model_years=[2023],
         scenario=ntem_constants.Scenarios.CORE,   
-        output_zoning= config.dev_pattern.geo_boundary.value,   
+        output_zoning= "normits",   
         iteration_name="20250318", 
         export_home=r"T:\ThomasPrince\TEM I-Drive Comparison\Outputs - caf.tem",
         return_segmentation=["hh_type", "p", "m", "tp"]
