@@ -117,8 +117,8 @@ constraint:
   dlog_emp: I:\Data\D-Log\DLIT\Outputs\Test15_DLog24_rnn\05_aggregation\lad_job.csv
   dlog_pop: I:\Data\D-Log\DLIT\Outputs\Test15_DLog24_rnn\05_aggregation\lad_population.csv
   ntem_hh: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Households.csv
-  ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
-  ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
+  ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
+  ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
 
   sector: region #region, combined_lad 
   lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv

@@ -5,7 +5,6 @@ import numpy as np
 
 # Local imports
 from dlit_lu import inputs, utilities
-from dlit_lu.viz import GrowthRateVisualizer
 
 LOG = logging.getLogger(__name__)
 
@@ -810,8 +809,5 @@ def run(config: inputs.DLitConfig):
         utilities.write_to_csv(key_constraint_path / sector_target_tot_file, sector_target_tot)
         utilities.write_to_csv(key_constraint_path / zone_target_tot_file, zone_target_tot)
 
-    # # Generate visualizations
-    # # visualizer = GrowthRateVisualizer(output_dir=key_constraint_path / 'visualizations')
-    # # visualizer.generate_visualizations(combined_datasets["GrowthRate"])
 
     LOG.info("Data processing, aggregation completed")
