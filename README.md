@@ -157,3 +157,40 @@ Optional parameters for aggregating zonal data to LAD .
 | lad_shapefile               |     File Path      | Path to LAD shapefile.                                                   |
 | shapefile_id_column         |        Text        | Name of ID column in shapefile.                                          |
 | geometry_simplify_tolerance | Integer (Optional) | Optional tolerance parameter to simplify the shapefile to.               |
+
+## Constraint
+
+| Parameter                      |            Type            | Description                                                                                                                                                |
+| :----------------------------- | :------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------     |
+| sector                         |         Text               | Aggregated level to apply constraint.                                                      |
+| lad_name                       |         File Path          | Path to CSV file containing lad id and lad name.                                           |
+| region_name                    |         File Path          | Path to CSV file containing region id and region name.                                     |
+| lad_to_region_file             |         File Path          | Path to CSV file containing lookup between lad and region.                                 |
+| ddg_pop                        |         File Path          | Path to the CSV file containing DDG population (lad).                                      |
+| ddg_emp                        |         File Path          | Path to the CSV file containing DDG employment (lad).                                      | 
+| dlog_hh                        |    File Path (optional)    | Path to the CSV file containing Dlog household at lad level.                               | 
+| dlog_emp                       |    File Path (optional)    | Path to the CSV file containing Dlog employment at lad level.                              |
+| dlog_pop                       |    File Path (optional)    | Path to the CSV file containing Dlog population at lad level.                              |
+| ntem_hh                        |         File Path          | Path to the CSV file containing NTEM household at lad level.                               |
+| ntem_emp                       |         File Path          | Path to the CSV file containing NTEM employment at lad level.                              |
+| ntem_pop                       |         File Path          | Path to the CSV file containing NTEM population at lad level.                              |
+| msoa_shapefile_path            |         File Path          | Path to normits zone shape file                                                            |
+| lsoa_hh_centroids              |         File Path          | Path to hh weighted lsoa centroids                                                         |
+| lsoa_emp_centroids             |         File Path          | Path to emp weighted lsoa centroids                                                        |
+| lsoa_pop_centroids             |         File Path          | Path to pop weighted lsoa centroids                                                        |
+| normits_hh_centroids           |         File Path          | Path to hh weighted normits centroids                                                      |
+| normits_emp_centroids          |         File Path          | Path to emp weighted normits centroids                                                     |
+| normits_pop_centroids          |         File Path          | Path to pop weighted normits centroids                                                     |
+| noham_hh_centroids             |         File Path          | Path to hh weighted noham centroids                                                        |
+| noham_emp_centroids            |         File Path          | Path to emp weighted noham centroids                                                       |
+| noham_pop_centroids            |         File Path          | Path to pop weighted noham centroids                                                       |
+| norms_hh_centroids             |         File Path          | Path to hh weighted norms centroids                                                        |
+| norms_emp_centroids            |         File Path          | Path to emp weighted norms centroids                                                       |
+| norms_pop_centroids            |         File Path          | Path to pop weighted norms centroids                                                       |
+| msoa_hh_centroids              |         File Path          | Path to hh weighted msoa centroids                                                         |
+| msoa_emp_centroids             |         File Path          | Path to emp weighted msoa centroids                                                        |
+| msoa_pop_centroids             |         File Path          | Path to pop weighted msoa centroids                                                        |
+| lsoa_to_normits                |         File Path          | Path to translation file bewteen lsoa and normits                                          |
+| lsoa_to_noham                  |         File Path          | Path to translation file bewteen lsoa and noham                                            |
+| lsoa_to_norms                  |         File Path          | Path to translation file bewteen lsoa and norms                                            |
+| lsoa_to_msoa                   |         File Path          | Path to translation file bewteen lsoa and msoa                                             |
