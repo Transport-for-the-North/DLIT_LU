@@ -19,7 +19,7 @@ import argparse
 from tqdm.contrib import logging as tqdm_log
 
 # local imports
-from dlit_lu import constraint, infilling, inputs, utilities, land_use, parser, dev_pattern
+from dlit_lu import constraint, infilling, inputs, utilities, land_use, parser, dev_pattern, tripend
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -64,3 +64,11 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
 
     if config.run_constraint:
        constraint.run(config)
+
+    if config.run_tripend:
+        tripend.run(config)
+        
+
+        
+        
+

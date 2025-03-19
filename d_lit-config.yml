@@ -121,4 +121,13 @@ constraint:
   ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
   ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
 
-
+tripend:
+  # ntem_scenario: core #High #Low etc
+  zone_tt_pop: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_normits\normits_zonal_new_population_by_tt.csv.bz2
+  zone_soc_sic_emp: I:\Data\D-Log\DLIT\Outputs\Test14_DLog24_regression_no_negatives\05_normits\normits_zonal_new_job_by_sic_soc.csv.bz2
+  nomits_fr_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
+  nomits_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
+  normits_nhb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_nhb_adjusted.csv.bz2
+  pop2023:  T:\ThomasPrince\TEM Input\Land Use\population\normits\pop_2023.hdf
+  tfn_tt: I:\NTS\classified builds\traveller_type_tfn.csv
+  

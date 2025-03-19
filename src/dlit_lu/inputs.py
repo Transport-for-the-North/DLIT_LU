@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 # third party imports
 import pydantic
-from pydantic import dataclasses
+from pydantic import dataclasses, model_validator
 import caf.toolkit
 
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
@@ -281,36 +281,16 @@ class ConstraintConfig:
     dlog_pop: Optional[pathlib.Path] = None
 
 
+@dataclasses.dataclass
+class TripendsConfig:
+
+    zone_tt_pop: pydantic.FilePath
+    zone_soc_sic_emp: pydantic.FilePath
+    pop2023: pydantic.FilePath
+    tfn_tt: pydantic.FilePath
+
 class DLitConfig(caf.toolkit.BaseConfig):
-    """Manages reading / writing the tool's config file.
-
-
-    Parameters
-    ----------
-    run_infill: bool
-        whether to run the infilling module
-    run_land_use: bool
-        whether to run the land use module
-    output_folder: pathlib.Path
-        output folder file path
-    proposed_luc_split_path: pathlib.Path
-        path to proposed land use split (output from infill)
-    existing_luc_split_path: pathlib.Path
-        path to existing land use split (output from infill)
-    dlog_input_file: pathlib.Path
-        path to D-log file
-    lookups_sheet_name: str
-        name of lookup sheet in D-Log
-    infill: InfillConfig, optional
-        infilling config parameters, required for running infilling.
-    land_use: LandUseConfig, optional
-        land use config parameters, required for land use processing.
-
-    Raises
-    ------
-    ValidationError
-        If any required parameters aren't given or are invalid.
-    """
+    """Manages reading / writing the tool's config file."""
 
     run_infill: bool
     run_land_use: bool
@@ -328,6 +308,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     land_use: Optional[LandUseConfig] = None
     dev_pattern: Optional[DevPatnConfig] = None
     constraint: Optional[ConstraintConfig] = None
+    tripend: Optional[TripendsConfig] = None
 
     @pydantic.validator("infill")
     def check_running_infill(  # pylint: disable=no-self-argument
@@ -398,26 +379,46 @@ class DLitConfig(caf.toolkit.BaseConfig):
             )
 
         return value
+    
+    @pydantic.validator("tripend")
+    def tripend_input_check(  # pylint: disable=no-self-argument
+        cls, value: TripendsConfig | None, values: dict[str, Any]
+    ) -> TripendsConfig:
+        """Check contraints is given if running module."""
+        if not values["run_tripend"]:
+            # Don't need to check if we aren't running constraints module
+            return value
 
-    @pydantic.root_validator
-    def check_running(  # pylint: disable=no-self-argument
-        cls, values: dict[str, Any]
-    ) -> dict[str, Any]:
+        if value is None:
+            raise ValueError("tripend is required if run_tripend is true")
+
+        if not values.get("run_constraint") and not all(
+            [value.zone_tt_pop, value.zone_soc_sic_emp]
+        ):
+            raise ValueError(
+                "zone_tt_pop, zone_soc_sic_emp are required if not running constraint module"
+            )
+
+        return value
+
+    @model_validator(mode='after')
+    def check_running(cls, instance: 'DLitConfig') -> 'DLitConfig':
         """Ensure at least one module is set to run."""
         if not any(
             [
-                values.get("run_infill"),
-                values.get("run_land_use"),
-                values.get("run_dev_pattern"),
-                values.get("run_constraint"),
+                instance.run_infill,
+                instance.run_land_use,
+                instance.run_dev_pattern,
+                instance.run_constraint,
+                instance.run_tripend
             ]
         ):
             raise ValueError(
                 "At least one of run_infill, run_land_use, "
-                "run_dev_pattern, or run_constraints must be set to True"
+                "run_dev_pattern, run_constraint, or run_tripend must be set to True"
             )
 
-        return values
+        return instance
 
 
 class InfillingAverages(caf.toolkit.BaseConfig):
