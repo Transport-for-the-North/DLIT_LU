@@ -1284,6 +1284,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     site_assessment = lu.disagg_mixed(utilities.to_dict(input_data))
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
     res_sites = pd.read_csv(config.dev_pattern.res_site_data)
+    hh_type_sites = pd.read_csv(config.dev_pattern.hh_type_site_data)
     pop_tt_sites = pd.read_csv(config.dev_pattern.pop_tt_site_data)
     job_sic_soc_sites = pd.read_csv(config.dev_pattern.emp_sic_soc_site_data)
     by_data_tot = pd.read_csv(config.dev_pattern.lsoa_data_path)
@@ -1522,7 +1523,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     job_sic_soc_sites[build_out_columns] = job_sic_soc_sites[build_out_columns].multiply(job_sic_soc_sites["prob_val"], axis=0)
 
     site_zone_processer = SiteZoneProcessor(config)
-    hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(hh_sites, site_geometry_col="geometry")
+    hh_type_sites_zone = site_zone_processer.zone_site_geospatial_lookup(hh_type_sites, site_geometry_col="geometry")
     pop_tt_sites_zone = site_zone_processer.zone_site_geospatial_lookup(pop_tt_sites, site_geometry_col="geometry")
     job_sic_soc_sites_zone = site_zone_processer.zone_site_geospatial_lookup(job_sic_soc_sites, site_geometry_col="geometry")
 
@@ -1561,6 +1562,21 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         model_zone_data=True,
     )
 
+    hh_type_zone = site_zone_processer.agg_zonal_data(
+        hh_type_sites_zone,
+        build_out_columns,
+        site_size_column,
+        dimension_columns=[
+            "accom_h",
+            "ns_sec",
+            "adults",
+            "car_availability",
+            "children"
+        ]
+    )
+    hh_type_zone_header_list=hh_type_zone.columns.to_list()
+    print("The header of the output zonal household segmented by type: ", hh_type_zone_header_list)
+
     pop_tt_zone = site_zone_processer.agg_zonal_data(
         pop_tt_sites_zone,
         build_out_columns,
@@ -1583,7 +1599,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     zonal_household_file_name = f"{model_zone}_zonal_household.csv"
     zonal_population_file_name = f"{model_zone}_zonal_population.csv"
-    zonal_job_file_name = f"{model_zone}_zonal_job.csv"    
+    zonal_job_file_name = f"{model_zone}_zonal_job.csv" 
+    hh_type_zone_file_name = f"{model_zone}_zonal_new_hh_by_type.csv.bz2"
     pop_tt_zone_file_name = f"{model_zone}_zonal_new_population_by_tt.csv.bz2"
     job_sic_soc_zone_file_name = f"{model_zone}_zonal_new_job_by_sic_soc.csv.bz2"
 
@@ -1596,7 +1613,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     utilities.write_to_csv(
         key_output_path / zonal_job_file_name, zonal_job
     )
-
+    utilities.write_to_csv(
+        key_output_path / hh_type_zone_file_name, hh_type_zone
+    )
     utilities.write_to_csv(
         key_output_path / pop_tt_zone_file_name, pop_tt_zone
     )

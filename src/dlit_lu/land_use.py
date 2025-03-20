@@ -50,15 +50,32 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     LUTI = config.land_use.luti
     lu_output_path = config.output_folder / "04_land_use_outputs"
     lu_output_path.mkdir(exist_ok=True)
-    
+
+    LOG.info("Loading in key inputs for land use module") 
+    lsoa = parser.parse_zone(config.land_use.lsoa_shapefile_path)  
     average_infill_values = inputs.InfillingAverages.load_yaml(
         config.output_folder / inputs.AVERAGE_INFILLING_VALUES_FILE
     )
+    lsoa_hh_column_names = [
+        "accom_h",
+        "ns_sec",
+        "adults",
+        "car_availability",
+        "children",
+        "lsoa2021_id",
+        "household"
+    ]
+    hh_type_columns = [
+        "accom_h",
+        "ns_sec",
+        "adults",
+        "car_availability",
+        "children"
+    ]
 
     lsoa_hh_pop_column_names = [
         "lsoa2021_id",
-
-        "dwelling_type",
+        "accom_h",
         "household",
         "population",
         "pop_per_dwelling",
@@ -75,6 +92,12 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         "lsoa2021_id",
         "jobs",
     ]
+    by_lsoa_hh = pd.read_csv(
+        config.land_use.lsoa_hh_types_path, 
+        names=lsoa_hh_column_names, 
+        header=0, 
+        index_col=None
+    )
 
     by_lsoa_hh_pop = pd.read_csv(
         config.land_use.lsoa_dwelling_pop_path, 
@@ -94,11 +117,13 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         header=0, 
         index_col=None
     )
-
+    LOG.info("Deriving key ratios from base year land use inputs")
+    hh_type_factor = gb_hh_type_distribution(by_lsoa_hh, hh_type_columns)
     traveller_type_factor = gb_traveller_type_distribution(by_lsoa_pop_by_tt)
     lsoa_dwelling_ratio = calc_lsoa_proportion(by_lsoa_hh_pop)
     ratio_soc_over_sic = gb_soc_over_sic_distribution(by_lsoa_jobs)
 
+    LOG.info("Producing base year lsoa total household, population and employment")
     by_lsoa_data = tot_by_pop_dwel_emp(
         by_lsoa_hh_pop,
         by_lsoa_pop_by_tt,
@@ -108,7 +133,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     by_lsoa_data_file_name = "tot_by_data_out.csv"
     utilities.write_to_csv(config.output_folder / by_lsoa_data_file_name, by_lsoa_data)
 
-    lsoa = parser.parse_zone(config.land_use.lsoa_shapefile_path)
+
 
     LOG.info("Defining key and common columns to be kept for both residential and commercial sites")
     # key common columns
@@ -248,11 +273,11 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         res_key_columns + build_out_columns,
     ]
 
-    res_sites = expand_site_certainty(
+    res_sites_expand = expand_site_certainty(
         res_sites,
         config.land_use.web_tag_certainty_path
     )
-    print(res_sites)
+
 
     emp_sites = employment_build_out.loc[
         :,
@@ -273,7 +298,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Export site level dwelling and floorspace data")
 
-    res_sites_uncertainty = res_sites.groupby(
+    res_sites_uncertainty = res_sites_expand.groupby(
         res_key_columns
     ).sum()
 
@@ -362,6 +387,26 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     )  # inputs needed by module dev_pattern
 
 
+    LOG.info("Disaggregating total household into household types")
+    res_lsoa_sites_segmented = apply_hh_land_use(
+        res_lsoa_sites,
+        build_out_columns,
+        res_key_columns,
+        hh_type_columns,
+        hh_type_factor,
+    )
+    res_sites_hh_segmented = res_lsoa_sites_segmented.groupby(
+        res_key_columns + hh_type_columns)[build_out_columns].sum() 
+    
+    LOG.info("Exporting site level household data")
+    res_sites_hh_segmented_file = (
+        "household_segmented_sites_uncertainty_build_out.csv.bz2"
+    )
+
+    utilities.write_to_csv(
+        lu_output_path / res_sites_hh_segmented_file,
+        res_sites_hh_segmented,
+    )  # inputs needed by module dev_pattern   
     LOG.info("Disaggregating dwellings into population by dwelling type")
     res_lsoa_sites_pop = disagg_dwelling(
         res_lsoa_sites,
@@ -371,7 +416,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     res_lsoa_sites_pop = res_lsoa_sites_pop.loc[
         :,
         build_out_columns
-        + res_key_columns + ["lsoa2021_id", "dwelling_type"],
+        + res_key_columns + ["lsoa2021_id", "accom_h"],
     ]
 
     LOG.info("Disaggregating site level population further by traveller type")
@@ -416,7 +461,51 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Ending Land Use Module")
 
+def gb_hh_type_distribution(data: pd.DataFrame, hh_type_columns: list[str]) -> pd.DataFrame:
+    """calculates the factors for each traveller type
 
+    aggregates across all zones and dwelling types
+
+    Parameters
+    ----------
+    data: pd.DataFrame
+        TfN base year population land use
+    hh_type_columns: list[str]
+        List of columns containing household segmentations
+    Returns
+    -------
+    pd.DataFrame
+        contains factors for lsoa traveller type
+    """
+    # Aggregating by household type columns and summing the 'household' values
+    agg_zones = data.groupby(hh_type_columns)["household"].sum().reset_index()
+    
+    # Calculating the global total sum of 'household'
+    total_hh = data["household"].sum()
+    
+    # Calculating the ratio of each household type combination
+    agg_zones["ratio"] = agg_zones["household"] / total_hh
+    
+    # Selecting relevant columns (household segmentations + ratio)
+    agg_zones = agg_zones[hh_type_columns + ["ratio"]]
+    
+    # Merging the ratio back into the original data based on hh_type_columns
+    data = data.merge(agg_zones, on=hh_type_columns, how="left")
+    
+    # Setting the index to include LSOA and household type columns
+    data = data.set_index(["lsoa2021_id"] + hh_type_columns)
+    
+    return data
+    # lsoa_ratios = []
+    # for id_ in data["lsoa2021_id"].unique():
+    #     temp = ratios.copy()
+    #     temp["lsoa2021_id"] = (
+    #         pd.Series([id_]).repeat(len(ratios)).reset_index(drop=True)
+    #     )
+    #     lsoa_ratios.append(temp)
+    # all_lsoa_ratios = pd.concat(lsoa_ratios, axis=0).set_index(["lsoa2021_id"],hh_type_columns)
+    # all_lsoa_ratios.columns = ["ratios"]
+    # return all_lsoa_ratios
 
 
 def gb_traveller_type_distribution(data: pd.DataFrame) -> pd.DataFrame:
@@ -524,6 +613,44 @@ def apply_soc_over_sic_ratio(
     )
     return data_ratios
 
+def apply_hh_land_use(
+    data: pd.DataFrame,
+    unit_cols: list[str],
+    common_key_cols: list[str],
+    hh_type_cols: list[str],
+    hh_type_factors: pd.DataFrame,
+) -> pd.DataFrame:
+    """applies TfN population land use factors to data
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        data containing the unit values
+    unit_columns : list[str]
+        list of column names in data that contain the unit values to be updated
+    tt_factors : pd.DataFrame
+        dataframe containing the TfN population land use factors
+
+    Returns
+    -------
+    pd.DataFrame
+        dataframe with updated unit values, indexed by lsoa11cd,
+        accom_h (dwelling type), and tfn_traveller_type
+    """
+    key_cols = common_key_cols + ["lsoa2021_id"] + hh_type_cols
+    data_ratios = (
+        data.reset_index(drop=False)
+        .merge(
+            hh_type_factors.reset_index(drop=False),
+            on="lsoa2021_id",
+        )
+        .set_index(key_cols)
+    )
+    data_ratios = data_ratios.loc[:, unit_cols].multiply(
+        data_ratios["ratios"], axis=0
+    )
+    return data_ratios
+
 
 def apply_pop_land_use(
     data: pd.DataFrame,
@@ -546,7 +673,7 @@ def apply_pop_land_use(
     -------
     pd.DataFrame
         dataframe with updated unit values, indexed by lsoa11cd,
-        dwelling_type, and tfn_traveller_type
+        accom_h (dwelling type), and tfn_traveller_type
     """
     key_cols = common_key_cols + ["lsoa2021_id", "tt"]
     data_ratios = (
@@ -991,7 +1118,7 @@ def calc_lsoa_proportion(by_hh_pop: pd.DataFrame) -> pd.DataFrame:
         population and ratio of dwellings by dwelling type
     """
     lsoa_hh = by_hh_pop.copy()
-    lsoa_hh.set_index(["lsoa2021_id", "dwelling_type"], inplace=True)
+    lsoa_hh.set_index(["lsoa2021_id", "accom_h"], inplace=True)
     lsoa_hh["dwelling_ratio"] = (
         lsoa_hh["household"] / lsoa_hh["household"].groupby(level="lsoa2021_id").sum()
     )

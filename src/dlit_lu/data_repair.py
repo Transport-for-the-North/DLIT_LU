@@ -817,10 +817,15 @@ def incorrect_luc_formatting(
     ]
     format_lookup = pd.DataFrame([possible_error_codes, wrong_format_check]).transpose()
     format_lookup.columns = ["land_use_code", "incorrect_format"]
-    format_lookup = format_lookup.append(
-        {"land_use_code": "sg", "incorrect_format": "suigeneris"},
-        ignore_index=True,
-    )
+
+    # Replace append with pd.concat
+    new_row = pd.DataFrame([["sg", "suigeneris"]], columns=["land_use_code", "incorrect_format"])
+    format_lookup = pd.concat([format_lookup, new_row], ignore_index=True)
+
+    # format_lookup = format_lookup.append(
+    #     {"land_use_code": "sg", "incorrect_format": "suigeneris"},
+    #     ignore_index=True,
+    # )
 
     fixed_format = {}
 
@@ -874,12 +879,8 @@ def calc_average_years_webtag_certainty(
             filtered_value = value[value["missing_years"] == False]
             filtered_value = filtered_value[value["web_tag_certainty_id"] == id_]
 
-            all_start_years = all_start_years.append(
-                filtered_value["start_year_id"], ignore_index=True
-            )
-            all_end_years = all_end_years.append(
-                filtered_value["end_year_id"], ignore_index=True
-            )
+            all_start_years = pd.concat([all_start_years, filtered_value["start_year_id"]], ignore_index=True)
+            all_end_years = pd.concat([all_end_years, filtered_value["end_year_id"]], ignore_index=True)
         mode_start_year = all_start_years.mode().values[0]
         mode_end_year = all_end_years.mode().values[0]
 
@@ -1562,7 +1563,7 @@ def unit_area_ratio_mean(
                 out=np.full_like(data_subset[units_col], np.nan),
             ),
         )
-
+        
     all_ratios = all_ratios[np.isfinite(all_ratios)]
     distribution_plots(all_ratios, "Unit-Site Area Ratio Plot", plot_path)
     return all_ratios.mean()
@@ -1615,53 +1616,6 @@ def unit_area_ratio_median(
     distribution_plots_median(all_ratios, "Unit-Site Area Ratio Plot_Median", plot_path)
     return np.median(all_ratios)
 
-def unit_area_ratio(
-    data: dict[str, pd.DataFrame],
-    unit_columns: dict[str, str],
-    area_columns: dict[str, str],
-    plot_path: pathlib.Path,
-) -> float:
-    """calculate the ratio for unit to area
-
-    Only give identical units i.e. all dwelling or all floorspace
-
-    Parameters
-    ----------
-    data : dict[str, pd.DataFrame]
-        data to be analysed
-    unit_columns : dict[str, str]
-        columns with unit (e.g. total_dwelling for residental)
-        for each sheet, same keys as data
-    area_columns : dict[str, str]
-        columns with site area for each sheet, same keys as data
-
-    Returns
-    -------
-    float
-        Mean ratio between units column and area column.
-    """
-    all_ratios = np.array([])
-    for key, value in data.items():
-        units_col = unit_columns[key]
-        area_col = area_columns[key]
-
-        # data subset only contains entries with site area and dwelling/floorspace
-        data_subset = value.loc[
-            (~value[units_col].isna()) & (~value[area_col].isna()), :
-        ]
-        all_ratios = np.append(
-            all_ratios,
-            np.divide(
-                data_subset[units_col],
-                data_subset[area_col],
-                where=data_subset[area_col] != 0,
-                out=np.full_like(data_subset[units_col], np.nan),
-            ),
-        )
-
-    all_ratios = all_ratios[np.isfinite(all_ratios)]
-    distribution_plots(all_ratios, "Unit-Site Area Ratio Plot", plot_path)
-    return all_ratios.mean()
 
 
 def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> None:
@@ -1821,6 +1775,71 @@ def _infill_comparison_figure(
 
     fig.savefig(output_file)
     LOG.info("Written: %s", output_file)
+    
+    # """Plot a KDE or Histogram comparing the `before` and `after` values."""
+
+    # def tidy_name(name: str) -> str:
+    #     return " ".join(name.split("_")).title()
+
+    # plot_type = plot_type.lower().strip()
+
+    # fig, axes = plt.subplots(
+    #     len(plot_columns), layout="constrained", figsize=(10, 7 * len(plot_columns))
+    # )
+    # fig.suptitle(title, fontsize="x-large")
+
+    # data = {"before": before, "after": after}
+
+    # for ax, column in zip(axes, plot_columns):
+    #     if plot_type == "kde":
+    #         for nm, df in data.items():
+    #             sns.kdeplot(
+    #                 df[column],
+    #                 ax=ax,
+    #                 fill=True,
+    #                 hatch="/" if nm == "before" else "\\",
+    #                 label=f"{nm.title()} Infilling",
+    #             )
+
+    #     elif plot_type in ("hist", "histogram"):
+    #         # Calculate bins across all data so the same bins are used for both plots
+    #         combined = np.concatenate([before[column].values, after[column].values])
+    #         combined = combined[np.isfinite(combined)]
+    #         hist_bins = np.histogram_bin_edges(combined, bins=50)
+    #         patches = []  # Store patches to apply hatching later
+            
+    #         for i, (nm, df) in enumerate(data.items()):
+    #             # Ensure the color string is valid
+    #             color = f"C{i % 10}"  # Modulo to ensure within valid range
+    #             rgb_color = colors.to_rgb(color)  # Get RGB color
+    #             rgba_color = colors.to_rgba(rgb_color, alpha=0.3)  # Convert to RGBA with transparency
+                
+    #             # Plot histogram and get patch collection
+    #             _, _, patches_tmp = ax.hist(
+    #                 df[column],
+    #                 bins=hist_bins,
+    #                 histtype="bar",
+    #                 edgecolor=rgba_color,
+    #                 facecolor=rgba_color,  
+    #                 density=True,
+    #                 label=f"{nm.title()} Infilling",
+    #             )
+    #             patches.extend(patches_tmp)
+            
+    #         # Apply hatching manually to patches
+    #         for patch, nm in zip(patches, ["before"] * len(data["before"]) + ["after"] * len(data["after"])):
+    #             patch.set_hatch(hatches[nm])
+
+    #     else:
+    #         raise ValueError(f"invalid plot type: {plot_type}")
+
+    #     ax.legend()
+    #     ax.set_title(tidy_name(column))
+    #     ax.set_ylabel("Density")
+    #     ax.set_xlabel(tidy_name(column))
+
+    # fig.savefig(output_file)
+    # LOG.info("Written: %s", output_file)
 
 
 def find_and_replace_luc(

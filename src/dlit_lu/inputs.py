@@ -48,6 +48,20 @@ class Sector(enum.Enum):
 
 
 @dataclasses.dataclass
+class SummaryInputs:
+    """Lookup file and shapefile for creating output summaries."""
+
+    # summary_lad: str
+    lsoa_to_lad_file: pydantic.FilePath
+    msoa_to_lad_file: pydantic.FilePath
+    norms_to_lad_file: pydantic.FilePath
+    noham_to_lad_file: pydantic.FilePath
+    normits_to_lad_file: pydantic.FilePath
+    lad_shapefile: pydantic.FilePath
+    shapefile_id_column: str
+    geometry_simplify_tolerance: int | None = None
+
+@dataclasses.dataclass
 class InfillConfig:
     """Manages reading / writing the tool's config file.
 
@@ -86,22 +100,6 @@ class InfillConfig:
     gfa_infill_method: GFAInfillMethod
 
 
-@dataclasses.dataclass
-class SummaryInputs:
-    """Lookup file and shapefile for creating output summaries."""
-
-    # summary_lad: str
-    lsoa_to_lad_file: pydantic.FilePath
-    msoa_to_lad_file: pydantic.FilePath
-    norms_to_lad_file: pydantic.FilePath
-    noham_to_lad_file: pydantic.FilePath
-    normits_to_lad_file: pydantic.FilePath
-    lad_shapefile: pydantic.FilePath
-    shapefile_id_column: str
-    geometry_simplify_tolerance: int | None = None
-
-
-
 
 @dataclasses.dataclass
 class LandUseConfig:
@@ -111,6 +109,8 @@ class LandUseConfig:
     ----------
     lsoa_shapefile_path : pydantic.FilePath
         Path to the LSOA shapefile.
+    lsoa_hh_types_path: pydantic.FilePath
+        Path to the LSOA household segmented by type file.
     lsoa_dwelling_pop_path : pydantic.FilePath
         Path to the LSOA dwelling population file.
     lsoa_traveller_type_path : pydantic.FilePath
@@ -134,6 +134,7 @@ class LandUseConfig:
     """
 
     lsoa_shapefile_path: pydantic.FilePath
+    lsoa_hh_types_path: pydantic.FilePath
     lsoa_dwelling_pop_path: pydantic.FilePath
     lsoa_traveller_type_path: pydantic.FilePath
     lsoa_jobs_path: pydantic.FilePath
@@ -220,8 +221,10 @@ class DevPatnConfig:
         Path to employment site data.
     res_site_data : Optional[pathlib.Path], default=None
         Path to residential site data.
+   hh_type_site_data : Optional[pathlib.Path], default=None
+        Path to household data segmented by household type.
     pop_tt_site_data : Optional[pathlib.Path], default=None
-        Path to population data segmented by travel time.
+        Path to population data segmented by travel type.
     emp_sic_soc_site_data : Optional[pathlib.Path], default=None
         Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
     summary_data : SummaryInputs, optional
@@ -259,6 +262,7 @@ class DevPatnConfig:
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
     res_site_data: Optional[pathlib.Path] = None
+    hh_type_site_data : Optional[pathlib.Path] = None
     pop_tt_site_data: Optional[pathlib.Path] = None
     emp_sic_soc_site_data: Optional[pathlib.Path] = None
     summary_data: SummaryInputs | None = None
