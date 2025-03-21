@@ -1509,10 +1509,10 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     LOG.info("Processing zonal household, population and jobs based on D-log data")
     site_size_column = "site_size"
-    hh_sites = res_sites.copy()
-    hh_sites[site_size_column] = np.where(hh_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
-    hh_sites["prob_val"] = hh_sites["web_tag_certainty"].map(probability_dict)
-    hh_sites[build_out_columns] = hh_sites[build_out_columns].multiply(hh_sites["prob_val"], axis=0)
+
+    hh_type_sites[site_size_column] = np.where(hh_type_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    hh_type_sites["prob_val"] = hh_type_sites["web_tag_certainty"].map(probability_dict)
+    hh_type_sites[build_out_columns] = hh_type_sites[build_out_columns].multiply(hh_type_sites["prob_val"], axis=0)
 
     pop_tt_sites[site_size_column] =  np.where(pop_tt_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
     pop_tt_sites["prob_val"] = pop_tt_sites["web_tag_certainty"].map(probability_dict)
@@ -1528,7 +1528,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     job_sic_soc_sites_zone = site_zone_processer.zone_site_geospatial_lookup(job_sic_soc_sites, site_geometry_col="geometry")
 
     hh_zone = site_zone_processer.agg_zonal_data(
-        hh_sites_zone,
+        hh_type_sites_zone,
         build_out_columns,
         site_size_column,
         dimension_columns=None

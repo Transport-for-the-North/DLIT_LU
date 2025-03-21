@@ -138,7 +138,7 @@ class ConstraintProcessor():
         totals_after = {col: sector_agg[col].sum() for col in val_cols}
 
         for col in val_cols:
-            if not np.all(pd.np.isclose(totals_before[col], totals_after[col])):
+            if not np.all(np.isclose(totals_before[col], totals_after[col])):
                 raise ValueError(f"Total of '{col}' changed after aggregation: before={totals_before[col]}, after={totals_after[col]}")
 
         return sector_agg
@@ -535,6 +535,51 @@ class GrowthCalculator:
             updated_data[year] = updated_data[base_year_column] + data[year]
 
         return updated_data
+
+def calculate_zone_weights(zone_data: pd.DataFrame, build_out_columns: list, sector_name: str) -> pd.DataFrame:
+    """
+    Calculates the zone weights based on the growth gaps and aggregates them by region.
+
+    Parameters:
+    ----------
+    zone_gap_growth : pd.DataFrame
+        DataFrame containing the zone gap growth data with regions and columns for growth.
+
+    build_out_columns : list
+        List of columns containing the build-out growth data.
+
+    sector_name : str
+        The name of the column representing the sector or region (e.g., 'REGIONNM') in the DataFrame.
+
+    Returns:
+    -------
+    pd.DataFrame
+        DataFrame containing the zone weights and their aggregated values by region.
+    """
+    
+    # Aggregating zone gap growth by region
+    agg_zone_data = zone_data.groupby(sector_name)[build_out_columns].sum()
+    agg_zone_data.columns = [f"{col}_agg" for col in build_out_columns]
+    
+    # Merging with the original data to calculate weights
+    zone_weight = zone_data.merge(agg_zone_data, on=sector_name)
+    
+    # Calculating the weight for each growth column
+    for col in build_out_columns:
+        zone_weight[f"{col}_weight"] = (
+            zone_weight[col] / zone_weight[f"{col}_agg"]
+        )
+    
+    # Selecting the necessary columns and returning the result
+    zone_weight = zone_weight[[sector_name] + [f"{col}_weight" for col in build_out_columns]]
+    
+    # Aggregating the weights by region
+    agg_zone_weight = zone_weight.groupby(sector_name)[[f"{col}_weight" for col in build_out_columns]].sum()
+    
+    # Printing the aggregated zone weight
+    print("agg zone weight", agg_zone_weight)
+    
+    return zone_weight
         
 def run(config: inputs.DLitConfig):
 
@@ -607,7 +652,7 @@ def run(config: inputs.DLitConfig):
         "ntem_pop": processor.sector_agg(lad_data["ntem_pop"], base_year_column, year_cols_ntem),
         "ntem_emp": processor.sector_agg(lad_data["ntem_emp"], base_year_column, year_cols_ntem),
     }
-    LOG.info("Process to get datasets for LAD and Region completed")
+    LOG.info("Process to get datasets for LAD and aggregated LAD completed")
     # Define dataset mappings dynamically by looping through pop and emp keys
     datasets_process = []
 
@@ -659,7 +704,7 @@ def run(config: inputs.DLitConfig):
     # data_names = [data_name for data_name, _, _, _, _, _ in datasets_process]
     # print(data_names)
 
-    LOG.info("Export datasets for LAD and Region")
+    LOG.info("Export datasets for LAD and Aggregated LAD")
     # List of subkeys in the required order
     subkeys = ['YearTotal', 'AbsoluteGrowth', 'GrowthRatio', 'GrowthRate', 'AnnualGrowthRate']
     output_path = key_constraint_path / f"output_for_viz"
@@ -696,7 +741,7 @@ def run(config: inputs.DLitConfig):
     LOG.info(f"Constraining dlog data with DDG data")
     for id in ids:
         LOG.info(f"Constraining dlog data with DDG data for {id}")
-        
+        LOG.info(f"Working out the background growth for aggregated sector for {id}")        
         sector_target_growth = growth_calculator.target_growth(
             results[f"{sector}_dlog_{id}"]["YearTotal"], 
             results[f"{sector}_ddg_{id}"]["YearTotal"], 
@@ -709,56 +754,109 @@ def run(config: inputs.DLitConfig):
         sector_index_column_count = sector_target_growth.columns.get_loc(base_year_column)
         sector_index_columns = list(sector_target_growth.columns[:sector_index_column_count])
         sector_bg_growth = sector_target_growth[sector_index_columns].copy()
+        sector_bg_gratio = sector_target_growth[sector_index_columns].copy()
         for col in build_out_columns:
             sector_bg_growth[col] = sector_target_growth[col] - sector_estimated_growth[col]
-      
+            # Avoid division by zero: Set ratio to 1 if denominator is 0
+            sector_bg_gratio[col] = (sector_target_growth[col] / sector_estimated_growth[col]).where(sector_estimated_growth[col] != 0, 1)
+
+
+        print(sector_bg_growth)
+        print(sector_bg_gratio)
+
+        LOG.info(f"Comparing trend based growth with Dlog estimated growth for each LAD for {id}")         
         zone_target_growth = growth_calculator.target_growth(
             results[f"lad_dlog_{id}"]["YearTotal"], 
             results[f"lad_ddg_{id}"]["YearTotal"], 
             base_year_column, 
             build_out_columns,
         )
-        # Create a list of columns to select (zone_index_columns and base_year_column)
-        # Calculate weight to distribute sector level background into zone level
+        # Dlog estimated growth at lower geographical level
+        zone_estimated_growth = results[f"lad_dlog_{id}"]["AbsoluteGrowth"]
+
+        # Create a list of columns for index
         zone_index_column_count = zone_target_growth.columns.get_loc(base_year_column)
         zone_index_columns = list(zone_target_growth.columns[:zone_index_column_count])
-        agg_zone_target_growth = zone_target_growth.groupby('REGIONNM')[build_out_columns].sum()
-        agg_zone_target_growth.columns = [f"{col}_agg" for col in build_out_columns]
-        zone_weight = zone_target_growth.merge(agg_zone_target_growth, on='REGIONNM')
-        
-        for col in build_out_columns:
-            zone_weight[f"{col}_weight"] = (
-                zone_weight[col] / zone_weight[f"{col}_agg"]
-            )
-        
-        zone_weight = zone_weight[zone_index_columns + [f"{col}_weight" for col in build_out_columns]]
-        
-        agg_zone_weight = zone_weight.groupby('REGIONNM')[[f"{col}_weight" for col in build_out_columns]].sum()
-        print("agg zone weight", agg_zone_weight)
+        zone_target_growth = zone_target_growth.sort_values(by=zone_index_columns).reset_index(drop=True)        
+        zone_estimated_growth = zone_estimated_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
 
+        # calculate gap of growth between target (trend-based forecast) and estimated (from dlog) for each zone (lad)
+        zone_tgt_growth = zone_target_growth[zone_index_columns + build_out_columns]
+        zone_etmt_growth = zone_estimated_growth[zone_index_columns + build_out_columns]
+
+        zone_gap_growth = zone_tgt_growth[zone_index_columns].copy()
+        for col in build_out_columns:
+            zone_gap_growth[col] = zone_tgt_growth[col] - zone_etmt_growth[col]
+            if zone_gap_growth[col] < 0:
+                zone_gap_growth[col] = 0 
+
+        # Calculate weight to distribute sector level background growth into zone level for possitive sector bg growth
+        zone_weight = calculate_zone_weights(zone_gap_growth, build_out_columns, sector_name="REGIONNM")
         # Get lower geographical level background growth    
         zone_bg_growth = zone_weight.merge(sector_bg_growth, on='REGIONNM')
         for col in build_out_columns:
             zone_bg_growth[col] = zone_bg_growth[col] * zone_bg_growth[f"{col}_weight"]
+            # Set negative values to zero
+            zone_bg_growth[col] = zone_bg_growth[col].where(zone_bg_growth[col] >= 0, 0)
         zone_bg_growth = zone_bg_growth[zone_index_columns + build_out_columns]
    
         agg_zone_bg_growth = zone_bg_growth.groupby('REGIONNM')[build_out_columns].sum()
 
-        # Dlog estimated growth at lower geographical level
-        zone_estimated_growth = results[f"lad_dlog_{id}"]["AbsoluteGrowth"]
+        # Get zone scaler for negative sector bg growth - to scale down estimated growth 
+        zone_scaler = zone_etmt_growth[zone_index_columns].copy()
+        zone_scaled_etmt_growth = zone_etmt_growth[zone_index_columns].copy()
+        zone_scaler = zone_scaler.merge(sector_bg_gratio, on="REGIONNM")
+        zone_scaler = zone_scaler[zone_index_columns + build_out_columns]   
+        for col in build_out_columns:
+            zone_scaled_etmt_growth[col] = (
+                zone_etmt_growth[col].values * zone_scaler[col].values
+            )
+        # agg_zone_gap_growth = zone_gap_growth.groupby('REGIONNM')[build_out_columns].sum()
+        # agg_zone_gap_growth.columns = [f"{col}_agg" for col in build_out_columns]
+        # zone_weight = zone_gap_growth.merge(agg_zone_gap_growth, on='REGIONNM')
+        # for col in build_out_columns:
+        #     zone_weight[f"{col}_weight"] = (
+        #         zone_weight[col] / zone_weight[f"{col}_agg"]
+        #     )
+        
+        # zone_weight = zone_weight[zone_index_columns + [f"{col}_weight" for col in build_out_columns]]
+        
+        # agg_zone_weight = zone_weight.groupby('REGIONNM')[[f"{col}_weight" for col in build_out_columns]].sum()
+        # print("agg zone weight", agg_zone_weight)
+
+
+
+
+        # agg_zone_target_growth = zone_target_growth.groupby('REGIONNM')[build_out_columns].sum()
+        # agg_zone_target_growth.columns = [f"{col}_agg" for col in build_out_columns]
+        # zone_weight = zone_target_growth.merge(agg_zone_target_growth, on='REGIONNM')
+        
+        # for col in build_out_columns:
+        #     zone_weight[f"{col}_weight"] = (
+        #         zone_weight[col] / zone_weight[f"{col}_agg"]
+        #     )
+        
+        # zone_weight = zone_weight[zone_index_columns + [f"{col}_weight" for col in build_out_columns]]
+        
+        # agg_zone_weight = zone_weight.groupby('REGIONNM')[[f"{col}_weight" for col in build_out_columns]].sum()
+        # print("agg zone weight", agg_zone_weight)
+
+        # Get lower geographical level background growth    
+
 
         # Create a list of columns to select (zone_index_columns and base_year_column)
         columns_to_select = zone_index_columns + [base_year_column]
+        # Generating final adjusted data
         zone_adjusted_growth = zone_target_growth[columns_to_select]
 
-        # Create a list of columns to select (zone_index_columns and base_year_column)
-        zone_estimated_growth = zone_estimated_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
+
         zone_bg_growth = zone_bg_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
+        zone_scaled_etmt_growth = zone_scaled_etmt_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
         zone_adjusted_growth = zone_adjusted_growth.sort_values(by=zone_index_columns).reset_index(drop=True)
 
         for col in build_out_columns:
             zone_adjusted_growth[col] = (
-                zone_estimated_growth[col].values + zone_bg_growth[col].values
+                zone_scaled_etmt_growth[col].values + zone_bg_growth[col].values
             )
         agg_zone_adj_growth = zone_adjusted_growth.groupby('REGIONNM')[build_out_columns].sum()
         # Create target year total        
@@ -788,6 +886,8 @@ def run(config: inputs.DLitConfig):
         zone_bg_growth_file = f"lad_background_growth_{id}.csv"
         agg_zone_bg_growth_file = f"agg_lad_background_growth_{id}.csv"
         zone_estimated_growth_file = f"lad_estimated_growth_{id}.csv"
+        zone_scaler_file = f"lad_scaler_{id}.csv"
+        zone_scaled_etmt_growth_file = f"lad_scaled_estimated_growth_{id}.csv"
         zone_adjusted_growth_file = f"lad_adjusted_growth_{id}.csv"
         agg_zone_adj_growth_file = f"agg_lad_adjusted_growth_{id}.csv"
         zone_forecast_file = f"lad_forecast_{id}.csv"
@@ -802,6 +902,8 @@ def run(config: inputs.DLitConfig):
         utilities.write_to_csv(key_constraint_path / zone_bg_growth_file, zone_bg_growth)
         utilities.write_to_csv(key_constraint_path / agg_zone_bg_growth_file, agg_zone_bg_growth)
         utilities.write_to_csv(key_constraint_path / zone_estimated_growth_file, zone_estimated_growth)
+        utilities.write_to_csv(key_constraint_path / zone_scaler_file, zone_scaler)
+        utilities.write_to_csv(key_constraint_path / zone_scaled_etmt_growth_file, zone_scaled_etmt_growth)
         utilities.write_to_csv(key_constraint_path / zone_adjusted_growth_file, zone_adjusted_growth)
         utilities.write_to_csv(key_constraint_path / agg_zone_adj_growth_file, agg_zone_adj_growth)
         utilities.write_to_csv(key_constraint_path / zone_forecast_file, zone_forecast)

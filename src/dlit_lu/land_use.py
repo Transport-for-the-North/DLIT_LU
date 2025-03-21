@@ -189,8 +189,6 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         input_data.proposed_land_use_split,
         "ratio",
     )
-    # temp = construction_land_use_data["employment"][["site_reference_id", "proposed_land_use", "ratio"]]
-    # print(temp)
 
     msg = "Demolitions calculated with dampener = %.2f"
     if config.land_use.demolition_dampener == 1:
@@ -290,11 +288,18 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         :,
         build_out_columns + res_key_columns + ["LSOA21CD"],
     ]
+    res_lsoa_sites = res_lsoa_sites.rename(
+        columns={"LSOA21CD": "lsoa2021_id"}
+    )
     emp_lsoa_sites = zone_site_geospatial_lookup(employment_build_out, lsoa)
     emp_lsoa_sites = emp_lsoa_sites.loc[
         :,
         build_out_columns + emp_key_columns + ["LSOA21CD"],
     ]
+
+    emp_lsoa_sites = emp_lsoa_sites.rename(
+        columns={"LSOA21CD": "lsoa2021_id"}
+    )
 
     LOG.info("Export site level dwelling and floorspace data")
 
@@ -318,9 +323,10 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         lu_output_path / emp_sites_uncertainty_file, emp_sites_uncerntainty
     )
 
-    LOG.info("Creating LUTI zonal data")
+
     # Files needed by LUTI
     if LUTI: 
+        LOG.info("Creating LUTI zonal data")
         luti_output_path = config.output_folder / "LUTI_outputs"
         luti_output_path.mkdir(exist_ok=True)
         # Need LUTI zone system and shapefile here to convert site data into luti zonal data
@@ -349,9 +355,6 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         )
 
     LOG.info("Convert site development to jobs")
-    emp_lsoa_sites = emp_lsoa_sites.rename(
-        columns={"LSOA21CD": "lsoa2021_id"}
-    )
 
     emp_lsoa_sites_jobs = convert_gfa_to_jobs_site(
         emp_lsoa_sites,
@@ -388,6 +391,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
 
     LOG.info("Disaggregating total household into household types")
+
     res_lsoa_sites_segmented = apply_hh_land_use(
         res_lsoa_sites,
         build_out_columns,
@@ -461,21 +465,22 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Ending Land Use Module")
 
+
 def gb_hh_type_distribution(data: pd.DataFrame, hh_type_columns: list[str]) -> pd.DataFrame:
-    """calculates the factors for each traveller type
+    """calculates the factors for each household type
 
     aggregates across all zones and dwelling types
 
     Parameters
     ----------
     data: pd.DataFrame
-        TfN base year population land use
+        TfN base year household data
     hh_type_columns: list[str]
         List of columns containing household segmentations
     Returns
     -------
     pd.DataFrame
-        contains factors for lsoa traveller type
+        contains factors for lsoa household type
     """
     # Aggregating by household type columns and summing the 'household' values
     agg_zones = data.groupby(hh_type_columns)["household"].sum().reset_index()
@@ -484,7 +489,7 @@ def gb_hh_type_distribution(data: pd.DataFrame, hh_type_columns: list[str]) -> p
     total_hh = data["household"].sum()
     
     # Calculating the ratio of each household type combination
-    agg_zones["ratio"] = agg_zones["household"] / total_hh
+    agg_zones["ratios"] = agg_zones["household"] / total_hh
     
     # Selecting relevant columns (household segmentations + ratio)
     agg_zones = agg_zones[hh_type_columns + ["ratio"]]
@@ -492,20 +497,14 @@ def gb_hh_type_distribution(data: pd.DataFrame, hh_type_columns: list[str]) -> p
     # Merging the ratio back into the original data based on hh_type_columns
     data = data.merge(agg_zones, on=hh_type_columns, how="left")
     
+    # Dropping the "household" column
+    data = data.drop(columns=["household"])
+    
     # Setting the index to include LSOA and household type columns
     data = data.set_index(["lsoa2021_id"] + hh_type_columns)
     
     return data
-    # lsoa_ratios = []
-    # for id_ in data["lsoa2021_id"].unique():
-    #     temp = ratios.copy()
-    #     temp["lsoa2021_id"] = (
-    #         pd.Series([id_]).repeat(len(ratios)).reset_index(drop=True)
-    #     )
-    #     lsoa_ratios.append(temp)
-    # all_lsoa_ratios = pd.concat(lsoa_ratios, axis=0).set_index(["lsoa2021_id"],hh_type_columns)
-    # all_lsoa_ratios.columns = ["ratios"]
-    # return all_lsoa_ratios
+
 
 
 def gb_traveller_type_distribution(data: pd.DataFrame) -> pd.DataFrame:
@@ -857,10 +856,7 @@ def convert_gfa_to_jobs_site(
     )
     data_jobs.drop(columns=["fte_floorspace", "land_use_code"], inplace=True)
     data_jobs = data_jobs[has_jobs]
-    # data_jobs.set_index(
-    #     ["site_reference_id", "easting", "northing", "lsoa2021_id", "land_use"],
-    #     inplace=True,
-    # )
+
     return data_jobs
 
 
@@ -893,10 +889,6 @@ def convert_luc_to_sic_site(
     )
     data_sic_code.drop(columns=["land_use_code", "land_use"], inplace=True)
     data_sic_code.rename(columns={"sic_code": "sic_2d"}, inplace=True)
-    # data_sic_code.set_index(
-    #     ["site_reference_id", "easting", "northing", "lsoa2021_id", "sic_2d"],
-    #     inplace=True,
-    # )
 
     return data_sic_code
 
@@ -1062,7 +1054,7 @@ def disagg_dwelling(
     lsoa_ratio.reset_index(inplace=True)
 
     data = data.merge(
-        lsoa_ratio, how="left", left_on="LSOA21CD", right_on="lsoa2021_id"
+        lsoa_ratio, how="left", on="lsoa2021_id"
     )
 
     for column in unit_columns:
@@ -1077,8 +1069,6 @@ def zone_site_geospatial_lookup(
     zone: gpd.GeoDataFrame,
 ) -> gpd.GeoDataFrame:
     """spatially joins zone shapefile to DLOG sites
-
-
     Parameters
     ----------
     data : pd.DataFrame
@@ -1104,9 +1094,6 @@ def zone_site_geospatial_lookup(
 
 def calc_lsoa_proportion(by_hh_pop: pd.DataFrame) -> pd.DataFrame:
     """calculates the lsoa population by dwelling type
-
-
-
     Parameters
     ----------
     lsoa_hh: pd.DataFrame
