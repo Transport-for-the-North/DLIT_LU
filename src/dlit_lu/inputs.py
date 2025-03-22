@@ -1,5 +1,4 @@
-"""handles reading config file
-"""
+"""handles reading config file"""
 
 # standard imports
 from __future__ import annotations
@@ -16,6 +15,7 @@ import caf.toolkit
 AVERAGE_INFILLING_VALUES_FILE = "infilling_average_values.yml"
 MEAN_INFILLING_VALUES_FILE = "infilling_mean_values.yml"
 MEDIAN_INFILLING_VALUES_FILE = "infilling_median_values.yml"
+
 
 class GFAInfillMethod(enum.Enum):
     """Method for infilling the GFA from the site area."""
@@ -61,6 +61,7 @@ class SummaryInputs:
     shapefile_id_column: str
     geometry_simplify_tolerance: int | None = None
 
+
 @dataclasses.dataclass
 class InfillConfig:
     """Manages reading / writing the tool's config file.
@@ -98,7 +99,6 @@ class InfillConfig:
     known_invalid_luc_path: pydantic.FilePath
     regions_shapefiles_path: pydantic.FilePath
     gfa_infill_method: GFAInfillMethod
-
 
 
 @dataclasses.dataclass
@@ -142,7 +142,7 @@ class LandUseConfig:
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
     web_tag_certainty_path: pydantic.FilePath
-    luti: bool 
+    luti: bool
     # land_use_input: Optional[pydantic.FilePath] = None
     # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]
     # as pydantic.FilePath immediately validates whether the file exists when parsing the YAML
@@ -152,83 +152,82 @@ class LandUseConfig:
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
 
 
-
 @dataclasses.dataclass
 class DevPatnConfig:
     """Manages reading / writing the tool's config file.
 
-    Attributes
-    ----------
-    base_year : str
-        The base year for the model.
-    geo_boundary : GeoBoundary
-        Specifies the model zone boundary.
-    viz_distribution : bool
-        Flag indicating whether to visualize distribution.
-    index_weights_path: pydantic.FilePath
-        Path to the weights defined for variables which will form the final weighted index to determine large sites
-    normits_shapefile_path : pydantic.FilePath
-        Path to the Normits zone shapefile.
-    noham_shapefile_path : pydantic.FilePath
-        Path to the Noham zone shapefile.
-    norms_shapefile_path : pydantic.FilePath
-        Path to the Norms zone shapefile.
-    msoa_shapefile_path : pydantic.FilePath
-        Path to the MSOA (Middle Layer Super Output Area) shapefile.
-    lsoa_hh_centroids : pydantic.FilePath
-        Path to LSOA household centroids.
-    lsoa_emp_centroids : pydantic.FilePath
-        Path to LSOA employment centroids.
-    lsoa_pop_centroids : pydantic.FilePath
-        Path to LSOA population centroids.
-    normits_hh_centroids : pydantic.FilePath
-        Path to Normits household centroids.
-    normits_emp_centroids : pydantic.FilePath
-        Path to Normits employment centroids.
-    normits_pop_centroids : pydantic.FilePath
-        Path to Normits population centroids.
-    noham_hh_centroids : pydantic.FilePath
-        Path to Noham household centroids.
-    noham_emp_centroids : pydantic.FilePath
-        Path to Noham employment centroids.
-    noham_pop_centroids : pydantic.FilePath
-        Path to Noham population centroids.
-    norms_hh_centroids : pydantic.FilePath
-        Path to Norms household centroids.
-    norms_emp_centroids : pydantic.FilePath
-        Path to Norms employment centroids.
-    norms_pop_centroids : pydantic.FilePath
-        Path to Norms population centroids.
-    msoa_hh_centroids : pydantic.FilePath
-        Path to MSOA household centroids.
-    msoa_emp_centroids : pydantic.FilePath
-        Path to MSOA employment centroids.
-    msoa_pop_centroids : pydantic.FilePath
-        Path to MSOA population centroids.
-    lsoa_to_normits : pydantic.FilePath
-        Path to the translation file from LSOA to Normits.
-    lsoa_to_noham : pydantic.FilePath
-        Path to the translation file from LSOA to Noham.
-    lsoa_to_norms : pydantic.FilePath
-        Path to the translation file from LSOA to Norms.
-    lsoa_to_msoa : pydantic.FilePath
-        Path to the translation file from LSOA to MSOA.
-    lsoa_data_path : Optional[pathlib.Path], default=None
-        Path to the zonal totals file containing population, dwelling, and employment data.
-    assessment_input : Optional[pathlib.Path], default=None
-        Path to the site assessment input file, used to determine if land use values are estimated.
-    emp_site_data : Optional[pathlib.Path], default=None
-        Path to employment site data.
-    res_site_data : Optional[pathlib.Path], default=None
-        Path to residential site data.
-   hh_type_site_data : Optional[pathlib.Path], default=None
-        Path to household data segmented by household type.
-    pop_tt_site_data : Optional[pathlib.Path], default=None
-        Path to population data segmented by travel type.
-    emp_sic_soc_site_data : Optional[pathlib.Path], default=None
-        Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
-    summary_data : SummaryInputs, optional
-        Lookup file and shapefile for creating output summaries at different zone levels.
+     Attributes
+     ----------
+     base_year : str
+         The base year for the model.
+     geo_boundary : GeoBoundary
+         Specifies the model zone boundary.
+     viz_distribution : bool
+         Flag indicating whether to visualize distribution.
+     index_weights_path: pydantic.FilePath
+         Path to the weights defined for variables which will form the final weighted index to determine large sites
+     normits_shapefile_path : pydantic.FilePath
+         Path to the Normits zone shapefile.
+     noham_shapefile_path : pydantic.FilePath
+         Path to the Noham zone shapefile.
+     norms_shapefile_path : pydantic.FilePath
+         Path to the Norms zone shapefile.
+     msoa_shapefile_path : pydantic.FilePath
+         Path to the MSOA (Middle Layer Super Output Area) shapefile.
+     lsoa_hh_centroids : pydantic.FilePath
+         Path to LSOA household centroids.
+     lsoa_emp_centroids : pydantic.FilePath
+         Path to LSOA employment centroids.
+     lsoa_pop_centroids : pydantic.FilePath
+         Path to LSOA population centroids.
+     normits_hh_centroids : pydantic.FilePath
+         Path to Normits household centroids.
+     normits_emp_centroids : pydantic.FilePath
+         Path to Normits employment centroids.
+     normits_pop_centroids : pydantic.FilePath
+         Path to Normits population centroids.
+     noham_hh_centroids : pydantic.FilePath
+         Path to Noham household centroids.
+     noham_emp_centroids : pydantic.FilePath
+         Path to Noham employment centroids.
+     noham_pop_centroids : pydantic.FilePath
+         Path to Noham population centroids.
+     norms_hh_centroids : pydantic.FilePath
+         Path to Norms household centroids.
+     norms_emp_centroids : pydantic.FilePath
+         Path to Norms employment centroids.
+     norms_pop_centroids : pydantic.FilePath
+         Path to Norms population centroids.
+     msoa_hh_centroids : pydantic.FilePath
+         Path to MSOA household centroids.
+     msoa_emp_centroids : pydantic.FilePath
+         Path to MSOA employment centroids.
+     msoa_pop_centroids : pydantic.FilePath
+         Path to MSOA population centroids.
+     lsoa_to_normits : pydantic.FilePath
+         Path to the translation file from LSOA to Normits.
+     lsoa_to_noham : pydantic.FilePath
+         Path to the translation file from LSOA to Noham.
+     lsoa_to_norms : pydantic.FilePath
+         Path to the translation file from LSOA to Norms.
+     lsoa_to_msoa : pydantic.FilePath
+         Path to the translation file from LSOA to MSOA.
+     lsoa_data_path : Optional[pathlib.Path], default=None
+         Path to the zonal totals file containing population, dwelling, and employment data.
+     assessment_input : Optional[pathlib.Path], default=None
+         Path to the site assessment input file, used to determine if land use values are estimated.
+     emp_site_data : Optional[pathlib.Path], default=None
+         Path to employment site data.
+     res_site_data : Optional[pathlib.Path], default=None
+         Path to residential site data.
+    hh_type_site_data : Optional[pathlib.Path], default=None
+         Path to household data segmented by household type.
+     pop_tt_site_data : Optional[pathlib.Path], default=None
+         Path to population data segmented by travel type.
+     emp_sic_soc_site_data : Optional[pathlib.Path], default=None
+         Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
+     summary_data : SummaryInputs, optional
+         Lookup file and shapefile for creating output summaries at different zone levels.
     """
 
     base_year: str
@@ -262,7 +261,7 @@ class DevPatnConfig:
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
     res_site_data: Optional[pathlib.Path] = None
-    hh_type_site_data : Optional[pathlib.Path] = None
+    hh_type_site_data: Optional[pathlib.Path] = None
     pop_tt_site_data: Optional[pathlib.Path] = None
     emp_sic_soc_site_data: Optional[pathlib.Path] = None
     summary_data: SummaryInputs | None = None
@@ -292,6 +291,7 @@ class TripendsConfig:
     zone_soc_sic_emp: pydantic.FilePath
     pop2023: pydantic.FilePath
     tfn_tt: pydantic.FilePath
+
 
 class DLitConfig(caf.toolkit.BaseConfig):
     """Manages reading / writing the tool's config file."""
@@ -383,7 +383,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
             )
 
         return value
-    
+
     @pydantic.validator("tripend")
     def tripend_input_check(  # pylint: disable=no-self-argument
         cls, value: TripendsConfig | None, values: dict[str, Any]
@@ -405,8 +405,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
         return value
 
-    @model_validator(mode='after')
-    def check_running(cls, instance: 'DLitConfig') -> 'DLitConfig':
+    @model_validator(mode="after")
+    def check_running(cls, instance: "DLitConfig") -> "DLitConfig":
         """Ensure at least one module is set to run."""
         if not any(
             [
@@ -414,7 +414,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
                 instance.run_land_use,
                 instance.run_dev_pattern,
                 instance.run_constraint,
-                instance.run_tripend
+                instance.run_tripend,
             ]
         ):
             raise ValueError(
@@ -443,6 +443,7 @@ class InfillingMeans(caf.toolkit.BaseConfig):
     mean_mix_area: float
     mean_gfa_site_area_ratio: float
     mean_dwelling_site_area_ratio: float
+
 
 class InfillingMedians(caf.toolkit.BaseConfig):
     """Medians calculated for use in medians infill method."""
