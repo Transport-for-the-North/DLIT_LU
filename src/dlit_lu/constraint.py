@@ -595,7 +595,10 @@ class ConstraintCalculation:
 
     @staticmethod
     def calculate_zone_weights(
-        zone_data: pd.DataFrame, build_out_columns: list, sector_name: str
+        zone_data: pd.DataFrame, 
+        build_out_columns: list,
+        zone_index_comlumns: list, 
+        sector_name: str
     ) -> pd.DataFrame:
         """
         Calculates the zone weights based on the growth gaps and aggregates them by sector/region.
@@ -607,6 +610,9 @@ class ConstraintCalculation:
 
         build_out_columns : list
             List of column names representing growth-related data.
+        
+        zone_index_comlumns: list
+            List of columns used for indexing and merging zone-level data (e.g., ['ZONE_ID']).    
 
         sector_name : str
             The name of the column representing the sector or region (e.g., 'REGIONNM') in the DataFrame.
@@ -616,6 +622,7 @@ class ConstraintCalculation:
         pd.DataFrame
             DataFrame containing the computed zone weights, with values aggregated by region.
         """
+
         agg_zone_data = zone_data.groupby(sector_name)[build_out_columns].sum()
         agg_zone_data.columns = [f"{col}_agg" for col in build_out_columns]
 
@@ -624,7 +631,7 @@ class ConstraintCalculation:
         for col in build_out_columns:
             zone_weight[col] = zone_weight[col] / zone_weight[f"{col}_agg"]
 
-        return zone_weight[[sector_name] + build_out_columns]
+        return zone_weight[zone_index_comlumns + build_out_columns]
 
     @staticmethod
     def calculate_ratio(
@@ -1079,7 +1086,7 @@ def run(config: inputs.DLitConfig):
         # Create a list of columns for index
         zone_index_column_count = zone_target_growth.columns.get_loc(base_year_column)
         zone_index_columns = list(zone_target_growth.columns[:zone_index_column_count])
-        zone_base_year = zone_target_growth[zone_index_columns + base_year_column]
+        zone_base_year = zone_target_growth[zone_index_columns + [base_year_column]]
         # Adjust zone_etmt growth using scaler to make sure the sector level total estimated growth won't exceed 95% of target growth
         zone_etmt_growth = zone_estimated_growth[zone_index_columns + build_out_columns]
 
@@ -1138,7 +1145,10 @@ def run(config: inputs.DLitConfig):
 
         # calculate weight to be used to distribute sector level background growth
         zone_weight = calc.calculate_zone_weights(
-            zone_gap_growth, build_out_columns, sector_name="REGIONNM"
+            zone_gap_growth, 
+            build_out_columns, 
+            zone_index_columns, 
+            sector_name="REGIONNM"
         )
         # Get lower geographical level background growth
         zone_bg_growth = zone_target_growth[zone_index_columns].copy()

@@ -1272,6 +1272,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Loading Key Inputs")
     # Create probability values for each certainty
     probability_dict = pd.read_csv(config.land_use.web_tag_certainty_path).to_dict()
+    
     # Create res_weight_dict directly by loading the relevant columns and converting them into a dictionary
     res_weight_dict = pd.read_csv(
         config.dev_pattern.index_weights_path, usecols=['variables', 'residential']
@@ -1486,22 +1487,16 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         stats.plot_distribution(
             res_zone_sites, columns_to_explore, plot_path, category="res_val"
         )
-
-
-        LOG.info(f"Visualizing the distribution of employment site attributes")
-        stats.plot_distribution(
-            emp_zone_sites, columns_to_explore, plot_path, category="emp_val"
-        )
-
-        LOG.info("Ending Development Pattern Module")
-
         # Box plot of attributes
-        LOG.info(f"Visualizing the distribution of residential site attributes")
         stats.plot_boxplots(
             res_zone_sites, columns_to_explore, plot_path, category="res_val"
         )
 
         LOG.info(f"Visualizing the distribution of employment site attributes")
+        stats.plot_distribution(
+            emp_zone_sites, columns_to_explore, plot_path, category="emp_val"
+        )
+        # Box plot of attributes
         stats.plot_boxplots(
             emp_zone_sites, columns_to_explore, plot_path, category="emp_val"
         )
