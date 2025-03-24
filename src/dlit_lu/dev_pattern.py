@@ -1279,6 +1279,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     res_weight_dict_df = pd.read_csv(
         config.dev_pattern.index_weights_path, usecols=['variables', 'residential']
     )
+    
     res_weight_dict = dict(zip(res_weight_dict_df['variables'], res_weight_dict_df['residential']))
     # Create emp_weight_dict directly by loading the relevant columns and converting them into a dictionary
     emp_weight_dict_df = pd.read_csv(

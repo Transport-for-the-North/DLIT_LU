@@ -1069,7 +1069,13 @@ def run(config: inputs.DLitConfig):
             build_out_columns,
             sector_index_columns,
         )
-
+        # Apply conditional transformation
+        for col in build_out_columns:
+            sector_ratio[col] = np.where(
+                (sector_ratio[col] > 1),
+                1,  # set gap to zero to avoid additional background growth when estimated growth is not zero and the gap is negative (estimated exceeds target)
+                sector_ratio[col],  # Keep original value otherwise
+            )
         print(sector_ratio)
 
         # Dlog estimated growth at lower geographical level
