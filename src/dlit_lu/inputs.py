@@ -291,6 +291,7 @@ class TripendsConfig:
     zone_soc_sic_emp: pydantic.FilePath
     pop2023: pydantic.FilePath
     tfn_tt: pydantic.FilePath
+    zone_hh: pydantic.FilePath
 
 
 class DLitConfig(caf.toolkit.BaseConfig):

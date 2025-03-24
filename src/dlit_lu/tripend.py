@@ -23,6 +23,10 @@ class Tripends:
         "tt_pop": {
             "index_cols": ['tt'],
             "segments": ['gender_3', 'aws', 'soc', 'ns_sec', 'hh_type'],
+        },
+        "hh": {
+            "index_cols": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
+            "segments": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
         }
     }
 
@@ -96,8 +100,11 @@ class Tripends:
         zoning = cb.ZoningSystem.get_zoning('normits')
 
         dvec = DVector(import_data=data, zoning_system=zoning, segmentation=seg)
-        if data_type == "tt_pop":
+        if data_type == "tt_pop" :
             dvec = dvec.add_segments(['adult_nssec'])
+
+        if data_type == "hh" :
+            dvec = dvec.add_segments(['adult_nssec', 'total'])
 
         dvec.save(output_path)
 
@@ -114,7 +121,8 @@ def run(config: inputs.DLitConfig):
     data_files = {
         "soc_sic_emp": config.tripend.zone_soc_sic_emp,
         "tt_pop": config.tripend.zone_tt_pop,
-        "tfn_tt": config.tripend.tfn_tt
+        "tfn_tt": config.tripend.tfn_tt,
+        "hh": config.tripend.zone_hh,
     }
 
     data_frames = {key: pd.read_csv(path).fillna(0) for key, path in data_files.items()}
@@ -124,7 +132,8 @@ def run(config: inputs.DLitConfig):
 
     output_folders = {
         "soc_sic_emp": base_folder / "dlog_soc_sic_emp",
-        "tt_pop": base_folder / "dlog_tt_pop"
+        "tt_pop": base_folder / "dlog_tt_pop",
+        "hh": base_folder / "dlog_hh"
     }
 
     for folder in output_folders.values():
@@ -132,7 +141,7 @@ def run(config: inputs.DLitConfig):
 
     tripend = Tripends()
 
-    for dtype in ["soc_sic_emp", "tt_pop"]:
+    for dtype in ["soc_sic_emp", "tt_pop", "hh"]:
         processed_data = tripend.process_data(
             data_frames[dtype], 
             dtype, 
