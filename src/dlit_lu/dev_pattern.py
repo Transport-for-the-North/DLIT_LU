@@ -1271,16 +1271,20 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     config.output_folder.mkdir(exist_ok=True)
     LOG.info("Loading Key Inputs")
     # Create probability values for each certainty
-    probability_dict = pd.read_csv(config.land_use.web_tag_certainty_path).to_dict()
-    
+    probability_dict_df = pd.read_csv(config.land_use.web_tag_certainty_path)
+    # Convert it to a dictionary
+    probability_dict = dict(zip(probability_dict_df["web_tag_certainty"], probability_dict_df["probability"]))
+
     # Create res_weight_dict directly by loading the relevant columns and converting them into a dictionary
-    res_weight_dict = pd.read_csv(
+    res_weight_dict_df = pd.read_csv(
         config.dev_pattern.index_weights_path, usecols=['variables', 'residential']
-    ).set_index('variables')['residential'].to_dict()
+    )
+    res_weight_dict = dict(zip(res_weight_dict_df['variables'], res_weight_dict_df['residential']))
     # Create emp_weight_dict directly by loading the relevant columns and converting them into a dictionary
-    emp_weight_dict = pd.read_csv(
+    emp_weight_dict_df = pd.read_csv(
         config.dev_pattern.index_weights_path, usecols=['variables', 'employment']
-    ).set_index('variables')['employment'].to_dict()
+    )
+    emp_weight_dict = dict(zip(emp_weight_dict_df['variables'], emp_weight_dict_df['employment']))
 
     site_assessment = lu.disagg_mixed(utilities.to_dict(input_data))
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
