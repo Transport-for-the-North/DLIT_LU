@@ -1,9 +1,9 @@
 #Set Up Parameters
 run_infill: False
 run_land_use: False
-run_dev_pattern: True
-run_constraint: True
-run_tripend: False
+run_dev_pattern: False
+run_constraint: False
+run_tripend: True
 
 #Mandatory Parameters
 #--str
