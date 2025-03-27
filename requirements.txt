@@ -14,4 +14,5 @@ pyogrio == 0.5.*
 seaborn == 0.11.*
 caf.toolkit == 0.0.7
 scikit-learn == 1.2.*
+plotly>=5
 dash == 2.16.1  # Added Dash

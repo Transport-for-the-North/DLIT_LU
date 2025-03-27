@@ -61,6 +61,8 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     assess_data = parser.parse_dev_pattern_input(config)
     if config.run_dev_pattern and assess_data is not None:
         dev_pattern.run(assess_data, config)
+    # else:
+    #     te_inputs = parser.parse_tripend_input(config)
 
     if config.run_constraint:
        constraint.run(config)

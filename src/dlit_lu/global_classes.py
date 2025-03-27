@@ -60,6 +60,8 @@ class DLogData(NamedTuple):
     note that the DataFrames do not have identical column names
     Parameters
     ----------
+    combined_data: Optional[pd.DataFrame] = None
+        the combined data set
     residential_data: pd.DataFrame
         the residential data set
     employment_data: pd.DataFrame
@@ -68,8 +70,6 @@ class DLogData(NamedTuple):
         sites which have residential and employment developments
     lookup: Lookup
         a look up table for the IDs used in the data
-    combined_data: Optional[pd.DataFrame] = None
-        the combined data set
     proposed_land_use_split: Optional[pd.DataFrame] = None
         the split of proposed land use codes that appears in the dlog
     existing_land_use_split: Optional[pd.DataFrame] = None
@@ -146,6 +146,11 @@ class DLogData(NamedTuple):
             existing_land_use_split=optional_copy(self.existing_land_use_split),
         )
 
+class DlogTEData(NamedTuple):
+    hb_prod: pd.DataFrame
+    hb_attr: pd.DataFrame
+    nhb_prod: pd.DataFrame
+    nhb_attr: pd.DataFrame
 
 class AuxiliaryData(NamedTuple):
     """stores data not contained in the DLog required for processing

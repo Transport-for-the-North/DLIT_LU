@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import enum
 import pathlib
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 # third party imports
 import pydantic
@@ -45,7 +45,25 @@ class GeoBoundary(enum.Enum):
 class Sector(enum.Enum):
     REGION = "region"
     COMBINED_LAD = "combined_lad"
+    LAD = "lad"
 
+# Define sector-specific metadata at the module level
+SECTOR_INFO_MAP: Dict[Sector, Dict[str, Any]] = {
+    Sector.REGION: {
+        "lookup_path": None,  # Path to the translation file from config.constraint or config.tripend
+        "zone_id": "lad2013_id",  # Static value (column name) in translation file
+        "sector_id": "ntem_region_id",  # Static value (column name) in translation file
+        "zone_to_sector_prop_col": "lad2013_to_ntem_region",  # Static value (column name) in translation file
+        "sector_name": None,  # Key to fetch from config.constraint
+    },
+    Sector.LAD: {
+        "lookup_path": None, # Path to the translation file from config.constraint or config.tripend
+        "zone_id": None, # Will be dynamically assigned, column name in translation file
+        "sector_id": None, # Will be dynamically assigned, column name in translation file
+        "zone_to_sector_prop_col": None, # Will be dynamically assigned, column name in translation file
+        "sector_name": None, # Key to fetch from config.constraint
+    },
+}
 
 @dataclasses.dataclass
 class SummaryInputs:
@@ -160,6 +178,8 @@ class DevPatnConfig:
      ----------
      base_year : str
          The base year for the model.
+     end_year : str
+         The end year of Dlog data.
      geo_boundary : GeoBoundary
          Specifies the model zone boundary.
      viz_distribution : bool
@@ -220,7 +240,7 @@ class DevPatnConfig:
          Path to employment site data.
      res_site_data : Optional[pathlib.Path], default=None
          Path to residential site data.
-    hh_type_site_data : Optional[pathlib.Path], default=None
+     hh_type_site_data : Optional[pathlib.Path], default=None
          Path to household data segmented by household type.
      pop_tt_site_data : Optional[pathlib.Path], default=None
          Path to population data segmented by travel type.
@@ -231,6 +251,7 @@ class DevPatnConfig:
     """
 
     base_year: str
+    end_year: str
     geo_boundary: GeoBoundary
     viz_distribution: bool
     index_weights_path: pydantic.FilePath
@@ -257,6 +278,7 @@ class DevPatnConfig:
     lsoa_to_noham: pydantic.FilePath
     lsoa_to_norms: pydantic.FilePath
     lsoa_to_msoa: pydantic.FilePath
+    tfn_tt: pydantic.FilePath
     lsoa_data_path: Optional[pathlib.Path] = None
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
@@ -287,11 +309,20 @@ class ConstraintConfig:
 @dataclasses.dataclass
 class TripendsConfig:
 
-    zone_tt_pop: pydantic.FilePath
-    zone_soc_sic_emp: pydantic.FilePath
-    pop2023: pydantic.FilePath
+    sector: Sector
+    # pop2023: pydantic.FilePath
+    by_fr_hb: pydantic.FilePath
+    by_to_hb: pydantic.FilePath
+    by_nhb: pydantic.FilePath
     tfn_tt: pydantic.FilePath
-    zone_hh: pydantic.FilePath
+    normits_hb_prod: Optional[pathlib.Path] = None
+    normits_hb_attr: Optional[pathlib.Path] = None
+    normits_nhb_prod: Optional[pathlib.Path] = None
+    normits_nhb_attr: Optional[pathlib.Path] = None
+    normits_tt_pop: Optional[pathlib.Path] = None
+    normits_soc_sic_emp: Optional[pathlib.Path] = None
+    normits_hh: Optional[pathlib.Path] = None
+
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -398,10 +429,10 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("tripend is required if run_tripend is true")
 
         if not values.get("run_constraint") and not all(
-            [value.zone_tt_pop, value.zone_soc_sic_emp]
+            [value.normits_tt_pop, value.normits_soc_sic_emp, value.normits_hh]
         ):
             raise ValueError(
-                "zone_tt_pop, zone_soc_sic_emp are required if not running constraint module"
+                "normits_tt_pop, normits_soc_sic_emp and normits_hh are required if not running constraint module"
             )
 
         return value

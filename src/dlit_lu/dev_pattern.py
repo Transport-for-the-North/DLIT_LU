@@ -5,6 +5,7 @@
 # standard imports
 import logging
 import pathlib
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 # third party imports
@@ -18,6 +19,8 @@ from scipy.spatial import cKDTree
 # local imports
 from dlit_lu import stats, utilities, global_classes, parser, inputs
 from dlit_lu import land_use as lu
+from caf.base.data_structures import DVector
+import caf.base as cb
 
 # constants
 LOG = logging.getLogger(__name__)
@@ -197,7 +200,6 @@ class ZoneTranslator(BaseZoneHandler):
                 new_pop_data,
                 new_job_data,
                 group_by_column,
-                zone_gdf_id_col,
             )
             zonal_household = self._cumulative_yearly_totals(
                 zonal_household_growth,
@@ -401,7 +403,6 @@ class ZoneTranslator(BaseZoneHandler):
         new_pop_data: pd.DataFrame, 
         new_job_data: pd.DataFrame, 
         zone_col_in_by: str,
-        zone_col_in_new: str,
     ) -> pd.DataFrame:
         """
         Merge new dwelling, population, and job data into the existing zonal data.
@@ -420,8 +421,6 @@ class ZoneTranslator(BaseZoneHandler):
             The column name representing zones in new dataframes.
         zone_col_in_by : str
             The column name representing zones in by_data.
-        build_out_columns: list
-            The column list with values
         Returns
         -------
         pd.DataFrame
@@ -429,27 +428,32 @@ class ZoneTranslator(BaseZoneHandler):
         """
         # Merging by_data with new_dwel_data to create zonal_dwelling
 
-        zonal_household = by_data.merge(new_hh_data, 
-                                    left_on=zone_col_in_by, 
-                                    right_on=zone_col_in_new, 
+        zonal_household = by_data.merge(new_hh_data,
+                                    on=zone_col_in_by, 
+                                    # left_on=zone_col_in_by, 
+                                    # right_on=zone_col_in_new, 
                                     how="left")
         zonal_household = zonal_household[[zone_col_in_by, "household"] + new_hh_data.columns.to_list()]
-        zonal_household = zonal_household.drop(columns= zone_col_in_new).rename(columns={"household": "2023"})
+        zonal_household = zonal_household.rename(columns={"household": "2023"})
+        zonal_household = zonal_household.loc[:, ~zonal_household.columns.duplicated()]
         # Merging by_data with new_pop_data to create zonal_population
         zonal_population = by_data.merge(new_pop_data, 
-                                        left_on=zone_col_in_by, 
-                                        right_on=zone_col_in_new, 
+                                    on=zone_col_in_by, 
+                                    # left_on=zone_col_in_by, 
+                                    # right_on=zone_col_in_new, 
                                         how="left")
         zonal_population = zonal_population[[zone_col_in_by, "population"] + new_pop_data.columns.to_list()]
-        zonal_population = zonal_population.drop(columns= zone_col_in_new).rename(columns={"population": "2023"})
+        zonal_population = zonal_population.rename(columns={"population": "2023"})
+        zonal_population = zonal_population.loc[:, ~zonal_population.columns.duplicated()]
         # Merging by_data with new_job_data to create zonal_jobs
         zonal_job = by_data.merge(new_job_data, 
-                                left_on=zone_col_in_by, 
-                                right_on=zone_col_in_new, 
+                                on=zone_col_in_by, 
+                                # left_on=zone_col_in_by, 
+                                # right_on=zone_col_in_new,  
                                 how="left")
         zonal_job = zonal_job[[zone_col_in_by, "jobs"] + new_job_data.columns.to_list()]
-        zonal_job = zonal_job.drop(columns= zone_col_in_new).rename(columns={"jobs": "2023"})
-
+        zonal_job = zonal_job.rename(columns={"jobs": "2023"})
+        zonal_job = zonal_job.loc[:, ~zonal_job.columns.duplicated()]
         return zonal_household, zonal_population, zonal_job
 
     def _zone_to_lad(
@@ -624,6 +628,8 @@ class SiteZoneProcessor(BaseZoneHandler):
 
         # Define grouping keys
         zone_id_col = self.zone_info["zone_gdf_id_col"]
+        rename_zone_id_col = self.zone_info["group_by_column"]
+
         if dimension_columns is None:
             dimension_columns = []  # If None, set to an empty list
         groupby_columns = [zone_id_col] + dimension_columns
@@ -650,7 +656,9 @@ class SiteZoneProcessor(BaseZoneHandler):
         agg_small = agg_small.rename(columns={col: f"{col}_small" for col in build_out_columns})
         # Merge all results
         agg_data = agg_all.merge(agg_large, on=groupby_columns, how="left").merge(agg_small, on=groupby_columns, how="left")
-
+        # Rename zone_id_col to rename_zone_id_col
+        agg_data = agg_data.rename(columns={zone_id_col: rename_zone_id_col})
+        
         return agg_data
 
     def merge_zonal_attributes(
@@ -1081,6 +1089,132 @@ class LargeSites:
 
         return merged_sites, large_sites, large_site_ids
 
+class PrepTripends:
+    
+    # YEARS = range(2024, 2067)
+    CATEGORIES = ['', '_large', '_small']
+    # DATA_CONFIG = {
+    #     "soc_sic_emp": {
+    #         "index_cols": ['sic_2_digit', 'soc'],
+    #         "rename_cols": {'sic_2d': 'sic_2_digit'},
+    #         "segments": ['sic_2_digit', 'soc']
+    #     },
+    #     "tt_pop": {
+    #         "index_cols": ['tt'],
+    #         "segments": ['gender_3', 'aws', 'soc', 'ns_sec', 'hh_type'],
+    #     },
+    #     "hh": {
+    #         "index_cols": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
+    #         "segments": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
+    #     }
+    # }
+
+    def __init__(self, config: inputs.DLitConfig) -> None:
+        """Initialize the class with dynamic YEARS based on the base year."""
+        self.base_year_int = int(config.dev_pattern.base_year) 
+        self.end_year_int = int(config.dev_pattern.end_year) # Ensure config has base_year_int
+        self.years = range(self.base_year_int + 1, self.end_year_int + 1)  
+
+        self.data_config = {
+            "soc_sic_emp": {
+                "index_cols": ['sic_2_digit', 'soc'],
+                "rename_cols": {'sic_2d': 'sic_2_digit'},
+                "segments": ['sic_2_digit', 'soc']
+            },
+            "tt_pop": {
+                "index_cols": ['tt'],
+                "segments": ['gender_3', 'aws', 'soc', 'ns_sec', 'hh_type'],
+            },
+            "hh": {
+                "index_cols": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
+                "segments": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
+            }
+        }
+        self.cols_to_merge = ['gender_3', 'aws', 'ns_sec', 'soc', 'hh_type']
+        self.rename_mapping = {
+            'gender': 'gender_3',
+            'aws': 'aws',
+            'ns': 'ns_sec',
+            'soc': 'soc',
+            'hh_type': 'hh_type'
+        }
+        # Initialize the BaseZoneHandler for geo_boundary and other zone info
+        self.base_zone_handler = BaseZoneHandler(config)
+        self.zone_info = self.base_zone_handler.zone_info
+        self.zone_id = self.zone_info["group_by_column"]
+
+    def merge_and_rename(self, 
+                         data: pd.DataFrame, 
+                         lookup: pd.DataFrame) -> pd.DataFrame:
+        
+        """Merge and rename columns for tt_pop data."""
+
+        return data.merge(lookup, on='tt', how='left').rename(columns=self.rename_mapping)
+
+    def process_data(
+            self, 
+            data: pd.DataFrame, 
+            data_type: str, 
+            lookup: pd.DataFrame = None
+    ) -> Dict[str, pd.DataFrame]:
+        
+        """Process data for a given type and pivot it per year and category."""
+
+        if data_type not in self.data_config:
+            raise ValueError(f"Unknown data type: {data_type}")
+
+        config = self.data_config[data_type]
+        if "rename_cols" in config:
+            data.rename(columns=config["rename_cols"], inplace=True)
+
+        index_cols = config["index_cols"]
+
+        if data_type == "tt_pop" and lookup is not None:
+            data = self.merge_and_rename(data, lookup)
+            index_cols = self.cols_to_merge  
+
+        if self.zone_id in data.columns:
+            data[self.zone_id] = data[self.zone_id].astype('int64')
+
+        processed_data = {
+            f"{year}{category}": data.pivot_table(index=index_cols, columns=self.zone_id, values=f"{year}{category}", fill_value=0)
+            for year in self.years for category in self.CATEGORIES if f"{year}{category}" in data.columns
+        }
+
+        return processed_data
+
+    def prepare_segmentation_input(self, 
+                                   data_type: str) -> cb.SegmentationInput:
+        
+        """Prepare segmentation input based on data type."""
+
+        if data_type not in self.data_config:
+
+            raise ValueError(f"Unknown data type for segmentation: {data_type}")
+        
+        return cb.SegmentationInput(enum_segments=self.data_config[data_type]["segments"], naming_order=self.data_config[data_type]["segments"])
+
+    def perform_segmentation_and_zoning(
+            self, 
+            data: pd.DataFrame, 
+            data_type: str,
+            output_path: Path
+    ):
+        
+        """Perform segmentation and zoning, then save the result."""
+
+        seg = cb.Segmentation(self.prepare_segmentation_input(data_type))
+        zoning = cb.ZoningSystem.get_zoning('normits')
+
+        dvec = DVector(import_data=data, zoning_system=zoning, segmentation=seg)
+        if data_type == "tt_pop" :
+            dvec = dvec.add_segments(['adult_nssec'])
+
+        if data_type == "hh" :
+            dvec = dvec.add_segments(['adult_nssec', 'total'])
+
+        dvec.save(output_path)
+
 
 
 def get_site_reference_ids(
@@ -1306,8 +1440,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     
 
     key_columns = ["site_reference_id", "easting", "northing", "web_tag_certainty"]
-    build_out_columns = np.arange(base_year_int + 1, 2067, 1).tolist()
-    build_out_columns = [str(year) for year in build_out_columns]
+    build_out_columns = [str(year) for year in range(base_year_int + 1, 2067)]
 
     LOG.info("Creating list of sites with estimated development values")
     # list of residential sites with estimated values
@@ -1664,6 +1797,43 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     utilities.write_to_csv(
         key_agg_path / lad_job_abgrowth_file_name, lad_job_ab_growth
     )
+
+    LOG.info("Further transforming and processing land use data for tripend module")
+    data_frames = {
+        "soc_sic_emp": job_sic_soc_zone,
+        "tt_pop": pop_tt_zone,
+        "tfn_tt": pd.read_csv(config.dev_pattern.tfn_tt),
+        "hh": hh_type_zone,
+    }
+
+    output_folders = {
+        "soc_sic_emp": key_output_path / "dlog_soc_sic_emp",
+        "tt_pop": key_output_path / "dlog_tt_pop",
+        "hh": key_output_path / "dlog_hh"
+    }
+
+    for folder in output_folders.values():
+        folder.mkdir(exist_ok=True)
+    
+
+    LOG.info("Transforming and processing land use data for tripend module")
+    prep_teinput = PrepTripends(config)
+
+    for dtype in ["soc_sic_emp", "tt_pop", "hh"]:
+        processed_data = prep_teinput.process_data(
+            data_frames[dtype], 
+            dtype, 
+            data_frames["tfn_tt"] if dtype == "tt_pop" else None
+        )
+
+        for year_col, pivot_df in processed_data.items():
+            category = next((cat for cat in prep_teinput.CATEGORIES if cat in year_col), '')
+
+            output_folder = output_folders[dtype] / f"{dtype}{category}"
+            output_folder.mkdir(exist_ok=True)
+
+            output_file = output_folder / f"dlog_{dtype}_{year_col}.dvec"
+            prep_teinput.perform_segmentation_and_zoning(pivot_df, dtype, output_file)
 
     LOG.info("Ending Development Pattern Module")
 

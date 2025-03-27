@@ -6,6 +6,7 @@ import numpy as np
 # Local imports
 from dlit_lu import inputs, utilities
 
+
 LOG = logging.getLogger(__name__)
 
 
@@ -20,6 +21,27 @@ class ConstraintProcessor:
         sector_info (Dict[str, Any]): The sector metadata for the selected sector.
     """
 
+    # def __init__(self, config: inputs.DLitConfig) -> None:
+    #     """
+    #     Initializes the ConstraintProcessor with configuration settings.
+
+    #     Args:
+    #         config (inputs.DLitConfig): The configuration object containing constraint details.
+    #     """
+    #     self.sector: inputs.Sector = config.constraint.sector
+    #     self.config: inputs.DLitConfig = config
+    #     self.sector_info_map: Dict[inputs.Sector, Dict[str, Any]] = {
+    #         inputs.Sector.REGION: {
+    #             "lookup_path": self.config.constraint.lad_to_region_file,
+    #             "zone_id": "lad2013_id",
+    #             "base_year_column": self.config.dev_pattern.base_year,
+    #             "sector_id": "ntem_region_id",
+    #             "zone_to_sector_prop_col": "lad2013_to_ntem_region",
+    #             "sector_name": self.config.constraint.region_name,
+    #         }
+    #     }
+
+    #     self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
     def __init__(self, config: inputs.DLitConfig) -> None:
         """
         Initializes the ConstraintProcessor with configuration settings.
@@ -27,20 +49,24 @@ class ConstraintProcessor:
         Args:
             config (inputs.DLitConfig): The configuration object containing constraint details.
         """
-        self.sector: inputs.Sector = config.constraint.sector
         self.config: inputs.DLitConfig = config
-        self.sector_info_map: Dict[inputs.Sector, Dict[str, Any]] = {
-            inputs.Sector.REGION: {
-                "lookup_path": self.config.constraint.lad_to_region_file,
-                "zone_id": "lad2013_id",
-                "base_year_column": self.config.dev_pattern.base_year,
-                "sector_id": "ntem_region_id",
-                "zone_to_sector_prop_col": "lad2013_to_ntem_region",
-                "sector_name": self.config.constraint.region_name,
-            }
-        }
-
+        self.sector: inputs.Sector = config.constraint.sector
+        self.sector_info_map =  inputs.SECTOR_INFO_MAP 
+        self.base_year_column = config.dev_pattern.base_year
+        
+        # Validate sector
+        if self.sector not in self.sector_info_map:
+            raise ValueError(f"Unsupported sector: {self.sector}")
+        
+        # Retrieve sector-specific metadata from predefined SECTOR_INFO_MAP
         self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
+
+      
+        # Override lookup path dynamically from config
+        self.sector_info["lookup_path"] = self.config.constraint.lad_to_region_file
+        # Sector name from configuration
+        self.sector_info["sector_name"] = self.config.constraint.region_name       
+        
 
     def sector_agg(
         self,
@@ -63,9 +89,9 @@ class ConstraintProcessor:
         Returns:
             pd.DataFrame: Aggregated data at the regional level.
         """
+        base_year_column = self.base_year_column
         lookup_path = self.sector_info["lookup_path"]
         zone_id = self.sector_info["zone_id"]
-        base_year_column = self.sector_info["base_year_column"]
         sector_id = self.sector_info["sector_id"]
         zone_to_sector_prop_col = self.sector_info["zone_to_sector_prop_col"]
 
@@ -1076,7 +1102,7 @@ def run(config: inputs.DLitConfig):
                 1,  # set gap to zero to avoid additional background growth when estimated growth is not zero and the gap is negative (estimated exceeds target)
                 sector_ratio[col],  # Keep original value otherwise
             )
-        print(sector_ratio)
+        # print(sector_ratio)
 
         # Dlog estimated growth at lower geographical level
         zone_estimated_growth = results[f"lad_dlog_{id}"]["AbsoluteGrowth"]
@@ -1122,7 +1148,7 @@ def run(config: inputs.DLitConfig):
             sector_index_columns,
         )
 
-        print(sector_bg_growth)
+        # print(sector_bg_growth)
 
         LOG.info(
             f"Calculating weight to distribute background growth for each LAD for {id}"
