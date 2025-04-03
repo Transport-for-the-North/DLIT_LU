@@ -660,6 +660,36 @@ class SiteZoneProcessor(BaseZoneHandler):
         agg_data = agg_data.rename(columns={zone_id_col: rename_zone_id_col})
         
         return agg_data
+    
+    @staticmethod
+    def accumulated_growth(
+            site_data: pd.DataFrame,
+            build_out_columns: list,
+            column_prefixes: list
+        )-> pd.DataFrame:
+        """
+        Computes accumulated sum for each group of columns in column_prefixes.
+        
+        Parameters:
+            df (pd.DataFrame): The input DataFrame.
+            build_out_columns: Future year columns.
+            column_prefixes (list): List of column name patterns (e.g., "", "_large", "_small").
+        
+        Returns:
+            pd.DataFrame: DataFrame with accumulated values.
+        """
+        df_accumulated = site_data.copy()
+
+        # Loop through each prefix to compute cumulative sum for the columns with the given prefix
+        for prefix in column_prefixes:
+            # Create column names based on year and prefix
+            cols = [f"{year}{prefix}" for year in build_out_columns]
+            
+            # Apply cumulative sum across the rows (axis=1)
+            df_accumulated[cols] = site_data[cols].cumsum(axis=1)
+        
+        return df_accumulated
+        
 
     def merge_zonal_attributes(
         self, site_data: pd.DataFrame, by_data: pd.DataFrame
@@ -1707,8 +1737,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             "children"
         ]
     )
-    hh_type_zone_header_list=hh_type_zone.columns.to_list()
-    print("The header of the output zonal household segmented by type: ", hh_type_zone_header_list)
 
     pop_tt_zone = site_zone_processer.agg_zonal_data(
         pop_tt_sites_zone,
@@ -1716,8 +1744,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         site_size_column,
         dimension_columns=["tt"]
     )
-    pop_tt_zone_header_list=pop_tt_zone.columns.to_list()
-    print("The header of the output zonal population segmented by tt: ", pop_tt_zone_header_list)
+
 
 
 
@@ -1727,8 +1754,21 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         site_size_column,
         dimension_columns=["sic_2d", "soc"]
     )
+
+
+    # Call function for accumulated sum
+    column_prefixes = ["", "_large", "_small"]
+    hh_type_zone= site_zone_processer.accumulated_growth(hh_type_zone, build_out_columns, column_prefixes)
+    pop_tt_zone= site_zone_processer.accumulated_growth(pop_tt_zone, build_out_columns, column_prefixes)
+    job_sic_soc_zone= site_zone_processer.accumulated_growth(job_sic_soc_zone, build_out_columns, column_prefixes)
+
+    hh_type_zone_header_list=hh_type_zone.columns.to_list()
+    print("The header of the output zonal household segmented by type: ", hh_type_zone_header_list)
+    pop_tt_zone_header_list=pop_tt_zone.columns.to_list()
+    print("The header of the output zonal population segmented by tt: ", pop_tt_zone_header_list)
     job_sic_soc_zone_header_list = job_sic_soc_zone.columns.to_list()
     print("The header of the output zonal job segmented by tt: ", job_sic_soc_zone_header_list)
+
 
     zonal_household_file_name = f"{model_zone}_zonal_household.csv"
     zonal_population_file_name = f"{model_zone}_zonal_population.csv"

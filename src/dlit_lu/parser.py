@@ -196,35 +196,37 @@ def parse_dev_pattern_input(config: inputs.DLitConfig) -> global_classes.AssessD
     )
     return data_output
 
-def parse_tripend_input(config: inputs.DLitConfig) -> global_classes.DlogTEData:
-    """Parse land use input data from a given input path.
+# def parse_tripend_input(config: inputs.DLitConfig) -> global_classes.DlogTEData:
+#     """Parse land use input data from a given input path.
 
-    Parameters:
-    ----------
-    config (inputs.DLitConfig): Input configuration object
+#     Parameters:
+#     ----------
+#     config (inputs.DLitConfig): Input configuration object
 
-    Returns:
-    ----------
-    data_output (global_classes.DlogTEData): Parsed land use data in a DlogTEData object
+#     Returns:
+#     ----------
+#     data_output (global_classes.DlogTEData): Parsed land use data in a DlogTEData object
 
-    """
-    # parse sheets
-    LOG.info("Parsing hb_prod sheet")
-    hb_prod = pd.read_csv(config.tripend.normits_hb_prod)
-    LOG.info("Parsing hb_attr sheet")
-    hb_attr = pd.read_csv(config.tripend.normits_hb_prod)
-    LOG.info("Parsing nhb_prod sheet")
-    nhb_prod = pd.read_csv(config.tripend.normits_nhb_prod)
-    LOG.info("Parsing nhb_attr sheet")
-    nhb_attr = pd.read_csv(config.tripend.normits_nhb_prod)
+#     """
+#     # parse sheets
+#     LOG.info("Parsing hb_prod sheet")
+#     hb_prod = pd.read_csv(config.tripend.normits_hb_prod)
+#     LOG.info("Parsing hb_attr sheet")
+#     hb_attr = pd.read_csv(config.tripend.normits_hb_prod)
+#     LOG.info("Parsing nhb_prod sheet")
+#     nhb_prod = pd.read_csv(config.tripend.normits_nhb_prod)
+#     LOG.info("Parsing nhb_attr sheet")
+#     nhb_attr = pd.read_csv(config.tripend.normits_nhb_prod)
 
-    data_output = global_classes.DlogTEData(
-        hb_prod=hb_prod,
-        hb_attr=hb_attr,
-        nhb_prod=nhb_prod,
-        nhb_attr=nhb_attr,
-    )
-    return data_output
+#     data_output = global_classes.DlogTEData(
+#         hb_prod=hb_prod,
+#         hb_attr=hb_attr,
+#         nhb_prod=nhb_prod,
+#         nhb_attr=nhb_attr,
+#     )
+#     return data_output
+
+
 
 def parse_sheet(
     input_file_path: pathlib.Path,

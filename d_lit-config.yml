@@ -1,9 +1,9 @@
 #Set Up Parameters
 run_infill: False
 run_land_use: False
-run_dev_pattern: True
+run_dev_pattern: False
 run_constraint: False
-run_tripend: False
+run_tripend: True
 
 #Mandatory Parameters
 #--str
@@ -11,7 +11,6 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v6.xlsx
 #--Write file paths
-
 output_folder: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn
 proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\proposed_luc_split_path.csv
 existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\existing_luc_split_path.csv
@@ -127,11 +126,13 @@ constraint:
 tripend:
   # ntem_scenario: core #High #Low etc
   sector: lad #lad, region
+  future_years:
+    - 2024  # list[int]
   # key input paths from dev_pattern
-  dlog_hb_prod: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_normits\dlog_hbprod\hb_normits_tem_segmented.csv.bz2
-  dlog_hb_attr: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_normits\dlog_hbattr\hb_normits_tem_segmented.csv.bz2
-  dlog_nhb_prod: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_normits\dlog_nhbprod\nhb_normits_tem_segmented.csv.bz2
-  dlog_nhb_attr: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_normits\dlog_nhbattr\nhb_normits_tem_segmented.csv.bz2
+  dlog_hb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\01042025_All\Core\hb_productions\hb_normits_tem_segmented.csv.bz2
+  dlog_hb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\01042025_All\Core\hb_attractions\hb_normits_tem_segmented.csv.bz2
+  dlog_nhb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\01042025_All\Core\nhb_productions\nhb_normits_tem_segmented.csv.bz2
+  dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\01042025_All\Core\nhb_productions\nhb_normits_tem_segmented.csv.bz2
   # key input paths from base year trip end
   by_fr_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
   by_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
@@ -147,6 +148,7 @@ tripend:
   ntem_lad_nhb_attr: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\LAD13_attraction_nhb.csv.bz2
   # key input paths to lookups
 
-  # lookup paths between Trip End base year zone- normits and any model zone
+  # Whether or not to export files for viz
+  export_for_viz: True
 
   

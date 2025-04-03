@@ -310,18 +310,25 @@ class ConstraintConfig:
 class TripendsConfig:
 
     sector: Sector
+    future_years: list[int]
     # pop2023: pydantic.FilePath
     by_fr_hb: pydantic.FilePath
     by_to_hb: pydantic.FilePath
     by_nhb: pydantic.FilePath
-    tfn_tt: pydantic.FilePath
-    normits_hb_prod: Optional[pathlib.Path] = None
-    normits_hb_attr: Optional[pathlib.Path] = None
-    normits_nhb_prod: Optional[pathlib.Path] = None
-    normits_nhb_attr: Optional[pathlib.Path] = None
-    normits_tt_pop: Optional[pathlib.Path] = None
-    normits_soc_sic_emp: Optional[pathlib.Path] = None
-    normits_hh: Optional[pathlib.Path] = None
+    ntem_zone_hb_prod: pydantic.FilePath
+    ntem_zone_hb_attr: pydantic.FilePath
+    ntem_zone_nhb_prod: pydantic.FilePath
+    ntem_zone_nhb_attr: pydantic.FilePath
+    ntem_lad_hb_prod: pydantic.FilePath
+    ntem_lad_hb_attr: pydantic.FilePath
+    ntem_lad_nhb_prod: pydantic.FilePath
+    ntem_lad_nhb_attr: pydantic.FilePath
+    export_for_viz: bool
+    dlog_hb_prod: Optional[pathlib.Path] = None
+    dlog_hb_attr: Optional[pathlib.Path] = None
+    dlog_nhb_prod: Optional[pathlib.Path] = None
+    dlog_nhb_attr: Optional[pathlib.Path] = None
+
 
 
 
@@ -429,10 +436,10 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("tripend is required if run_tripend is true")
 
         if not values.get("run_constraint") and not all(
-            [value.normits_tt_pop, value.normits_soc_sic_emp, value.normits_hh]
+            [value.dlog_hb_prod, value.dlog_hb_attr]
         ):
             raise ValueError(
-                "normits_tt_pop, normits_soc_sic_emp and normits_hh are required if not running constraint module"
+                "dlog_hb_prod, dlog_hb_attr are required if not running constraint module"
             )
 
         return value

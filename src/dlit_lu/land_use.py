@@ -303,7 +303,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     LOG.info("Export site level dwelling and floorspace data")
 
-    res_sites_uncertainty = res_sites_expand.groupby(
+    res_sites_uncertainty = res_sites.groupby(
         res_key_columns
     ).sum()
 
@@ -331,7 +331,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         luti_output_path.mkdir(exist_ok=True)
         # Need LUTI zone system and shapefile here to convert site data into luti zonal data
         luti_zones = parser.parse_zone(config.land_use.luti_zone_shapefile_path)
-        res_luti_sites = zone_site_geospatial_lookup(res_sites, luti_zones)
+        res_luti_sites = zone_site_geospatial_lookup(res_sites_expand, luti_zones)
         res_luti_sites = res_luti_sites.loc[
             :,
             build_out_columns + res_key_columns + ["zone_id"],
@@ -492,7 +492,7 @@ def gb_hh_type_distribution(data: pd.DataFrame, hh_type_columns: list[str]) -> p
     agg_zones["ratios"] = agg_zones["household"] / total_hh
     
     # Selecting relevant columns (household segmentations + ratio)
-    agg_zones = agg_zones[hh_type_columns + ["ratio"]]
+    agg_zones = agg_zones[hh_type_columns + ["ratios"]]
     
     # Merging the ratio back into the original data based on hh_type_columns
     data = data.merge(agg_zones, on=hh_type_columns, how="left")

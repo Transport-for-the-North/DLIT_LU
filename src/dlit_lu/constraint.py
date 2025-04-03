@@ -178,7 +178,7 @@ class ConstraintProcessor:
 
         return sector_agg
 
-    def add_names_to_data(
+    def add_names_to_lu_data(
         self,
         data: pd.DataFrame,
         id_column: str,
@@ -221,7 +221,7 @@ class ConstraintProcessor:
             )
             data_with_name = data_with_name.drop(columns=["zone_id"])
             data_with_name = data_with_name.rename(
-                columns={id_column: "REGIONCD", "zone_name": "REGIONNM"}
+                columns={id_column: "REGIONCD", "zone_name": f"REGIONNM"}
             )
             columns = list(data_with_name.columns)
             columns.remove("REGIONNM")
@@ -240,7 +240,7 @@ class ConstraintProcessor:
             columns.insert(1, "LADNM")
             data_with_name = data_with_name[columns]
 
-            # Add region names to LAD data
+            # Add sector names to LAD data
             if "LAD13CD" in data_with_name.columns:
                 lad_to_region_df = pd.read_csv(
                     self.config.constraint.lad_to_region_file
@@ -381,7 +381,7 @@ class GrowthCalculator:
             cagr_columns.append(cagr_column_name)
 
         result = growth_rate.iloc[
-            :, [0, 1, 2, 3] + [growth_rate.columns.get_loc(col) for col in cagr_columns]
+            :, [0, 1, 2, 3, 4, 5] + [growth_rate.columns.get_loc(col) for col in cagr_columns]
         ]
         return result
 
@@ -405,8 +405,6 @@ class GrowthCalculator:
             The base year for calculations.
         build_out_columns : list
             List of future year columns to calculate target growth.
-        index_column_count : int
-            The number of columns to be used for the index (e.g., 2 or 3).
         Returns
         -------
         pd.DataFrame
@@ -425,40 +423,46 @@ class GrowthCalculator:
                 f"Mismatch in column names specified for index between data_base and data_source."
             )
 
-        # Set specified columns as index for both DataFrames
-        data_base_indexed = data_base.copy()
-        data_base_indexed = data_base_indexed.set_index(index_columns)
-        data_source_indexed = data_source.copy()
-        data_source_indexed = data_source_indexed.set_index(index_columns)
+        # # Set specified columns as index for both DataFrames
+        # data_base_indexed = data_base.copy()
+        # data_base_indexed = data_base_indexed.set_index(index_columns)
+        # data_source_indexed = data_source.copy()
+        # data_source_indexed = data_source_indexed.set_index(index_columns)
 
-        # Sort both by index to avoid row-order mismatches
-        data_base_indexed = data_base_indexed.sort_index()
-        data_source_indexed = data_source_indexed.sort_index()
+        # # Sort both by index to avoid row-order mismatches
+        # data_base_indexed = data_base_indexed.sort_index()
+        # data_source_indexed = data_source_indexed.sort_index()
 
-        # Perform intersection of indices (rows that exist in both data_base and data_source)
-        common_index = data_base_indexed.index.intersection(data_source_indexed.index)
+        # # Perform intersection of indices (rows that exist in both data_base and data_source)
+        # common_index = data_base_indexed.index.intersection(data_source_indexed.index)
 
-        # Filter both dataframes to keep only the rows that exist in both
-        data_base_indexed = data_base_indexed.loc[common_index]
-        data_source_indexed = data_source_indexed.loc[common_index]
+        # # Filter both dataframes to keep only the rows that exist in both
+        # data_base_indexed = data_base_indexed.loc[common_index]
+        # data_source_indexed = data_source_indexed.loc[common_index]
 
         # Extract base year data (keeping specified columns as index + base year values)
         base_year = base_year_column
-        target_growth = data_base_indexed[[base_year]].copy()
+        target_growth = data_base[index_columns + [base_year]].copy()
 
         # Calculate growth rates using _calculate_growth
         growth_result = self.calculate_growth(
-            data_source_indexed, base_year_column, build_out_columns, growth_type="rate"
+            data_source, 
+            base_year_column, 
+            build_out_columns, 
+            growth_type="rate"
         )
-
+        # Merge growth rates with base year data
+        target_growth = target_growth.merge(
+            growth_result, on = index_columns, how = "left"
+        )
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
-            target_growth[year] = target_growth[base_year] * growth_result[year]
+            target_growth[year] = target_growth[base_year] * target_growth[year]
 
-        # Reset index so output matches original data format
-        target_growth = target_growth.reset_index()
+        # # Reset index so output matches original data format
+        # target_growth = target_growth.reset_index()
 
-        return target_growth
+        return target_growth [index_columns + [base_year] + build_out_columns]
 
     def target_yeartot(
         self,
@@ -480,8 +484,6 @@ class GrowthCalculator:
             The base year for calculations.
         build_out_columns : list
             List of future year columns to calculate target growth.
-        index_column_count : int
-            The number of columns to be used for the index (e.g., 2 or 3).
         Returns
         -------
         pd.DataFrame
@@ -500,43 +502,46 @@ class GrowthCalculator:
                 f"Mismatch in column names specified for index between data_base and data_source."
             )
 
-        # Set specified columns as index for both DataFrames
-        data_base_indexed = data_base.copy()
-        data_base_indexed = data_base_indexed.set_index(index_columns)
-        data_source_indexed = data_source.copy()
-        data_source_indexed = data_source_indexed.set_index(index_columns)
+        # # Set specified columns as index for both DataFrames
+        # data_base_indexed = data_base.copy()
+        # data_base_indexed = data_base_indexed.set_index(index_columns)
+        # data_source_indexed = data_source.copy()
+        # data_source_indexed = data_source_indexed.set_index(index_columns)
 
-        # Sort both by index to avoid row-order mismatches
-        data_base_indexed = data_base_indexed.sort_index()
-        data_source_indexed = data_source_indexed.sort_index()
+        # # Sort both by index to avoid row-order mismatches
+        # data_base_indexed = data_base_indexed.sort_index()
+        # data_source_indexed = data_source_indexed.sort_index()
 
-        # Perform intersection of indices (rows that exist in both data_base and data_source)
-        common_index = data_base_indexed.index.intersection(data_source_indexed.index)
+        # # Perform intersection of indices (rows that exist in both data_base and data_source)
+        # common_index = data_base_indexed.index.intersection(data_source_indexed.index)
 
-        # Filter both dataframes to keep only the rows that exist in both
-        data_base_indexed = data_base_indexed.loc[common_index]
-        data_source_indexed = data_source_indexed.loc[common_index]
+        # # Filter both dataframes to keep only the rows that exist in both
+        # data_base_indexed = data_base_indexed.loc[common_index]
+        # data_source_indexed = data_source_indexed.loc[common_index]
 
         # Extract base year data (keeping specified columns as index + base year values)
         base_year = base_year_column
-        target = data_base_indexed[[base_year]].copy()
+        target_growth = data_base[index_columns + [base_year]].copy()
 
         # Calculate growth rates using _calculate_growth
         growth_result = self.calculate_growth(
-            data_source_indexed,
+            data_source,
             base_year_column,
             build_out_columns,
             growth_type="ratio",
         )
-
+        # Merge growth rates with base year data
+        target_growth = target_growth.merge(
+            growth_result, on = index_columns, how = "left"
+        )
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
-            target[year] = target[base_year] * growth_result[year]
+            target_growth[year] = target_growth[base_year] * target_growth[year]
 
-        # Reset index so output matches original data format
-        target = target.reset_index()
+        # # Reset index so output matches original data format
+        # target = target.reset_index()
 
-        return target
+        return target_growth [index_columns + [base_year] + build_out_columns]
 
     def cumulative_yearly_totals(
         self,
@@ -623,8 +628,8 @@ class ConstraintCalculation:
     def calculate_zone_weights(
         zone_data: pd.DataFrame, 
         build_out_columns: list,
-        zone_index_comlumns: list, 
-        sector_name: str
+        zone_index_columns: list, 
+        sector_index_columns: list
     ) -> pd.DataFrame:
         """
         Calculates the zone weights based on the growth gaps and aggregates them by sector/region.
@@ -640,8 +645,8 @@ class ConstraintCalculation:
         zone_index_comlumns: list
             List of columns used for indexing and merging zone-level data (e.g., ['ZONE_ID']).    
 
-        sector_name : str
-            The name of the column representing the sector or region (e.g., 'REGIONNM') in the DataFrame.
+        sector_index_comlumns: list
+            List of columns representing the sector or region (e.g., 'REGIONNM') and segementation p and m in the DataFrame.
 
         Returns:
         -------
@@ -649,15 +654,15 @@ class ConstraintCalculation:
             DataFrame containing the computed zone weights, with values aggregated by region.
         """
 
-        agg_zone_data = zone_data.groupby(sector_name)[build_out_columns].sum()
+        agg_zone_data = zone_data.groupby(sector_index_columns)[build_out_columns].sum()
         agg_zone_data.columns = [f"{col}_agg" for col in build_out_columns]
 
-        zone_weight = zone_data.merge(agg_zone_data, on=sector_name)
+        zone_weight = zone_data.merge(agg_zone_data, on=sector_index_columns, how="left")
 
         for col in build_out_columns:
             zone_weight[col] = zone_weight[col] / zone_weight[f"{col}_agg"]
 
-        return zone_weight[zone_index_comlumns + build_out_columns]
+        return zone_weight[zone_index_columns + build_out_columns]
 
     @staticmethod
     def calculate_ratio(
@@ -768,7 +773,7 @@ class ConstraintCalculation:
         bg_data: pd.DataFrame,
         estimated_data: pd.DataFrame,
         build_out_columns: list,
-        sector_index_columns: list,
+        index_columns: list,
     ) -> pd.DataFrame:
         """
         Computes the sum of background and estimated growth values for each sector.
@@ -799,12 +804,12 @@ class ConstraintCalculation:
             columns={col: f"{col}_etmt" for col in build_out_columns}
         )
 
-        merged_data = bg_data.merge(estimated_data, on=sector_index_columns, how="left")
+        merged_data = bg_data.merge(estimated_data, on=index_columns, how="left")
 
         for col in build_out_columns:
             merged_data[col] = merged_data[f"{col}_bg"] + merged_data[f"{col}_etmt"]
 
-        return merged_data[sector_index_columns + build_out_columns]
+        return merged_data[index_columns + build_out_columns]
 
     @staticmethod
     def calculate_product(
@@ -993,7 +998,7 @@ def run(config: inputs.DLitConfig):
         use_sector_name,
         use_sector_cols,
     ) in datasets_process:
-        processed_data = processor.add_names_to_data(
+        processed_data = processor.add_names_to_lu_data(
             data,
             id_col,
             name_col,
@@ -1180,7 +1185,7 @@ def run(config: inputs.DLitConfig):
             zone_gap_growth, 
             build_out_columns, 
             zone_index_columns, 
-            sector_name="REGIONNM"
+            sector_index_columns=["REGIONNM"]
         )
         # Get lower geographical level background growth
         zone_bg_growth = zone_target_growth[zone_index_columns].copy()
