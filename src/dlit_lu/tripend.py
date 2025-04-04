@@ -313,7 +313,8 @@ class ByTeTransformation:
             raise ValueError(f"Column '{val}' not found in DataFrame")
         
         grouped_df = self.df.groupby(["normits_v3.3_id", "purpose", "mode"], as_index=False)[val].sum()
-
+        # Divide the summed value by 5 to get average week day totals
+        grouped_df[val] /= 5 
         # Rename columns
         grouped_df = grouped_df.rename(columns={
             "purpose": "p",
@@ -366,8 +367,8 @@ def run(config: inputs.DLitConfig):
     by_zone_te = {}
     summary_by_zone_te = []  # Initialize summary table outside the loop
     for name, df in datasets.items():
-        total_prod_before = df["prod"].sum()
-        total_attr_before = df["attr"].sum()
+        total_prod_before = df["prod"].sum() / 5 # Divide by 5 to get average week day totals
+        total_attr_before = df["attr"].sum() / 5 # Divide by 5 to get average week day totals
         transformer = ByTeTransformation(df, base_year_column)
            
         # Store transformed DataFrame
@@ -635,9 +636,20 @@ def run(config: inputs.DLitConfig):
 
             LOG.info(f"Working out the background growth at sector level for {id}")
 
-            print(results[f"{sector}_dlog_{id}"]["YearTotal"])
-            print(results[f"{sector}_ntem_{id}"]["YearTotal"])
-            print(results[f"{sector}_dlog_{id}"]["AbsoluteGrowth"])
+
+            sector_target_tot = growth_calculator.target_yeartot(
+                results[f"{sector}_dlog_{id}"]["YearTotal"],
+                results[f"{sector}_ntem_{id}"]["YearTotal"],
+                base_year_column,
+                future_year_columns,
+            )
+            zone_target_tot = growth_calculator.target_yeartot(
+                results[f"zone_dlog_{id}"]["YearTotal"],
+                results[f"zone_ntem_{id}"]["YearTotal"],
+                base_year_column,
+                future_year_columns,
+            )
+            
             sector_target_growth = growth_calculator.target_growth(
                 results[f"{sector}_dlog_{id}"]["YearTotal"],
                 results[f"{sector}_ntem_{id}"]["YearTotal"],
@@ -794,18 +806,6 @@ def run(config: inputs.DLitConfig):
             agg_zone_forecast = zone_forecast.groupby(sector_index_columns)[future_year_columns].sum()
             agg_zone_forecast = agg_zone_forecast.reset_index()
 
-            sector_target_tot = growth_calculator.target_yeartot(
-                results[f"{sector}_dlog_{id}"]["YearTotal"],
-                results[f"{sector}_ntem_{id}"]["YearTotal"],
-                base_year_column,
-                future_year_columns,
-            )
-            zone_target_tot = growth_calculator.target_yeartot(
-                results[f"zone_dlog_{id}"]["YearTotal"],
-                results[f"zone_ntem_{id}"]["YearTotal"],
-                base_year_column,
-                future_year_columns,
-            )
             LOG.info("Exporting key output data")   
             # Files to be exported
             sector_list = ["Bury", "Manchester"]

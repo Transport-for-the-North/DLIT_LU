@@ -2,8 +2,8 @@
 run_infill: False
 run_land_use: False
 run_dev_pattern: False
-run_constraint: False
-run_tripend: True
+run_constraint: True
+run_tripend: False
 
 #Mandatory Parameters
 #--str

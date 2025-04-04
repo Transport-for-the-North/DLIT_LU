@@ -423,23 +423,6 @@ class GrowthCalculator:
                 f"Mismatch in column names specified for index between data_base and data_source."
             )
 
-        # # Set specified columns as index for both DataFrames
-        # data_base_indexed = data_base.copy()
-        # data_base_indexed = data_base_indexed.set_index(index_columns)
-        # data_source_indexed = data_source.copy()
-        # data_source_indexed = data_source_indexed.set_index(index_columns)
-
-        # # Sort both by index to avoid row-order mismatches
-        # data_base_indexed = data_base_indexed.sort_index()
-        # data_source_indexed = data_source_indexed.sort_index()
-
-        # # Perform intersection of indices (rows that exist in both data_base and data_source)
-        # common_index = data_base_indexed.index.intersection(data_source_indexed.index)
-
-        # # Filter both dataframes to keep only the rows that exist in both
-        # data_base_indexed = data_base_indexed.loc[common_index]
-        # data_source_indexed = data_source_indexed.loc[common_index]
-
         # Extract base year data (keeping specified columns as index + base year values)
         base_year = base_year_column
         target_growth = data_base[index_columns + [base_year]].copy()
@@ -502,22 +485,6 @@ class GrowthCalculator:
                 f"Mismatch in column names specified for index between data_base and data_source."
             )
 
-        # # Set specified columns as index for both DataFrames
-        # data_base_indexed = data_base.copy()
-        # data_base_indexed = data_base_indexed.set_index(index_columns)
-        # data_source_indexed = data_source.copy()
-        # data_source_indexed = data_source_indexed.set_index(index_columns)
-
-        # # Sort both by index to avoid row-order mismatches
-        # data_base_indexed = data_base_indexed.sort_index()
-        # data_source_indexed = data_source_indexed.sort_index()
-
-        # # Perform intersection of indices (rows that exist in both data_base and data_source)
-        # common_index = data_base_indexed.index.intersection(data_source_indexed.index)
-
-        # # Filter both dataframes to keep only the rows that exist in both
-        # data_base_indexed = data_base_indexed.loc[common_index]
-        # data_source_indexed = data_source_indexed.loc[common_index]
 
         # Extract base year data (keeping specified columns as index + base year values)
         base_year = base_year_column
@@ -615,6 +582,12 @@ class GrowthCalculator:
         # Calculate totals by adding the base year column value to each of the years in build_out_columns
         for year in build_out_columns:
             updated_data[year] = updated_data[base_year_column] + data[year]
+
+        # Identify all other columns (excluding base_year_column and build_out_columns)
+        other_columns = [col for col in updated_data.columns if col != base_year_column and col not in build_out_columns]
+
+        # Rearrange columns to ensure base_year_column comes first, followed by build_out_columns, and other columns to the right
+        updated_data = updated_data[other_columns + [base_year_column] + build_out_columns]
 
         return updated_data
 
@@ -1077,8 +1050,39 @@ def run(config: inputs.DLitConfig):
     for id in ids:
 
         LOG.info(f"Working out the background growth at sector level for {id}")
+
+        # sector_target_tot = growth_calculator.target_yeartot(
+        #     results[f"{sector}_dlog_{id}"]["YearTotal"],
+        #     results[f"{sector}_ddg_{id}"]["YearTotal"],
+        #     base_year_column,
+        #     build_out_columns,
+        # )
+        sector_target_tot = growth_calculator.target_yeartot(
+            results[f"{sector}_ddg_{id}"]["YearTotal"], # use ddg base year
+            results[f"{sector}_ddg_{id}"]["YearTotal"],
+            base_year_column,
+            build_out_columns,
+        )
+        # zone_target_tot = growth_calculator.target_yeartot(
+        #     results[f"lad_dlog_{id}"]["YearTotal"],
+        #     results[f"lad_ddg_{id}"]["YearTotal"],
+        #     base_year_column,
+        #     build_out_columns,
+        # )
+        zone_target_tot = growth_calculator.target_yeartot(
+            results[f"lad_ddg_{id}"]["YearTotal"], # use ddg base year
+            results[f"lad_ddg_{id}"]["YearTotal"],
+            base_year_column,
+            build_out_columns,
+        )
+        # sector_target_growth = growth_calculator.target_growth(
+        #     results[f"{sector}_dlog_{id}"]["YearTotal"],
+        #     results[f"{sector}_ddg_{id}"]["YearTotal"],
+        #     base_year_column,
+        #     build_out_columns,
+        # )
         sector_target_growth = growth_calculator.target_growth(
-            results[f"{sector}_dlog_{id}"]["YearTotal"],
+            results[f"{sector}_ddg_{id}"]["YearTotal"], # use ddg base year
             results[f"{sector}_ddg_{id}"]["YearTotal"],
             base_year_column,
             build_out_columns,
@@ -1114,7 +1118,7 @@ def run(config: inputs.DLitConfig):
 
         # Relative DDG related growth at lower geographical level
         zone_target_growth = growth_calculator.target_growth(
-            results[f"lad_dlog_{id}"]["YearTotal"],
+            results[f"lad_ddg_{id}"]["YearTotal"], # use ddg base year
             results[f"lad_ddg_{id}"]["YearTotal"],
             base_year_column,
             build_out_columns,
@@ -1152,8 +1156,6 @@ def run(config: inputs.DLitConfig):
             build_out_columns,
             sector_index_columns,
         )
-
-        # print(sector_bg_growth)
 
         LOG.info(
             f"Calculating weight to distribute background growth for each LAD for {id}"
@@ -1216,78 +1218,145 @@ def run(config: inputs.DLitConfig):
             zone_adjusted_growth, base_year_column, build_out_columns
         )
 
+        # Get Scotland zonal data from DDG
+        zone_forecast_scotland = results[f"lad_ddg_{id}"]["YearTotal"].copy()
+        zone_forecast_scotland = zone_forecast_scotland[zone_forecast_scotland["REGIONNM"].str.strip().str.lower() == "scotland"]
+        zone_forecast_scotland = zone_forecast_scotland.drop("source", axis=1, errors='ignore')
+
+        # Merge the dataframes on the index columns (LAD13CD, LADNM, REGIONNM)
+        zone_forecast = zone_forecast.merge(
+            zone_forecast_scotland[zone_index_columns + build_out_columns],
+            on=zone_index_columns,
+            how="left",  # Ensure we keep all rows from zone_forecast
+            suffixes=("", "_scotland")
+        )
+
+        # Now update the year columns in zone_forecast with the values from zone_forecast_scotland
+        for year in build_out_columns:
+            zone_forecast[year] = zone_forecast[year].fillna(zone_forecast[f"{year}_scotland"])
+
+        # Drop the extra columns from the merge (e.g., the "_scotland" suffixed columns)
+        zone_forecast = zone_forecast.drop(columns=[f"{year}_scotland" for year in build_out_columns])  
+
+        # Agg zone forecast to sector level
         agg_zone_forecast = zone_forecast.groupby("REGIONNM")[build_out_columns].sum()
         agg_zone_forecast = agg_zone_forecast.reset_index()
 
-        sector_target_tot = growth_calculator.target_yeartot(
-            results[f"{sector}_dlog_{id}"]["YearTotal"],
-            results[f"{sector}_ddg_{id}"]["YearTotal"],
-            base_year_column,
-            build_out_columns,
-        )
-        zone_target_tot = growth_calculator.target_yeartot(
-            results[f"lad_dlog_{id}"]["YearTotal"],
-            results[f"lad_ddg_{id}"]["YearTotal"],
-            base_year_column,
-            build_out_columns,
-        )
-        # Files to be exported
-        sector_target_growth_file = f"{sector}_target_growth_{id}.csv"
-        sector_estimated_growth_file = f"{sector}_estimated_growth_{id}.csv"
-        sector_bg_growth_file = f"{sector}_background_growth_{id}.csv"
-        zone_target_growth_file = f"lad_target_growth_{id}.csv"
-        zone_bg_growth_file = f"lad_background_growth_{id}.csv"
-        agg_zone_bg_growth_file = f"agg_lad_background_growth_{id}.csv"
-        zone_estimated_growth_file = f"lad_estimated_growth_{id}.csv"
-        zone_scaler_file = f"lad_scaler_{id}.csv"
-        zone_scaled_etmt_growth_file = f"lad_scaled_estimated_growth_{id}.csv"
-        zone_adjusted_growth_file = f"lad_adjusted_growth_{id}.csv"
-        agg_zone_adj_growth_file = f"agg_lad_adjusted_growth_{id}.csv"
-        zone_forecast_file = f"lad_forecast_{id}.csv"
-        agg_zone_forecast_file = f"agg_lad_forecast_{id}.csv"
-        sector_target_tot_file = f"{sector}_target_tot_{id}.csv"
-        zone_target_tot_file = f"lad_target_tot_{id}.csv"
+        # # Further adjust the aggregated forecast year to meet sector level DDG total
+        # sector_ddg_ratio = calc.calculate_ratio(
+        #     cap_ratio = 1,
+        #     target_data = results[f"{sector}_ddg_{id}"]["YearTotal"],
+        #     estimated_data = agg_zone_forecast,
+        #     build_out_columns = build_out_columns,
+        #     sector_index_columns=["REGIONNM"],
+        # )
+        # # Get zone scaler from sector gratio
+        # zone_ddg_ratio = zone_etmt_growth[zone_index_columns].copy()
+        # zone_ddg_ratio = zone_ddg_ratio.merge(sector_ddg_ratio, on="REGIONNM") 
+        # zone_ddg_ratio = zone_ddg_ratio[zone_index_columns + build_out_columns]
+        # zone_ddg_forecast = calc.calculate_product(
+        #     zone_forecast,
+        #     zone_ddg_ratio,
+        #     build_out_columns,
+        #     zone_index_columns,
+        # )
+        # agg_zone_ddg_forecast = zone_ddg_forecast.groupby("REGIONNM")[build_out_columns].sum()
+        # agg_zone_ddg_forecast = agg_zone_ddg_forecast.reset_index()
 
-        utilities.write_to_csv(
-            key_constraint_path / sector_target_growth_file, sector_target_growth
+        # # Check the aggregated output data against ddg data at sector level
+        # sector_deviation = calc.calculate_gap(
+        #     results[f"{sector}_ddg_{id}"]["YearTotal"],
+        #     agg_zone_ddg_forecast,
+        #     build_out_columns,
+        #     sector_index_columns=["REGIONNM"],
+        # )
+        # deviation_total = sector_deviation[build_out_columns].sum().sum()
+        # print(deviation_total)
+        # if deviation_total > 0.01:
+        #     LOG.warning(
+        #         f"Warning: The aggregated forecast data for {sector} has a deviation of {deviation_total} from the DDG data."
+        #     )
+        # else:
+        #     LOG.info(
+        #         f"The aggregated forecast data for {sector} has been successfully constrained to the DDG data with a deviation total being {deviation_total}."
+        #     )
+
+        LOG.info(
+            f"Exporting the intermediate outputs for {sector} and {id} for checking purpose"
         )
-        utilities.write_to_csv(
-            key_constraint_path / sector_estimated_growth_file, sector_estimated_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / sector_bg_growth_file, sector_bg_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / zone_target_growth_file, zone_target_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / zone_bg_growth_file, zone_bg_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / agg_zone_bg_growth_file, agg_zone_bg_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / zone_estimated_growth_file, zone_estimated_growth
-        )
-        utilities.write_to_csv(key_constraint_path / zone_scaler_file, zone_scaler)
-        utilities.write_to_csv(
-            key_constraint_path / zone_scaled_etmt_growth_file, zone_scaled_etmt_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / zone_adjusted_growth_file, zone_adjusted_growth
-        )
-        utilities.write_to_csv(
-            key_constraint_path / agg_zone_adj_growth_file, agg_zone_adj_growth
-        )
-        utilities.write_to_csv(key_constraint_path / zone_forecast_file, zone_forecast)
-        utilities.write_to_csv(
-            key_constraint_path / agg_zone_forecast_file, agg_zone_forecast
-        )
-        utilities.write_to_csv(
-            key_constraint_path / sector_target_tot_file, sector_target_tot
-        )
-        utilities.write_to_csv(
-            key_constraint_path / zone_target_tot_file, zone_target_tot
-        )
+        inter_output_path = key_constraint_path / f"output_for_viz"
+        inter_output_path.mkdir(exist_ok=True)
+        # Define file names and corresponding data in a dictionary
+
+        file_data_mapping = {
+            "sector_target_tot": {
+                "data": sector_target_tot,
+                "file": f"{sector}_target_tot_{id}.csv"
+            },
+            "zone_target_tot": {
+                "data": zone_target_tot,
+                "file": f"lad_target_tot_{id}.csv"
+            },
+            "sector_target_growth": {
+                "data": sector_target_growth,
+                "file": f"{sector}_target_growth_{id}.csv"
+            },
+            "sector_estimated_growth": {
+                "data": sector_estimated_growth,
+                "file": f"{sector}_estimated_growth_{id}.csv"
+            },
+            "sector_bg_growth": {
+                "data": sector_bg_growth,
+                "file": f"{sector}_background_growth_{id}.csv"
+            },
+            "zone_target_growth": {
+                "data": zone_target_growth,
+                "file": f"lad_target_growth_{id}.csv"
+            },
+            "zone_bg_growth": {
+                "data": zone_bg_growth,
+                "file": f"lad_background_growth_{id}.csv"
+            },
+            "agg_zone_bg_growth": {
+                "data": agg_zone_bg_growth,
+                "file": f"agg_lad_background_growth_{id}.csv"
+            },
+            "zone_estimated_growth": {
+                "data": zone_estimated_growth,
+                "file": f"lad_estimated_growth_{id}.csv"
+            },
+            "zone_scaler": {
+                "data": zone_scaler,
+                "file": f"lad_scaler_{id}.csv"
+            },
+            "zone_scaled_etmt_growth": {
+                "data": zone_scaled_etmt_growth,
+                "file": f"lad_scaled_estimated_growth_{id}.csv"
+            },
+            "zone_adjusted_growth": {
+                "data": zone_adjusted_growth,
+                "file": f"lad_adjusted_growth_{id}.csv"
+            },
+            "agg_zone_adj_growth": {
+                "data": agg_zone_adj_growth,
+                "file": f"agg_lad_adjusted_growth_{id}.csv"
+            },
+        }
+        for key, value in file_data_mapping.items():
+            utilities.write_to_csv(inter_output_path / value["file"], value["data"])
+
+        final_output_mapping = {
+            "zone_forecast": {
+                "data": zone_forecast,
+                "file": f"lad_forecast_{id}.csv"
+            },
+            "agg_zone_forecast": {
+                "data": agg_zone_forecast,
+                "file": f"agg_lad_forecast_{id}.csv"
+            },
+        }        
+
+        for key, value in final_output_mapping.items():
+            utilities.write_to_csv(key_constraint_path / value["file"], value["data"])
 
     LOG.info("Data processing, aggregation completed")
