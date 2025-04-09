@@ -283,6 +283,8 @@ class DevPatnConfig:
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
     res_site_data: Optional[pathlib.Path] = None
+    pop_site_data: Optional[pathlib.Path] = None
+    emp_sic_site_data: Optional[pathlib.Path] = None
     hh_type_site_data: Optional[pathlib.Path] = None
     pop_tt_site_data: Optional[pathlib.Path] = None
     emp_sic_soc_site_data: Optional[pathlib.Path] = None

@@ -374,17 +374,23 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     emp_sites_jobs_segmented = emp_lsoa_sites_jobs_segmented.reset_index(drop=False).groupby(
         common_key_columns + ["sic_2d", "soc"]
     )[build_out_columns].sum()
+    emp_sites_jobs_sic = emp_lsoa_sites_jobs.reset_index(drop=False).groupby(
+        common_key_columns + ["sic_2d"]
+    )[build_out_columns].sum()
     emp_sites_jobs_tot = emp_lsoa_sites_jobs.reset_index(drop=False).groupby(
         common_key_columns
     )[build_out_columns].sum()
 
     emp_sites_jobs_segmented_file = "jobs_segmented_sites_uncertainty_build_out.csv.bz2"
+    emp_sites_jobs_sic_file = "jobs_sic_sites_uncertainty_build_out.csv"
     emp_sites_tot_file = "jobs_sites_uncertainty_build_out.csv"
 
     utilities.write_to_csv(
         lu_output_path / emp_sites_tot_file, emp_sites_jobs_tot
     )  # inputs needed by module dev_pattern
-
+    utilities.write_to_csv(
+        lu_output_path / emp_sites_jobs_sic_file, emp_sites_jobs_sic
+    )  # inputs needed by module dev_pattern
     utilities.write_to_csv(
         lu_output_path / emp_sites_jobs_segmented_file, emp_sites_jobs_segmented
     )  # inputs needed by module dev_pattern

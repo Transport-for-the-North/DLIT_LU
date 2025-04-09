@@ -1284,7 +1284,7 @@ def run(config: inputs.DLitConfig):
         LOG.info(
             f"Exporting the intermediate outputs for {sector} and {id} for checking purpose"
         )
-        inter_output_path = key_constraint_path / f"output_for_viz"
+        inter_output_path = key_constraint_path / f"output_intermediate"
         inter_output_path.mkdir(exist_ok=True)
         # Define file names and corresponding data in a dictionary
 

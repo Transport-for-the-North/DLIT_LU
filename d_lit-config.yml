@@ -1,8 +1,8 @@
 #Set Up Parameters
 run_infill: False
 run_land_use: False
-run_dev_pattern: False
-run_constraint: True
+run_dev_pattern: True
+run_constraint: False
 run_tripend: False
 
 #Mandatory Parameters
@@ -50,12 +50,14 @@ dev_pattern:
   base_year: 2023
   end_year: 2065 # the end year of Dlog data
   geo_boundary: normits # lsoa, normits, noham, norms, mosa
-  viz_distribution: True
+  viz_distribution: False
   index_weights_path : inputs\variable_index_weights.csv
   lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\tot_by_data_out.csv
   assessment_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
   emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
   res_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
+  pop_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\population_sites_uncertainty_build_out.csv
+  emp_sic_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\jobs_sic_sites_uncertainty_build_out.csv
   hh_type_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\household_segmented_sites_uncertainty_build_out.csv.bz2
   pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
   emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
