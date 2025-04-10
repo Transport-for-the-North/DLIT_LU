@@ -314,7 +314,7 @@ class ByTeTransformation:
         
         grouped_df = self.df.groupby(["normits_v3.3_id", "purpose", "mode"], as_index=False)[val].sum()
         # Divide the summed value by 5 to get average week day totals
-        grouped_df[val] /= 5 
+        grouped_df[val] = grouped_df[val] / 5 
         # Rename columns
         grouped_df = grouped_df.rename(columns={
             "purpose": "p",
@@ -397,7 +397,8 @@ def run(config: inputs.DLitConfig):
     # Convert summary data to DataFrame
     summary_df = pd.DataFrame(summary_by_zone_te)
     utilities.write_to_csv(key_te_folder / "by_te_summary.csv", summary_df)
-
+    utilities.write_to_csv(key_te_folder / "by_production.csv", by_zone_te["by_hb"]["prod"])
+    utilities.write_to_csv(key_te_folder / "by_attraction.csv", by_zone_te["by_hb"]["attr"])
     # Check the shape of the by_zone_te
     print(by_zone_te["by_hb"]["prod"].shape)
     print(by_zone_te["by_hb"]["attr"].shape)

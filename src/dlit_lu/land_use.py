@@ -366,14 +366,14 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     )
 
 
-    emp_lsoa_sites_jobs_segmented = apply_soc_over_sic_ratio(
-        emp_lsoa_sites_jobs, build_out_columns, common_key_columns, ratio_soc_over_sic
-    )
+    # emp_lsoa_sites_jobs_segmented = apply_soc_over_sic_ratio(
+    #     emp_lsoa_sites_jobs, build_out_columns, common_key_columns, ratio_soc_over_sic
+    # )
 
     LOG.info("Export site level job data")
-    emp_sites_jobs_segmented = emp_lsoa_sites_jobs_segmented.reset_index(drop=False).groupby(
-        common_key_columns + ["sic_2d", "soc"]
-    )[build_out_columns].sum()
+    # emp_sites_jobs_segmented = emp_lsoa_sites_jobs_segmented.reset_index(drop=False).groupby(
+    #     common_key_columns + ["sic_2d", "soc"]
+    # )[build_out_columns].sum()
     emp_sites_jobs_sic = emp_lsoa_sites_jobs.reset_index(drop=False).groupby(
         common_key_columns + ["sic_2d"]
     )[build_out_columns].sum()
@@ -381,7 +381,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         common_key_columns
     )[build_out_columns].sum()
 
-    emp_sites_jobs_segmented_file = "jobs_segmented_sites_uncertainty_build_out.csv.bz2"
+    # emp_sites_jobs_segmented_file = "jobs_segmented_sites_uncertainty_build_out.csv.bz2"
     emp_sites_jobs_sic_file = "jobs_sic_sites_uncertainty_build_out.csv"
     emp_sites_tot_file = "jobs_sites_uncertainty_build_out.csv"
 
@@ -391,32 +391,32 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     utilities.write_to_csv(
         lu_output_path / emp_sites_jobs_sic_file, emp_sites_jobs_sic
     )  # inputs needed by module dev_pattern
-    utilities.write_to_csv(
-        lu_output_path / emp_sites_jobs_segmented_file, emp_sites_jobs_segmented
-    )  # inputs needed by module dev_pattern
+    # utilities.write_to_csv(
+    #     lu_output_path / emp_sites_jobs_segmented_file, emp_sites_jobs_segmented
+    # )  # inputs needed by module dev_pattern
 
 
-    LOG.info("Disaggregating total household into household types")
+    # LOG.info("Disaggregating total household into household types")
 
-    res_lsoa_sites_segmented = apply_hh_land_use(
-        res_lsoa_sites,
-        build_out_columns,
-        res_key_columns,
-        hh_type_columns,
-        hh_type_factor,
-    )
-    res_sites_hh_segmented = res_lsoa_sites_segmented.groupby(
-        res_key_columns + hh_type_columns)[build_out_columns].sum() 
+    # res_lsoa_sites_segmented = apply_hh_land_use(
+    #     res_lsoa_sites,
+    #     build_out_columns,
+    #     res_key_columns,
+    #     hh_type_columns,
+    #     hh_type_factor,
+    # )
+    # res_sites_hh_segmented = res_lsoa_sites_segmented.groupby(
+    #     res_key_columns + hh_type_columns)[build_out_columns].sum() 
     
-    LOG.info("Exporting site level household data")
-    res_sites_hh_segmented_file = (
-        "household_segmented_sites_uncertainty_build_out.csv.bz2"
-    )
+    # LOG.info("Exporting site level household data")
+    # res_sites_hh_segmented_file = (
+    #     "household_segmented_sites_uncertainty_build_out.csv.bz2"
+    # )
 
-    utilities.write_to_csv(
-        lu_output_path / res_sites_hh_segmented_file,
-        res_sites_hh_segmented,
-    )  # inputs needed by module dev_pattern   
+    # utilities.write_to_csv(
+    #     lu_output_path / res_sites_hh_segmented_file,
+    #     res_sites_hh_segmented,
+    # )  # inputs needed by module dev_pattern   
     LOG.info("Disaggregating dwellings into population by dwelling type")
     res_lsoa_sites_pop = disagg_dwelling(
         res_lsoa_sites,
@@ -437,21 +437,21 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     res_sites_pop = res_lsoa_sites_pop.reset_index().groupby(
         res_key_columns)[build_out_columns].sum()
     
-    res_lsoa_sites_pop_segmented = apply_pop_land_use(
-        res_lsoa_sites_pop, build_out_columns, common_key_columns, traveller_type_factor
-    )
-    res_sites_pop_segmented = res_lsoa_sites_pop_segmented.groupby(
-        res_key_columns + ["tt"])[build_out_columns].sum()
+    # res_lsoa_sites_pop_segmented = apply_pop_land_use(
+    #     res_lsoa_sites_pop, build_out_columns, common_key_columns, traveller_type_factor
+    # )
+    # res_sites_pop_segmented = res_lsoa_sites_pop_segmented.groupby(
+    #     res_key_columns + ["tt"])[build_out_columns].sum()
 
     LOG.info("Exporting site level population data")
-    res_sites_pop_segmented_file = (
-        "population_segmented_sites_uncertainty_build_out.csv.bz2"
-    )
+    # res_sites_pop_segmented_file = (
+    #     "population_segmented_sites_uncertainty_build_out.csv.bz2"
+    # )
     res_sites_pop_tot_file = "population_sites_uncertainty_build_out.csv"
-    utilities.write_to_csv(
-        lu_output_path / res_sites_pop_segmented_file,
-        res_sites_pop_segmented,
-    )  # inputs needed by module dev_pattern
+    # utilities.write_to_csv(
+    #     lu_output_path / res_sites_pop_segmented_file,
+    #     res_sites_pop_segmented,
+    # )  # inputs needed by module dev_pattern
     utilities.write_to_csv(
         lu_output_path / res_sites_pop_tot_file, res_sites_pop
     )
