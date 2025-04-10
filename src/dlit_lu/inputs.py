@@ -323,13 +323,17 @@ class TripendsConfig:
     ntem_lad_hb_attr: pydantic.FilePath
     ntem_lad_nhb_prod: pydantic.FilePath
     ntem_lad_nhb_attr: pydantic.FilePath
+    normits_hh_car: pydantic.FilePath
+    normits_pop_car: pydantic.FilePath
+    normits_pop_age: pydantic.FilePath
+    lad_hh_car: pydantic.FilePath
+    lad_pop_car: pydantic.FilePath
+    lad_pop_age: pydantic.FilePath
     export_for_viz: bool
     dlog_hb_prod: Optional[pathlib.Path] = None
     dlog_hb_attr: Optional[pathlib.Path] = None
     dlog_nhb_prod: Optional[pathlib.Path] = None
     dlog_nhb_attr: Optional[pathlib.Path] = None
-
-
 
 
 class DLitConfig(caf.toolkit.BaseConfig):

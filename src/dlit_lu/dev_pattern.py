@@ -1409,7 +1409,80 @@ def process_site_data(
 
     return site_zone_sites
 
+class TargetProportions:
 
+    def __init__(self, 
+                 zonal_household, 
+                 zonal_population, 
+                 target_df, 
+                 zoning_sys):
+        
+        self.zonal_household = zonal_household
+        self.zonal_population = zonal_population
+        self.target_df = target_df
+        self.zoning_sys = zoning_sys
+
+    def process_proportion_data(self):
+
+        self.zonal_household.fillna(0, inplace=True)
+        self.zonal_population.fillna(0, inplace=True)
+
+        zonal_years = [col for col in self.zonal_household.columns if col.isdigit()]
+
+        for key, df in self.target_df.items():
+            last_year = max(int(col) for col in df.columns if col.isdigit())
+            for year in range(last_year + 1, int(zonal_years[-1]) + 1):
+                df[str(year)] = df[str(last_year)]
+
+        processed_data = {}
+
+        for key, df in self.target_df.items():
+            if key == "hh_car":
+                processed_data[key] = self._process(df, self.zonal_household, key)
+            else:
+                processed_data[key] = self._process(df, self.zonal_population, key)
+
+        return processed_data
+
+    def _process(self, df, zonal_df, key):
+
+        if self.zoning_sys == 'lad': 
+            merge_on = 'lad2013_id'
+            df = df.rename(columns ={'LAD13_id' : 'lad2013_id'})
+        else:
+            merge_on = 'normits_v3.3_id'
+
+        merged_df = pd.merge(df, zonal_df, on=merge_on, suffixes=('_target', ''))
+        result_columns = [merge_on]
+        results = pd.DataFrame(merged_df[merge_on])
+
+        if key == "hh_car":
+            results[['car_availability', 'car_availability_desc']] = merged_df[['car_availability', 'car_availability_desc']]
+        elif key == "pop_car":
+            results[['car_ownership', 'car_ownership_desc']] = merged_df[['car_ownership', 'car_ownership_desc']]
+        elif key == "pop_age":
+            results[['age_category', 'age_category_desc']] = merged_df[['age_category', 'age_category_desc']]
+
+        if '2023' in merged_df.columns:
+            results['2023'] = merged_df['2023']
+
+        for year in range(2024, 2067):  
+            year_str = str(year)
+            if year_str in merged_df.columns and f'{year_str}_target' in merged_df.columns:
+                results[year_str] = merged_df[f'{year_str}_target'] * merged_df[year_str]
+                result_columns.append(year_str)
+
+            ordered_columns = [merge_on] + [str(year) for year in range(2023, 2067)]
+        
+        base_years = [str(year) for year in range(2023, 2067)]
+        if key == "hh_car":
+            ordered_columns = [merge_on , 'car_availability', 'car_availability_desc'] + base_years
+        elif key == "pop_car":
+            ordered_columns = [merge_on , 'car_ownership', 'car_ownership_desc'] + base_years
+        elif key == "pop_age":
+            ordered_columns = [merge_on , 'age_category', 'age_category_desc'] + base_years 
+
+        return results[ordered_columns]
 
 def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     """runs process for converting DLOG to zone build out profiles
@@ -1837,6 +1910,57 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     utilities.write_to_csv(
         key_agg_path / lad_job_abgrowth_file_name, lad_job_ab_growth
     )
+
+    
+    LOG.info("Using NTEM age and car ownership profile to create target")
+
+    # Load data from config
+    lad_hh_car = pd.read_csv(config.tripend.lad_hh_car)
+    lad_pop_car = pd.read_csv(config.tripend.lad_pop_car)
+    lad_pop_age = pd.read_csv(config.tripend.lad_pop_age)
+    normits_hh_car = pd.read_csv(config.tripend.normits_hh_car)
+    normits_pop_car = pd.read_csv(config.tripend.normits_pop_car)
+    normits_pop_age = pd.read_csv(config.tripend.normits_pop_age)
+
+    target_df_lad = {
+        "lad_pop_car": lad_pop_car,
+        "lad_pop_age": lad_pop_age,
+        "lad_hh_car": lad_hh_car,
+    }
+
+    target_df_normits = {
+        "normits_pop_car": normits_pop_car,
+        "normits_pop_age": normits_pop_age,
+        "normits_hh_car": normits_hh_car
+    }
+    # output folders
+    out_fldr = {
+        "lad_pop_car": key_output_path / "target_pop_car_test",
+        "lad_pop_age": key_output_path / "target_pop_age_test",
+        "lad_hh_car": key_output_path / "target_hh_car_test",
+        "normits_pop_car" :  key_output_path / "target_pop_car_test",
+        "normits_pop_age" : key_output_path / "target_pop_age_test",
+        "normits_hh_car" : key_output_path / "target_hh_car_test"
+    }
+
+    for fldr in out_fldr.values():
+        fldr.mkdir(exist_ok=True)
+
+    # Process data
+    target_proportions_lad = TargetProportions(lad_household, lad_population , target_df_lad, 'lad')
+    processed_lad_data = target_proportions_lad.process_proportion_data()
+
+    target_proportions_normits = TargetProportions(zonal_household, zonal_population , target_df_normits, 'normits')
+    processed_normits_data = target_proportions_normits.process_proportion_data()
+
+    # Save the processed data
+    for key, df in processed_lad_data.items():
+        output_file = out_fldr[key] / f"lad_{key}_processed.csv.bz2"
+        df.to_csv(output_file, index=False, compression='bz2')
+
+    for key, df in processed_normits_data.items():
+        output_file = out_fldr[key] / f"normits_{key}_processed.csv.bz2"
+        df.to_csv(output_file, index=False, compression='bz2')
 
     LOG.info("Further transforming and processing land use data for tripend module")
     data_frames = {
