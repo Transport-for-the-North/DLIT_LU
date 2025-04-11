@@ -174,80 +174,94 @@ class LandUseConfig:
 class DevPatnConfig:
     """Manages reading / writing the tool's config file.
 
-     Attributes
-     ----------
-     base_year : str
-         The base year for the model.
-     end_year : str
-         The end year of Dlog data.
-     geo_boundary : GeoBoundary
-         Specifies the model zone boundary.
-     viz_distribution : bool
-         Flag indicating whether to visualize distribution.
-     index_weights_path: pydantic.FilePath
-         Path to the weights defined for variables which will form the final weighted index to determine large sites
-     normits_shapefile_path : pydantic.FilePath
-         Path to the Normits zone shapefile.
-     noham_shapefile_path : pydantic.FilePath
-         Path to the Noham zone shapefile.
-     norms_shapefile_path : pydantic.FilePath
-         Path to the Norms zone shapefile.
-     msoa_shapefile_path : pydantic.FilePath
-         Path to the MSOA (Middle Layer Super Output Area) shapefile.
-     lsoa_hh_centroids : pydantic.FilePath
-         Path to LSOA household centroids.
-     lsoa_emp_centroids : pydantic.FilePath
-         Path to LSOA employment centroids.
-     lsoa_pop_centroids : pydantic.FilePath
-         Path to LSOA population centroids.
-     normits_hh_centroids : pydantic.FilePath
-         Path to Normits household centroids.
-     normits_emp_centroids : pydantic.FilePath
-         Path to Normits employment centroids.
-     normits_pop_centroids : pydantic.FilePath
-         Path to Normits population centroids.
-     noham_hh_centroids : pydantic.FilePath
-         Path to Noham household centroids.
-     noham_emp_centroids : pydantic.FilePath
-         Path to Noham employment centroids.
-     noham_pop_centroids : pydantic.FilePath
-         Path to Noham population centroids.
-     norms_hh_centroids : pydantic.FilePath
-         Path to Norms household centroids.
-     norms_emp_centroids : pydantic.FilePath
-         Path to Norms employment centroids.
-     norms_pop_centroids : pydantic.FilePath
-         Path to Norms population centroids.
-     msoa_hh_centroids : pydantic.FilePath
-         Path to MSOA household centroids.
-     msoa_emp_centroids : pydantic.FilePath
-         Path to MSOA employment centroids.
-     msoa_pop_centroids : pydantic.FilePath
-         Path to MSOA population centroids.
-     lsoa_to_normits : pydantic.FilePath
-         Path to the translation file from LSOA to Normits.
-     lsoa_to_noham : pydantic.FilePath
-         Path to the translation file from LSOA to Noham.
-     lsoa_to_norms : pydantic.FilePath
-         Path to the translation file from LSOA to Norms.
-     lsoa_to_msoa : pydantic.FilePath
-         Path to the translation file from LSOA to MSOA.
-     lsoa_data_path : Optional[pathlib.Path], default=None
-         Path to the zonal totals file containing population, dwelling, and employment data.
-     assessment_input : Optional[pathlib.Path], default=None
-         Path to the site assessment input file, used to determine if land use values are estimated.
-     emp_site_data : Optional[pathlib.Path], default=None
-         Path to employment site data.
-     res_site_data : Optional[pathlib.Path], default=None
-         Path to residential site data.
-     hh_type_site_data : Optional[pathlib.Path], default=None
-         Path to household data segmented by household type.
-     pop_tt_site_data : Optional[pathlib.Path], default=None
-         Path to population data segmented by travel type.
-     emp_sic_soc_site_data : Optional[pathlib.Path], default=None
-         Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
-     summary_data : SummaryInputs, optional
-         Lookup file and shapefile for creating output summaries at different zone levels.
+    Attributes
+    ----------
+    base_year : str
+        The base year for the model.
+    end_year : str
+        The end year of the Dlog data.
+    geo_boundary : GeoBoundary
+        Specifies the model zone boundary.
+    viz_distribution : bool
+        Flag indicating whether to visualize distribution.
+    index_weights_path : pydantic.FilePath
+        Path to the weights file, defining variables for the final weighted index to determine large sites.
+    normits_shapefile_path : pydantic.FilePath
+        Path to the Normits zone shapefile.
+    noham_shapefile_path : pydantic.FilePath
+        Path to the Noham zone shapefile.
+    norms_shapefile_path : pydantic.FilePath
+        Path to the Norms zone shapefile.
+    msoa_shapefile_path : pydantic.FilePath
+        Path to the MSOA (Middle Layer Super Output Area) shapefile.
+    lsoa_hh_centroids : pydantic.FilePath
+        Path to LSOA (Lower Layer Super Output Area) household centroids.
+    lsoa_emp_centroids : pydantic.FilePath
+        Path to LSOA employment centroids.
+    lsoa_pop_centroids : pydantic.FilePath
+        Path to LSOA population centroids.
+    normits_hh_centroids : pydantic.FilePath
+        Path to Normits household centroids.
+    normits_emp_centroids : pydantic.FilePath
+        Path to Normits employment centroids.
+    normits_pop_centroids : pydantic.FilePath
+        Path to Normits population centroids.
+    noham_hh_centroids : pydantic.FilePath
+        Path to Noham household centroids.
+    noham_emp_centroids : pydantic.FilePath
+        Path to Noham employment centroids.
+    noham_pop_centroids : pydantic.FilePath
+        Path to Noham population centroids.
+    norms_hh_centroids : pydantic.FilePath
+        Path to Norms household centroids.
+    norms_emp_centroids : pydantic.FilePath
+        Path to Norms employment centroids.
+    norms_pop_centroids : pydantic.FilePath
+        Path to Norms population centroids.
+    msoa_hh_centroids : pydantic.FilePath
+        Path to MSOA household centroids.
+    msoa_emp_centroids : pydantic.FilePath
+        Path to MSOA employment centroids.
+    msoa_pop_centroids : pydantic.FilePath
+        Path to MSOA population centroids.
+    lsoa_to_normits : pydantic.FilePath
+        Path to the translation file from LSOA to Normits.
+    lsoa_to_noham : pydantic.FilePath
+        Path to the translation file from LSOA to Noham.
+    lsoa_to_norms : pydantic.FilePath
+        Path to the translation file from LSOA to Norms.
+    lsoa_to_msoa : pydantic.FilePath
+        Path to the translation file from LSOA to MSOA.
+    tfn_tt : pydantic.FilePath
+        Path to Transport for the North (TfN) travel time data.
+    normits_hh_car : pydantic.FilePath
+        Path to Normits household data segmented by car ownership.
+    normits_pop_car : pydantic.FilePath
+        Path to Normits population data segmented by car ownership.
+    normits_pop_age : pydantic.FilePath
+        Path to Normits population data segmented by age group.
+    lad_hh_car : pydantic.FilePath
+        Path to LAD (Local Authority District) household data segmented by car ownership.
+    lad_pop_car : pydantic.FilePath
+        Path to LAD population data segmented by car ownership.
+    lad_pop_age : pydantic.FilePath
+        Path to LAD population data segmented by age group.
+    lsoa_data_path : Optional[pathlib.Path], default=None
+        Path to the zonal totals file containing population, dwelling, and employment data.
+    assessment_input : Optional[pathlib.Path], default=None
+        Path to the site assessment input file, used to determine if land use values are estimated.
+    emp_site_data : Optional[pathlib.Path], default=None
+        Path to employment site data.
+    res_site_data : Optional[pathlib.Path], default=None
+        Path to residential site data.
+    hh_type_site_data : Optional[pathlib.Path], default=None
+        Path to household data segmented by household type.
+    pop_tt_site_data : Optional[pathlib.Path], default=None
+        Path to population data segmented by travel type.
+    emp_sic_soc_site_data : Optional[pathlib.Path], default=None
+        Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
+    summary_data : SummaryInputs | None, optional
+        Lookup file and shapefile for creating output summaries at different zone levels.
     """
 
     base_year: str
@@ -279,6 +293,12 @@ class DevPatnConfig:
     lsoa_to_norms: pydantic.FilePath
     lsoa_to_msoa: pydantic.FilePath
     tfn_tt: pydantic.FilePath
+    normits_hh_car: pydantic.FilePath
+    normits_pop_car: pydantic.FilePath
+    normits_pop_age: pydantic.FilePath
+    lad_hh_car: pydantic.FilePath
+    lad_pop_car: pydantic.FilePath
+    lad_pop_age: pydantic.FilePath
     lsoa_data_path: Optional[pathlib.Path] = None
     assessment_input: Optional[pathlib.Path] = None
     emp_site_data: Optional[pathlib.Path] = None
@@ -293,7 +313,40 @@ class DevPatnConfig:
 
 @dataclasses.dataclass
 class ConstraintConfig:
+    """Configuration for defining constraints related to household, employment, and population data.
 
+    This class holds the configuration for sector-based constraints, including paths to various
+    data sources for household, employment, and population, as well as files for region and Local
+    Authority District (LAD) mappings. The configuration also allows for optional DLOG data related
+    to household, employment, and population.
+
+    Attributes
+    ----------
+    sector : Sector
+        The sector for which constraints are applied.
+    lad_to_region_file : pydantic.FilePath
+        Path to the mapping file that translates LAD (Local Authority District) data to regions.
+    lad_name : pydantic.FilePath
+        Path to the file containing LAD names.
+    region_name : pydantic.FilePath
+        Path to the file containing region names.
+    ddg_pop : pydantic.FilePath
+        Path to the DDG (Demand Distribution Generator) population data.
+    ddg_emp : pydantic.FilePath
+        Path to the DDG employment data.
+    ntem_hh : pydantic.FilePath
+        Path to the NTEM (National Trip End Model) household data.
+    ntem_pop : pydantic.FilePath
+        Path to the NTEM population data.
+    ntem_emp : pydantic.FilePath
+        Path to the NTEM employment data.
+    dlog_hh : Optional[pathlib.Path], default=None
+        Path to the DLOG household data, if available.
+    dlog_emp : Optional[pathlib.Path], default=None
+        Path to the DLOG employment data, if available.
+    dlog_pop : Optional[pathlib.Path], default=None
+        Path to the DLOG population data, if available.
+    """
     sector: Sector
     lad_to_region_file: pydantic.FilePath
     lad_name: pydantic.FilePath
@@ -310,7 +363,52 @@ class ConstraintConfig:
 
 @dataclasses.dataclass
 class TripendsConfig:
+    """Configuration for defining trip ends and their associated data.
 
+    This class holds the configuration for trip-end data, including paths to various files
+    that describe trip production and attraction for different zones and regions, as well as
+    data for households, employment, and populations. Additionally, it includes options for 
+    exporting data for visualization and optional DLOG data related to trip ends.
+
+    Attributes
+    ----------
+    sector : Sector
+        The sector for which trip-end data is being defined.
+    future_years : list[int]
+        List of future years for which trip-end data is required.
+    by_fr_hb : pydantic.FilePath
+        Path to the file containing "by" trip ends from households (HB).
+    by_to_hb : pydantic.FilePath
+        Path to the file containing "to" trip ends from households (HB).
+    by_nhb : pydantic.FilePath
+        Path to the file containing "by" trip ends from non-households (NHB).
+    ntem_zone_hb_prod : pydantic.FilePath
+        Path to the NTEM zone-level production data for households (HB).
+    ntem_zone_hb_attr : pydantic.FilePath
+        Path to the NTEM zone-level attraction data for households (HB).
+    ntem_zone_nhb_prod : pydantic.FilePath
+        Path to the NTEM zone-level production data for non-households (NHB).
+    ntem_zone_nhb_attr : pydantic.FilePath
+        Path to the NTEM zone-level attraction data for non-households (NHB).
+    ntem_lad_hb_prod : pydantic.FilePath
+        Path to the NTEM LAD-level production data for households (HB).
+    ntem_lad_hb_attr : pydantic.FilePath
+        Path to the NTEM LAD-level attraction data for households (HB).
+    ntem_lad_nhb_prod : pydantic.FilePath
+        Path to the NTEM LAD-level production data for non-households (NHB).
+    ntem_lad_nhb_attr : pydantic.FilePath
+        Path to the NTEM LAD-level attraction data for non-households (NHB).
+    export_for_viz : bool
+        Flag indicating whether to export trip-end data for visualization.
+    dlog_hb_prod : Optional[pathlib.Path], default=None
+        Path to the DLOG household production data, if available.
+    dlog_hb_attr : Optional[pathlib.Path], default=None
+        Path to the DLOG household attraction data, if available.
+    dlog_nhb_prod : Optional[pathlib.Path], default=None
+        Path to the DLOG non-household production data, if available.
+    dlog_nhb_attr : Optional[pathlib.Path], default=None
+        Path to the DLOG non-household attraction data, if available.
+    """
     sector: Sector
     future_years: list[int]
     # pop2023: pydantic.FilePath
@@ -325,12 +423,6 @@ class TripendsConfig:
     ntem_lad_hb_attr: pydantic.FilePath
     ntem_lad_nhb_prod: pydantic.FilePath
     ntem_lad_nhb_attr: pydantic.FilePath
-    normits_hh_car: pydantic.FilePath
-    normits_pop_car: pydantic.FilePath
-    normits_pop_age: pydantic.FilePath
-    lad_hh_car: pydantic.FilePath
-    lad_pop_car: pydantic.FilePath
-    lad_pop_age: pydantic.FilePath
     export_for_viz: bool
     dlog_hb_prod: Optional[pathlib.Path] = None
     dlog_hb_attr: Optional[pathlib.Path] = None

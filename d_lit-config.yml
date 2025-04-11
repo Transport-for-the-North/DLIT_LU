@@ -11,9 +11,9 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v6.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\existing_luc_split_path.csv
 
 
 infill:
@@ -26,11 +26,11 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\user_input.xlsx
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\user_input.xlsx
   gfa_infill_method: regression_no_negatives # mean, median, glbaverage, regression, regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\03_post_fixes\post_fix_data.xlsx
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\03_post_fixes\post_fix_data.xlsx
 
   lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
   lsoa_hh_types_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output P13.3.csv
@@ -89,6 +89,13 @@ dev_pattern:
   lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_norms_v3.3\lsoa_2021_norms_v3.3_spatial.csv
   lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
   tfn_tt: I:\NTS\classified builds\traveller_type_tfn.csv
+  # key input paths from NTEM car ownership and planning data
+  normits_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_hh_car_proportions.csv.bz2
+  normits_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_pop_car_proportions.csv.bz2
+  normits_pop_age: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_pop_age_proportions.csv.bz2
+  lad_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lad_hh_car_proportions.csv.bz2
+  lad_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lad_pop_car_proportions.csv.bz2
+  lad_pop_age: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lad_pop_age_proportions.csv.bz2
   summary_data:
     # summary_lad: lad2013 # lad2013
     ###### 2011 LAD #######
@@ -118,9 +125,9 @@ constraint:
   ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
   ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
   # Inputs from previous module dev_pattern
-  dlog_hh: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\05_aggregation\lad_household.csv
-  dlog_emp: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\05_aggregation\lad_job.csv
-  dlog_pop: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\05_aggregation\lad_population.csv
+  dlog_hh: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_aggregation\lad_household.csv
+  dlog_emp: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_aggregation\lad_job.csv
+  dlog_pop: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_aggregation\lad_population.csv
   ntem_hh: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Households.csv
   ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
   ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
@@ -148,13 +155,7 @@ tripend:
   ntem_lad_hb_attr: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\LAD13_attraction_hb.csv.bz2
   ntem_lad_nhb_prod: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\LAD13_production_nhb.csv.bz2
   ntem_lad_nhb_attr: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\LAD13_attraction_nhb.csv.bz2
-  # key input paths from car ownership and planning data
-  normits_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_hh_car_proportions.csv.bz2
-  normits_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_pop_car_proportions.csv.bz2
-  normits_pop_age: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_pop_age_proportions.csv.bz2
-  lad_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lad_hh_car_proportions.csv.bz2
-  lad_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lad_pop_car_proportions.csv.bz2
-  lad_pop_age: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lad_pop_age_proportions.csv.bz2
+
   # Whether or not to export files for viz
   export_for_viz: True
 
