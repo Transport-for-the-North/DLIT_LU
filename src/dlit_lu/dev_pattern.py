@@ -933,7 +933,8 @@ class Ratios(BaseZoneHandler):
 
         # Rename columns to just year
         zonal_ratios.columns = [str(year) for year, _ in zonal_ratios.columns]
-
+        # Fill NaN values with zero
+        zonal_ratios = zonal_ratios.fillna(0)
         return zonal_ratios.reset_index()
 
     @staticmethod
@@ -2885,7 +2886,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # zone containing large sites
     zone_hh_largesites_fy = zonal_household_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_household_grth.columns]]
     zone_pop_largesites_fy = zonal_population_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_population_grth.columns]]
-    zone_job_sic_largesites_fy = zonal_job_sic_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_job_sic_grth.columns]]
+    zone_job_sic_largesites_fy = zonal_job_sic_grth[[zone_id, "sid_2d"] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_job_sic_grth.columns]]
     # rename year columns
     zone_hh_largesites_fy = zone_hh_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_household_grth.columns})
     zone_pop_largesites_fy = zone_pop_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_population_grth.columns})
