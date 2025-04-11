@@ -3078,8 +3078,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         on=[zone_id] + hh_type_columns,
         how="left",
     )
-    
-    zone_pop_segmented_scaled = zone_pop_segmented_scaled[[[zone_id, "tt"] + build_out_columns]]
+
+    zone_pop_segmented_scaled = zone_pop_segmented_scaled[[zone_id, "tt"] + build_out_columns]
     final_zonal_pop_segmented = zone_pop_segmented_scaled.merge(
         zone_pop_largesites_fy_seg,
         on=[zone_id, "tt"],
