@@ -2886,7 +2886,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # zone containing large sites
     zone_hh_largesites_fy = zonal_household_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_household_grth.columns]]
     zone_pop_largesites_fy = zonal_population_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_population_grth.columns]]
-    zone_job_sic_largesites_fy = zonal_job_sic_grth[[zone_id, "sid_2d"] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_job_sic_grth.columns]]
+    zone_job_sic_largesites_fy = zonal_job_sic_grth[[zone_id, "sic_2d"] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_job_sic_grth.columns]]
     # rename year columns
     zone_hh_largesites_fy = zone_hh_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_household_grth.columns})
     zone_pop_largesites_fy = zone_pop_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_population_grth.columns})
@@ -3078,19 +3078,22 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         on=[zone_id] + hh_type_columns,
         how="left",
     )
-    final_zonal_pop_segmented = zonal_pop_segmented.merge(
+    
+    zone_pop_segmented_scaled = zone_pop_segmented_scaled[[[zone_id, "tt"] + build_out_columns]]
+    final_zonal_pop_segmented = zone_pop_segmented_scaled.merge(
         zone_pop_largesites_fy_seg,
         on=[zone_id, "tt"],
         how="left",
     )
+
     final_zonal_job_segmented = zonal_job_sic_segmented.merge(
         zone_job_sic_largesites_fy_seg,
         on=[zone_id] + job_type_columns,
         how="left",
     )
-    print("zonal_hh_segmented", final_zonal_hh_segmented)
-    print("zonal_pop_segmented", final_zonal_pop_segmented)
-    print("zonal_job_sic_segmented", final_zonal_job_segmented)
+    print("final_zonal_hh_segmented", final_zonal_hh_segmented)
+    print("final_zonal_pop_segmented", final_zonal_pop_segmented)
+    print("final_zonal_job_sic_segmented", final_zonal_job_segmented)
 
     # LOG.info("Calculating accumulated growth for future year based on segmented zonal data for household, population and jobs")
     # # zonal_growth_hh_type = zone_translator._cumulative_yearly_growth(
@@ -3109,15 +3112,15 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # #     build_out_columns,
     # # )
 
-    zonal_outputs = [
-        (f"{model_zone}_zonal_household.csv", zonal_household),
-        (f"{model_zone}_zonal_population.csv", zonal_population),
-        (f"{model_zone}_zonal_job.csv", zonal_job),
-    ]
+    # zonal_outputs = [
+    #     (f"{model_zone}_zonal_household.csv", zonal_household),
+    #     (f"{model_zone}_zonal_population.csv", zonal_population),
+    #     (f"{model_zone}_zonal_job.csv", zonal_job),
+    # ]
 
-    # Write each output to CSV
-    for file_name, df in zonal_outputs:
-        utilities.write_to_csv(key_output_path / file_name, df)
+    # # Write each output to CSV
+    # for file_name, df in zonal_outputs:
+    #     utilities.write_to_csv(key_output_path / file_name, df)
 
     LOG.info("Aggregating zonal household, population and jobs to LAD")
     lad_household_ab_growth, lad_household = zone_translator.lad_summary(
