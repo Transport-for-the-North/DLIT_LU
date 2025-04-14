@@ -3,7 +3,7 @@ run_infill: False
 run_land_use: False
 run_dev_pattern: True
 run_constraint: False
-run_tripend: False
+run_tripend: True
 
 #Mandatory Parameters
 #--str
@@ -138,10 +138,10 @@ tripend:
   future_years:
     - 2024  # list[int]
   # key input paths from dev_pattern
-  dlog_hb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\09042025_All\dlog\hb_productions\hb_normits_tem_segmented.csv.bz2
-  dlog_hb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\09042025_All\dlog\hb_attractions\hb_normits_tem_segmented.csv.bz2
-  dlog_nhb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\09042025_All\dlog\nhb_productions\nhb_normits_tem_segmented.csv.bz2
-  dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\09042025_All\dlog\nhb_attractions\nhb_normits_tem_segmented.csv.bz2
+  dlog_hb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\hb_productions\hb_normits_tem_segmented.csv.bz2
+  dlog_hb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\hb_attractions\hb_normits_tem_segmented.csv.bz2
+  dlog_nhb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_productions\nhb_normits_tem_segmented.csv.bz2
+  dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_attractions\nhb_normits_tem_segmented.csv.bz2
   # key input paths from base year trip end
   by_fr_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
   by_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2

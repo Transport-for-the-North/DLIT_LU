@@ -12,8 +12,10 @@ from typing import Optional, Dict, Any, List, Union
 import pandas as pd
 import geopandas as gpd
 import numpy as np
+
 # from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial import cKDTree
+
 # import os
 
 # local imports
@@ -21,7 +23,8 @@ from dlit_lu import stats, utilities, global_classes, parser, inputs
 from dlit_lu import land_use as lu
 from caf.base.data_structures import DVector
 import caf.base as cb
-# from caf.toolkit import iterative_proportional_fitting as ipfn 
+
+# from caf.toolkit import iterative_proportional_fitting as ipfn
 
 # constants
 LOG = logging.getLogger(__name__)
@@ -122,21 +125,22 @@ class BaseZoneHandler:
 class ZoneTranslator(BaseZoneHandler):
     def __init__(self, config):
         super().__init__(config)
+
     def merge_data(
-        self, 
+        self,
         by_data: pd.DataFrame,
-        columns_to_process: Optional[list[str]]=None,
+        columns_to_process: Optional[list[str]] = None,
         dimension_columns: Optional[list] = None,
-        by_column: Optional[str]=None,
-        fy_columns: Optional[list[str]]=None,
-        new_hh_data: Optional[pd.DataFrame]=None,
-        new_pop_data: Optional[pd.DataFrame]=None,
-        new_job_data: Optional[pd.DataFrame]=None,
+        by_column: Optional[str] = None,
+        fy_columns: Optional[list[str]] = None,
+        new_hh_data: Optional[pd.DataFrame] = None,
+        new_pop_data: Optional[pd.DataFrame] = None,
+        new_job_data: Optional[pd.DataFrame] = None,
         merge_translation_data: bool = True,
         aggregate_by_zone: bool = True,
-        compute_area: bool = True, 
+        compute_area: bool = True,
         calculate_density: bool = True,
-        model_zone_data: bool = True
+        model_zone_data: bool = True,
     ) -> pd.DataFrame:
         """
         Merge zone translation data and perform aggregation.
@@ -173,19 +177,27 @@ class ZoneTranslator(BaseZoneHandler):
             Otherwise, returns a single processed DataFrame.
         """
         zone_id = self.zone_info["group_by_column"]
-        group_by_columns = [zone_id] if dimension_columns is None else [zone_id] + dimension_columns
+        group_by_columns = (
+            [zone_id] if dimension_columns is None else [zone_id] + dimension_columns
+        )
         zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
         translation_path = self.zone_info["translation_path"]
         prop_column = self.zone_info["prop_column"]
         # Merge data with translation if needed
         if merge_translation_data:
             by_data = self._merge_translation_data(
-                by_data, translation_path, columns_to_process, prop_column, group_by_columns
+                by_data,
+                translation_path,
+                columns_to_process,
+                prop_column,
+                group_by_columns,
             )
 
         # Perform aggregation by group
         if aggregate_by_zone:
-            by_data = self._aggregate_by_zone(by_data, group_by_columns, columns_to_process)
+            by_data = self._aggregate_by_zone(
+                by_data, group_by_columns, columns_to_process
+            )
 
         # Compute zonal area if enabled
         if compute_area:
@@ -196,15 +208,17 @@ class ZoneTranslator(BaseZoneHandler):
         # Calculate density if enabled
         if calculate_density:
             by_data = self._calculate_density(by_data, columns_to_process)
-        
+
         # Merge zonal data if enabled
         if model_zone_data:
-            zonal_household_growth, zonal_population_growth, zonal_job_growth= self._model_zone_data(
-                by_data,
-                new_hh_data,
-                new_pop_data,
-                new_job_data,
-                zone_id,
+            zonal_household_growth, zonal_population_growth, zonal_job_growth = (
+                self._model_zone_data(
+                    by_data,
+                    new_hh_data,
+                    new_pop_data,
+                    new_job_data,
+                    zone_id,
+                )
             )
             zonal_household = self._cumulative_yearly_totals(
                 zonal_household_growth,
@@ -221,10 +235,17 @@ class ZoneTranslator(BaseZoneHandler):
                 by_column,
                 fy_columns,
             )
-            return zonal_household_growth, zonal_population_growth, zonal_job_growth, zonal_household, zonal_population, zonal_job 
+            return (
+                zonal_household_growth,
+                zonal_population_growth,
+                zonal_job_growth,
+                zonal_household,
+                zonal_population,
+                zonal_job,
+            )
 
         return by_data
-    
+
     def lad_summary(
         self,
         data: pd.DataFrame,
@@ -263,7 +284,7 @@ class ZoneTranslator(BaseZoneHandler):
             base_year_column,
             future_year_columns,
             lad_id,
-            zone_to_lad_prop_col
+            zone_to_lad_prop_col,
         )
         # Compute cumulative yearly totals for LAD-level data
         lad_data_annualgrowth = lad_data_annualgrowth.set_index(lad_id)
@@ -273,7 +294,6 @@ class ZoneTranslator(BaseZoneHandler):
             future_year_columns,
         )
         return lad_data_annualgrowth, lad_data_annualtot
-
 
     def _merge_translation_data(
         self,
@@ -288,9 +308,9 @@ class ZoneTranslator(BaseZoneHandler):
             # Load translation data
             zone_translation = pd.read_csv(translation_path)
             # Merge and process data
-            by_data = by_data.merge(zone_translation, on="lsoa2021_id", how="left").set_index(
-                ["lsoa2021_id"] + group_by_columns
-            )
+            by_data = by_data.merge(
+                zone_translation, on="lsoa2021_id", how="left"
+            ).set_index(["lsoa2021_id"] + group_by_columns)
             # Apply proportional adjustment and reset index
             by_data = by_data.loc[:, columns_to_process].multiply(
                 by_data[prop_column], axis=0
@@ -298,9 +318,11 @@ class ZoneTranslator(BaseZoneHandler):
 
         return by_data.reset_index()
 
-
     def _aggregate_by_zone(
-        self, by_data: pd.DataFrame, group_by_columns: list[str], columns_to_process: list
+        self,
+        by_data: pd.DataFrame,
+        group_by_columns: list[str],
+        columns_to_process: list,
     ) -> pd.DataFrame:
         """
         Group data by the zone and aggregate specified columns.
@@ -399,14 +421,13 @@ class ZoneTranslator(BaseZoneHandler):
             # by_data[index_col] = scaler.fit_transform(by_data[[density_col]])
 
         return by_data
-    
 
     def _model_zone_data(
         self,
         by_data: pd.DataFrame,
-        new_hh_data: pd.DataFrame, 
-        new_pop_data: pd.DataFrame, 
-        new_job_data: pd.DataFrame, 
+        new_hh_data: pd.DataFrame,
+        new_pop_data: pd.DataFrame,
+        new_job_data: pd.DataFrame,
         zone_col_in_by: str,
     ) -> pd.DataFrame:
         """
@@ -433,33 +454,49 @@ class ZoneTranslator(BaseZoneHandler):
         """
         # Merging by_data with new_dwel_data to create zonal_dwelling
 
-        zonal_household = by_data.merge(new_hh_data,
-                                    on=zone_col_in_by, 
-                                    # left_on=zone_col_in_by, 
-                                    # right_on=zone_col_in_new, 
-                                    how="left")
-        zonal_household = zonal_household[[zone_col_in_by, "household"] + new_hh_data.columns.to_list()]
+        zonal_household = by_data.merge(
+            new_hh_data,
+            on=zone_col_in_by,
+            # left_on=zone_col_in_by,
+            # right_on=zone_col_in_new,
+            how="left",
+        )
+        zonal_household = zonal_household[
+            [zone_col_in_by, "household"] + new_hh_data.columns.to_list()
+        ]
         zonal_household = zonal_household.rename(columns={"household": "2023"})
         zonal_household = zonal_household.loc[:, ~zonal_household.columns.duplicated()]
         # Merging by_data with new_pop_data to create zonal_population
-        zonal_population = by_data.merge(new_pop_data, 
-                                    on=zone_col_in_by, 
-                                    # left_on=zone_col_in_by, 
-                                    # right_on=zone_col_in_new, 
-                                        how="left")
-        zonal_population = zonal_population[[zone_col_in_by, "population"] + new_pop_data.columns.to_list()]
+        zonal_population = by_data.merge(
+            new_pop_data,
+            on=zone_col_in_by,
+            # left_on=zone_col_in_by,
+            # right_on=zone_col_in_new,
+            how="left",
+        )
+        zonal_population = zonal_population[
+            [zone_col_in_by, "population"] + new_pop_data.columns.to_list()
+        ]
         zonal_population = zonal_population.rename(columns={"population": "2023"})
-        zonal_population = zonal_population.loc[:, ~zonal_population.columns.duplicated()]
+        zonal_population = zonal_population.loc[
+            :, ~zonal_population.columns.duplicated()
+        ]
         # Merging by_data with new_job_data to create zonal_jobs
-        zonal_job = by_data.merge(new_job_data, 
-                                on=zone_col_in_by, 
-                                # left_on=zone_col_in_by, 
-                                # right_on=zone_col_in_new,  
-                                how="left")
+        zonal_job = by_data.merge(
+            new_job_data,
+            on=zone_col_in_by,
+            # left_on=zone_col_in_by,
+            # right_on=zone_col_in_new,
+            how="left",
+        )
         zonal_job = zonal_job[[zone_col_in_by, "jobs"] + new_job_data.columns.to_list()]
         zonal_job = zonal_job.rename(columns={"jobs": "2023"})
         zonal_job = zonal_job.loc[:, ~zonal_job.columns.duplicated()]
-        return zonal_household.fillna(0), zonal_population.fillna(0), zonal_job.fillna(0)
+        return (
+            zonal_household.fillna(0),
+            zonal_population.fillna(0),
+            zonal_job.fillna(0),
+        )
 
     def _model_zone_data_with_dim(
         self,
@@ -489,12 +526,16 @@ class ZoneTranslator(BaseZoneHandler):
         # Merging by_data with new__data to create zonal_jobs segmented by sic_2d
         zone_id = self.zone_info["group_by_column"]
         zone_col_in_by = [zone_id] + dimension_columns
-        zonal_data = by_data.merge(new_data,
-                                    on=zone_col_in_by, 
-                                    # left_on=zone_col_in_by, 
-                                    # right_on=zone_col_in_new, 
-                                    how="left")
-        zonal_data = zonal_data[zone_col_in_by + [column_to_process] + new_data.columns.to_list()]
+        zonal_data = by_data.merge(
+            new_data,
+            on=zone_col_in_by,
+            # left_on=zone_col_in_by,
+            # right_on=zone_col_in_new,
+            how="left",
+        )
+        zonal_data = zonal_data[
+            zone_col_in_by + [column_to_process] + new_data.columns.to_list()
+        ]
         zonal_data = zonal_data.rename(columns={column_to_process: "2023"})
         zonal_data = zonal_data.loc[:, ~zonal_data.columns.duplicated()]
 
@@ -549,9 +590,7 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Merge data with lookup to assign LADs and proportions
         merged_df = data.merge(
-            lookup_df[[zone_id, lad_id, zone_to_lad_prop_col]],
-            on=zone_id,
-            how='left'
+            lookup_df[[zone_id, lad_id, zone_to_lad_prop_col]], on=zone_id, how="left"
         )
 
         # Apply proportions to each value column
@@ -571,13 +610,20 @@ class ZoneTranslator(BaseZoneHandler):
                 )
 
         return lad_agg
-    
 
     def _cumulative_yearly_totals(
         self,
         data: pd.DataFrame,
-        base_year_column : str = "2023",
-        future_year_columns: list[str] = ["2024", "2025", "2026", "2027", "2028", "2029", "2030"],
+        base_year_column: str = "2023",
+        future_year_columns: list[str] = [
+            "2024",
+            "2025",
+            "2026",
+            "2027",
+            "2028",
+            "2029",
+            "2030",
+        ],
     ) -> pd.DataFrame:
         """
         Calculate cumulative yearly totals from 2023 onwards, where each year's total
@@ -614,8 +660,16 @@ class ZoneTranslator(BaseZoneHandler):
     def _cumulative_yearly_growth(
         self,
         data: pd.DataFrame,
-        base_year_column : str = "2023",
-        future_year_columns: list[str] = ["2024", "2025", "2026", "2027", "2028", "2029", "2030"],
+        base_year_column: str = "2023",
+        future_year_columns: list[str] = [
+            "2024",
+            "2025",
+            "2026",
+            "2027",
+            "2028",
+            "2029",
+            "2030",
+        ],
     ) -> pd.DataFrame:
         """
         Calculate cumulative yearly totals from 2023 onwards, where each year's total
@@ -644,7 +698,7 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Compute cumulative totals year by year
         for _, year in enumerate(future_year_columns):
-            prev_year = base_year_column 
+            prev_year = base_year_column
             updated_data[year] = updated_data[year] - data[prev_year]
 
         return updated_data
@@ -652,10 +706,13 @@ class ZoneTranslator(BaseZoneHandler):
 
 class Ratios(BaseZoneHandler):
     """A class for calculating GB-wide distributions for households, travellers, and employment types."""
+
     def __init__(self, config):
         super().__init__(config)
 
-    def gb_hh_type_ratios(self, data: pd.DataFrame, hh_type_columns: List[str]) -> pd.DataFrame:
+    def gb_hh_type_ratios(
+        self, data: pd.DataFrame, hh_type_columns: List[str]
+    ) -> pd.DataFrame:
         """
         Calculates household type distribution ratios and merges them back to the data.
 
@@ -679,11 +736,11 @@ class Ratios(BaseZoneHandler):
             .reset_index(name="ratios")
         )
         return ratios
-    
+
     def zone_hh_type_ratios(
-        self, 
-        data: pd.DataFrame, 
-        hh_type_columns: List[str], 
+        self,
+        data: pd.DataFrame,
+        hh_type_columns: List[str],
     ) -> pd.DataFrame:
         """
         Calculates the proportion of each household type per zone.
@@ -710,12 +767,15 @@ class Ratios(BaseZoneHandler):
 
         # Step 2: Create MultiIndex (already created by groupby)
         #         Compute total households per zone and the ratio per household type
-        zonal_ratios["ratios"] = zonal_ratios["household"] / zonal_ratios.groupby(level=0)["household"].transform("sum")
+        zonal_ratios["ratios"] = zonal_ratios["household"] / zonal_ratios.groupby(
+            level=0
+        )["household"].transform("sum")
 
         return zonal_ratios.reset_index()
 
-
-    def gb_traveller_type_ratios(self, data: pd.DataFrame, pop_type_columns: List[str]) -> pd.DataFrame:
+    def gb_traveller_type_ratios(
+        self, data: pd.DataFrame, pop_type_columns: List[str]
+    ) -> pd.DataFrame:
         """
         Calculates the traveller type distribution for each zone.
 
@@ -740,9 +800,9 @@ class Ratios(BaseZoneHandler):
         return ratios
 
     def zone_traveller_type_ratios(
-        self, 
-        data: pd.DataFrame, 
-        pop_type_columns: List[str], 
+        self,
+        data: pd.DataFrame,
+        pop_type_columns: List[str],
     ) -> pd.DataFrame:
         """
         Calculates the proportion of each household type per zone.
@@ -769,11 +829,15 @@ class Ratios(BaseZoneHandler):
 
         # Step 2: Create MultiIndex (already created by groupby)
         #         Compute total households per zone and the ratio per household type
-        zonal_ratios["ratios"] = zonal_ratios["population"] / zonal_ratios.groupby(level=0)["population"].transform("sum")
+        zonal_ratios["ratios"] = zonal_ratios["population"] / zonal_ratios.groupby(
+            level=0
+        )["population"].transform("sum")
 
         return zonal_ratios.reset_index()
 
-    def gb_job_type_ratios(self, data: pd.DataFrame, job_type_columns: List[str]) -> pd.DataFrame:
+    def gb_job_type_ratios(
+        self, data: pd.DataFrame, job_type_columns: List[str]
+    ) -> pd.DataFrame:
         """
         Calculates the traveller type distribution for each zone.
 
@@ -801,7 +865,9 @@ class Ratios(BaseZoneHandler):
         )
         return ratios
 
-    def gb_soc_over_sic_ratios(self, data: pd.DataFrame, job_type_columns: List[str]) -> pd.DataFrame:
+    def gb_soc_over_sic_ratios(
+        self, data: pd.DataFrame, job_type_columns: List[str]
+    ) -> pd.DataFrame:
         """
         Calculates the ratio of SOC within each SIC across all zones.
 
@@ -821,11 +887,9 @@ class Ratios(BaseZoneHandler):
         ratios["ratios"] = ratios["jobs"] / ratios.groupby(level=0).transform("sum")
 
         return ratios.reset_index()
-    
+
     def zone_soc_over_sic_ratios(
-            self, 
-            df: pd.DataFrame,
-            job_type_columns: List[str]
+        self, df: pd.DataFrame, job_type_columns: List[str]
     ) -> pd.DataFrame:
         """
         Calculates the SOC ratio within each (zone_id, sic_2d) based on jobs, using MultiIndex.
@@ -845,15 +909,16 @@ class Ratios(BaseZoneHandler):
         # Set MultiIndex
         zone_ratios = df.groupby(group_by)["jobs"].sum().to_frame()
         # Calculate SOC ratios
-        zone_ratios['ratios'] = zone_ratios['jobs'] / zone_ratios.groupby(level=[0, 1])['jobs'].transform('sum')
-
+        zone_ratios["ratios"] = zone_ratios["jobs"] / zone_ratios.groupby(level=[0, 1])[
+            "jobs"
+        ].transform("sum")
 
         return zone_ratios.reset_index()
-    
+
     def zone_vals_by_type_fy(
-        self, 
-        data: pd.DataFrame, 
-        dimension_columns: List[str], 
+        self,
+        data: pd.DataFrame,
+        dimension_columns: List[str],
         build_out_columns: List[str],
     ) -> pd.DataFrame:
         """
@@ -877,20 +942,19 @@ class Ratios(BaseZoneHandler):
         zone_id = self.zone_info["group_by_column"]
         index_cols = [zone_id] + dimension_columns
 
-        #Aggregate to get total household counts per group
+        # Aggregate to get total household counts per group
         grouped = data.groupby(index_cols)[build_out_columns].sum()
 
         grouped = grouped.reset_index()
 
-
         return grouped
 
     def zone_ratios_by_type_fy(
-        self, 
-        data: pd.DataFrame, 
-        dimension_columns: List[str], 
+        self,
+        data: pd.DataFrame,
+        dimension_columns: List[str],
         build_out_columns: List[str],
-        level: Union[int, List[int]] = 0
+        level: Union[int, List[int]] = 0,
     ) -> pd.DataFrame:
         """
         Calculates the proportion of each household type per zone and year, using MultiIndex.
@@ -925,10 +989,12 @@ class Ratios(BaseZoneHandler):
 
         # Compute ratios
         for year in build_out_columns:
-            grouped[(year, 'ratio')] = grouped[year] / grouped.groupby(level=level)[year].transform("sum")
+            grouped[(year, "ratio")] = grouped[year] / grouped.groupby(level=level)[
+                year
+            ].transform("sum")
 
         # Drop raw count columns, keep only ratio columns
-        ratio_cols = [(year, 'ratio') for year in build_out_columns]
+        ratio_cols = [(year, "ratio") for year in build_out_columns]
         zonal_ratios = grouped[ratio_cols]
 
         # Rename columns to just year
@@ -938,7 +1004,9 @@ class Ratios(BaseZoneHandler):
         return zonal_ratios.reset_index()
 
     @staticmethod
-    def expand_gb_ratios_by_zone(zone_list_dataframe: pd.DataFrame, gb_ratios: pd.DataFrame) -> pd.DataFrame:
+    def expand_gb_ratios_by_zone(
+        zone_list_dataframe: pd.DataFrame, gb_ratios: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Perform a cross join between zone_list_dataframe and gb_ratios,
         repeating all ratio combinations for each zone.
@@ -957,7 +1025,9 @@ class Ratios(BaseZoneHandler):
         gb_ratios_copy["key"] = 1
 
         # Step 2: Perform cross join
-        by_zone_type_ratio = pd.merge(zone_list_copy, gb_ratios_copy, on="key").drop(columns="key")
+        by_zone_type_ratio = pd.merge(zone_list_copy, gb_ratios_copy, on="key").drop(
+            columns="key"
+        )
 
         # Step 3: Reset index
         by_zone_type_ratio.reset_index(drop=True, inplace=True)
@@ -982,24 +1052,21 @@ class Ratios(BaseZoneHandler):
         dimension_cols : list[str]
             List of column names used to define the ratio dimensions (e.g. demographic categories).
         ratios : pd.DataFrame
-            DataFrame containing ratio values. It must include the same zone and dimension columns 
+            DataFrame containing ratio values. It must include the same zone and dimension columns
             used to join with `data`, plus a column named 'ratios'.
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame with the same index as the original `data` but with unit columns adjusted 
+            A DataFrame with the same index as the original `data` but with unit columns adjusted
             by the ratio values.
         """
         zone_id = self.zone_info["group_by_column"]
-        key_cols = [zone_id] + dimension_cols 
-        data_ratios = (
-            data.reset_index(drop=False)
-            .merge(
-                ratios.reset_index(drop=False),
-                on=zone_id,
-                how="left",
-            )
+        key_cols = [zone_id] + dimension_cols
+        data_ratios = data.reset_index(drop=False).merge(
+            ratios.reset_index(drop=False),
+            on=zone_id,
+            how="left",
         )
         data_ratios = data_ratios[key_cols + unit_cols + ["ratios"]].set_index(key_cols)
         data_ratios = data_ratios.loc[:, unit_cols].multiply(
@@ -1025,35 +1092,30 @@ class Ratios(BaseZoneHandler):
         dimension_cols : list[str]
             List of column names used to define the ratio dimensions (e.g. demographic categories).
         ratios : pd.DataFrame
-            DataFrame containing ratio values. It must include the same zone and dimension columns 
+            DataFrame containing ratio values. It must include the same zone and dimension columns
             used to join with `data`, plus a column named 'ratios'.
 
         Returns
         -------
         pd.DataFrame
-            A DataFrame with the same index as the original `data` but with unit columns adjusted 
+            A DataFrame with the same index as the original `data` but with unit columns adjusted
             by the ratio values.
         """
         zone_id = self.zone_info["group_by_column"]
 
         key_cols = [zone_id] + dimension_cols
-        data_ratios = (
-            data.reset_index(drop=False)
-            .merge(
-                ratios.reset_index(drop=False),
-                on=[zone_id, "sic_2d"],
-            )
+        data_ratios = data.reset_index(drop=False).merge(
+            ratios.reset_index(drop=False),
+            on=[zone_id, "sic_2d"],
         )
         data_ratios = data_ratios[key_cols + unit_cols + ["ratios"]].set_index(key_cols)
         data_ratios = data_ratios.loc[:, unit_cols].multiply(
             data_ratios["ratios"], axis=0
         )
         return data_ratios.reset_index()
-    
+
     def ntem_pop_car_ratios(
-        self,
-        base_year_column: str,
-        build_out_columns: List[str]
+        self, base_year_column: str, build_out_columns: List[str]
     ) -> pd.DataFrame:
         """
         Extrapolate missing future year values and calculate ratios
@@ -1074,8 +1136,12 @@ class Ratios(BaseZoneHandler):
         data = pd.read_csv(self.zone_info["ntem_pop_car_ratio"])
         # Extract available year columns in the DataFrame
         year_cols_in_data = [col for col in data.columns if col.isdigit()]
-        ntem_future_year_list = [y for y in year_cols_in_data if int(y) >= int(base_year_column)]
-        extrapolated_years = [y for y in build_out_columns if y not in ntem_future_year_list]
+        ntem_future_year_list = [
+            y for y in year_cols_in_data if int(y) >= int(base_year_column)
+        ]
+        extrapolated_years = [
+            y for y in build_out_columns if y not in ntem_future_year_list
+        ]
 
         extended_data = data.copy()
         x_known = np.array([int(y) for y in ntem_future_year_list])
@@ -1093,16 +1159,14 @@ class Ratios(BaseZoneHandler):
 
         # Calculate ratios for all years in build_out_column vs base_year
         for year in build_out_columns:
-            extended_data[year] = (
-                extended_data[year].astype(float) / extended_data[base_year_column].astype(float)
-            )
+            extended_data[year] = extended_data[year].astype(float) / extended_data[
+                base_year_column
+            ].astype(float)
 
         return extended_data.drop(columns=[base_year_column])
 
     def ntem_hh_car_ratios(
-        self,
-        base_year_column: str,
-        build_out_columns: List[str]
+        self, base_year_column: str, build_out_columns: List[str]
     ) -> pd.DataFrame:
         """
         Extrapolate missing future year values and calculate ratios
@@ -1123,8 +1187,12 @@ class Ratios(BaseZoneHandler):
         data = pd.read_csv(self.zone_info["ntem_hh_car_ratio"])
         # Extract available year columns in the DataFrame
         year_cols_in_data = [col for col in data.columns if col.isdigit()]
-        ntem_future_year_list = [y for y in year_cols_in_data if int(y) >= int(base_year_column)]
-        extrapolated_years = [y for y in build_out_columns if y not in ntem_future_year_list]
+        ntem_future_year_list = [
+            y for y in year_cols_in_data if int(y) >= int(base_year_column)
+        ]
+        extrapolated_years = [
+            y for y in build_out_columns if y not in ntem_future_year_list
+        ]
 
         extended_data = data.copy()
         x_known = np.array([int(y) for y in ntem_future_year_list])
@@ -1142,12 +1210,12 @@ class Ratios(BaseZoneHandler):
 
         # Calculate ratios for all years in build_out_column vs base_year
         for year in build_out_columns:
-            extended_data[year] = (
-                extended_data[year].astype(float) / extended_data[base_year_column].astype(float)
-            )
+            extended_data[year] = extended_data[year].astype(float) / extended_data[
+                base_year_column
+            ].astype(float)
 
         return extended_data.drop(columns=[base_year_column])
-    
+
     def apply_ntem_trend(
         self,
         data: pd.DataFrame,
@@ -1168,14 +1236,14 @@ class Ratios(BaseZoneHandler):
         ----------
         data : pd.DataFrame
             Base-year data containing values to be scaled. Must include zone and dimension columns.
-        
+
         ntem_trends : pd.DataFrame
-            NTEM trend multipliers by zone and category for future years. Must include the same 
+            NTEM trend multipliers by zone and category for future years. Must include the same
             zone and dimension columns as `data`, plus columns for each year in `build_out_columns`.
 
         base_year_column : str
             Name of the column in `data` that contains base-year values (e.g. "2023").
-        
+
         build_out_columns : list[str]
             List of year columns representing future projection years (e.g. ["2024", ..., "2066"]).
 
@@ -1185,7 +1253,7 @@ class Ratios(BaseZoneHandler):
         Returns
         -------
         pd.DataFrame
-            A DataFrame with trend-adjusted and normalized values for each zone and category 
+            A DataFrame with trend-adjusted and normalized values for each zone and category
             across all build-out years.
         """
         zone_id = self.zone_info["group_by_column"]
@@ -1199,22 +1267,22 @@ class Ratios(BaseZoneHandler):
         zone_ratios = zone_ratios[key_cols + [base_year_column] + build_out_columns]
         # Multiply base values by trend factors for future years
         for year in build_out_columns:
-            zone_ratios[year] = (
-                zone_ratios[year].astype(float) * zone_ratios[base_year_column].astype(float)
-            )
+            zone_ratios[year] = zone_ratios[year].astype(float) * zone_ratios[
+                base_year_column
+            ].astype(float)
         # Normalize each year's values within each zone so they sum to 1 across categories
         for year in build_out_columns:
             total_per_zone = zone_ratios.groupby(zone_id)[year].transform("sum")
             zone_ratios[year] = zone_ratios[year] / total_per_zone
 
         return zone_ratios
-    
+
     def expand_by_dimension(
         self,
         zone_data: pd.DataFrame,
         zone_car_ratio: pd.DataFrame,
         build_out_columns: list[str],
-        dimension_columns: list[str], 
+        dimension_columns: list[str],
     ) -> pd.DataFrame:
         """
         Calculate the number of households by given dimension categories per zone and year.
@@ -1224,14 +1292,14 @@ class Ratios(BaseZoneHandler):
         zone_data : pd.DataFrame
             DataFrame with total projected households per zone and year.
             Expected columns: [zone_id] + build_out_columns.
-        
+
         zone_car_ratio : pd.DataFrame
             DataFrame with ratios per zone and dimension (e.g., car availability) for each year.
             Expected columns: [zone_id, *dimension_columns] + build_out_columns.
 
         build_out_columns : list[str]
             List of column names representing future years (e.g. ['2024', '2025', ..., '2066']).
-        
+
         dimension_columns : Optional[list[str]], default=None
             List of columns representing the dimensions (e.g., car availability, income group).
             If None, defaults to using a single dimension column like 'car_availability'.
@@ -1245,36 +1313,37 @@ class Ratios(BaseZoneHandler):
 
         zone_id = self.zone_info["group_by_column"]
         # Check if zone_data contains 'sic_2d' (i.e., jobs data) and adjust id_vars
-        if 'sic_2d' in zone_data.columns:
-            id_list = [zone_id, 'sic_2d']
+        if "sic_2d" in zone_data.columns:
+            id_list = [zone_id, "sic_2d"]
         else:
-            id_list = [zone_id] # Add 'sic_2d' for jobs data
+            id_list = [zone_id]  # Add 'sic_2d' for jobs data
 
         # Melt both dataframes to long format
-        data_long = zone_data.melt(id_vars=id_list, value_vars=build_out_columns, 
-                                    var_name="year", value_name="vals")
-        
-        ratio_long = zone_car_ratio.melt(id_vars=id_list + dimension_columns, 
-                                            value_vars=build_out_columns, 
-                                            var_name="year", value_name="ratios")
+        data_long = zone_data.melt(
+            id_vars=id_list,
+            value_vars=build_out_columns,
+            var_name="year",
+            value_name="vals",
+        )
+
+        ratio_long = zone_car_ratio.melt(
+            id_vars=id_list + dimension_columns,
+            value_vars=build_out_columns,
+            var_name="year",
+            value_name="ratios",
+        )
 
         # Merge on zone_id and year
-        merged = data_long.merge(
-            ratio_long,
-            on=id_list + ["year"],
-            how="left"
-        )
+        merged = data_long.merge(ratio_long, on=id_list + ["year"], how="left")
 
         # Calculate households by car availability
-        merged["val_by_dimension"] = (
-            merged["vals"].astype(float) * merged["ratios"].astype(float)
-        )
+        merged["val_by_dimension"] = merged["vals"].astype(float) * merged[
+            "ratios"
+        ].astype(float)
 
         # Pivot to wide format (optional)
         wide = merged.pivot_table(
-            index=id_list + dimension_columns,
-            columns="year",
-            values="val_by_dimension"
+            index=id_list + dimension_columns, columns="year", values="val_by_dimension"
         ).reset_index()
 
         wide.columns.name = None  # Clean up column index name
@@ -1285,10 +1354,10 @@ class Ratios(BaseZoneHandler):
         target_df: pd.DataFrame,
         estimated_df: pd.DataFrame,
         build_out_columns: list[str],
-        dimension_columns: list[str]
+        dimension_columns: list[str],
     ) -> pd.DataFrame:
         """
-        Calculate scaling factors by dividing target values by estimated values 
+        Calculate scaling factors by dividing target values by estimated values
         for each zone and dimension combination. Missing outcomes are filled with 1.
 
         Parameters
@@ -1314,7 +1383,7 @@ class Ratios(BaseZoneHandler):
             estimated_df,
             on=[zone_id] + dimension_columns,
             how="outer",
-            suffixes=("_target", "_estimated")
+            suffixes=("_target", "_estimated"),
         )
 
         # Compute ratio for each year and fill missing values in the final outcome
@@ -1329,14 +1398,14 @@ class Ratios(BaseZoneHandler):
         merged[build_out_columns] = merged[build_out_columns].fillna(1)
 
         # Return only the required columns
-        return merged[[zone_id] + dimension_columns + build_out_columns] 
+        return merged[[zone_id] + dimension_columns + build_out_columns]
 
     def apply_scaling_factor(
         self,
         segmented_df: pd.DataFrame,
         scaler_df: pd.DataFrame,
         build_out_columns: list[str],
-        dimension_columns: list[str]
+        dimension_columns: list[str],
     ) -> pd.DataFrame:
         """
         Apply scaling factors to a segmented DataFrame based on dimension columns (e.g., 'car_availability').
@@ -1359,13 +1428,13 @@ class Ratios(BaseZoneHandler):
             A new DataFrame with scaled values for each zone, dimension, and year.
         """
         zone_id = self.zone_info["group_by_column"]
-        
+
         # Merge the scaler values back into the segmented_df
         merged = segmented_df.merge(
             scaler_df,
             on=[zone_id] + dimension_columns,
             how="left",
-            suffixes=("", "_scaler")
+            suffixes=("", "_scaler"),
         )
 
         # Apply scaling for each year
@@ -1376,44 +1445,50 @@ class Ratios(BaseZoneHandler):
         scaler_cols = [f"{year}_scaler" for year in build_out_columns]
         merged = merged.drop(columns=scaler_cols)
 
-        return merged   
+        return merged
+
 
 class SiteZoneProcessor(BaseZoneHandler):
     def __init__(self, config: inputs.DLitConfig):
         super().__init__(config)
+
     def zone_site_geospatial_lookup(
-        self, 
-        site_data: pd.DataFrame,
-        site_geometry_col: str
-        ) -> gpd.GeoDataFrame:
+        self, site_data: pd.DataFrame, site_geometry_col: str
+    ) -> gpd.GeoDataFrame:
         """
         Perform a spatial join between site locations and predefined zones.
-        
+
         Parameters:
         site_data (pd.DataFrame): DataFrame containing site information.
         site_id_col (str): Column name representing unique site identifiers.
         site_geometry_col (str): Column name containing site geometries.
-        
+
         Returns:
         gpd.GeoDataFrame: Site data with zone assignments.
         """
         # Convert the 'data' DataFrame to a GeoDataFrame with geometry based on coordinates
         site_data = site_data.copy()
-        site_data[site_geometry_col] = gpd.points_from_xy(site_data["easting"], site_data["northing"])
-        site_gdf = gpd.GeoDataFrame(site_data, geometry=site_geometry_col, crs=self.zone_gdf.crs)
+        site_data[site_geometry_col] = gpd.points_from_xy(
+            site_data["easting"], site_data["northing"]
+        )
+        site_gdf = gpd.GeoDataFrame(
+            site_data, geometry=site_geometry_col, crs=self.zone_gdf.crs
+        )
 
         # Perform spatial join with the zone geometries
         joined_data = gpd.sjoin(site_gdf, self.zone_gdf, how="left")
 
         # Retain original site columns plus zone ID
-        return joined_data[site_data.columns.tolist() + [self.zone_info["zone_gdf_id_col"]]]
+        return joined_data[
+            site_data.columns.tolist() + [self.zone_info["zone_gdf_id_col"]]
+        ]
 
     def agg_zonal_data(
-        self, 
-        site_data: pd.DataFrame, 
-        build_out_columns: list, 
+        self,
+        site_data: pd.DataFrame,
+        build_out_columns: list,
         site_size_column: str,
-        dimension_columns: Optional[list] = None
+        dimension_columns: Optional[list] = None,
     ) -> pd.DataFrame:
         """
         Aggregate zonal data by summing build-out columns after dropping site-related columns.
@@ -1445,9 +1520,10 @@ class SiteZoneProcessor(BaseZoneHandler):
             dimension_columns = []  # If None, set to an empty list
         groupby_columns = [zone_id_col] + dimension_columns
 
-
         # Aggregate for all sites
-        agg_all = site_data.groupby(groupby_columns, as_index=False)[build_out_columns].sum()
+        agg_all = site_data.groupby(groupby_columns, as_index=False)[
+            build_out_columns
+        ].sum()
 
         # Aggregate for large sites
         agg_large = (
@@ -1456,7 +1532,9 @@ class SiteZoneProcessor(BaseZoneHandler):
             .sum()
         )
         # Add suffix only to the build_out_columns
-        agg_large = agg_large.rename(columns={col: f"{col}_large" for col in build_out_columns})
+        agg_large = agg_large.rename(
+            columns={col: f"{col}_large" for col in build_out_columns}
+        )
         # Aggregate for small sites
         agg_small = (
             site_data[site_data[site_size_column] == "small"]
@@ -1464,30 +1542,32 @@ class SiteZoneProcessor(BaseZoneHandler):
             .sum()
         )
         # Add suffix only to the build_out_columns
-        agg_small = agg_small.rename(columns={col: f"{col}_small" for col in build_out_columns})
+        agg_small = agg_small.rename(
+            columns={col: f"{col}_small" for col in build_out_columns}
+        )
         # Merge all results
-        agg_data = agg_all.merge(agg_large, on=groupby_columns, how="left").merge(agg_small, on=groupby_columns, how="left")
+        agg_data = agg_all.merge(agg_large, on=groupby_columns, how="left").merge(
+            agg_small, on=groupby_columns, how="left"
+        )
         # Rename zone_id_col to rename_zone_id_col
         agg_data = agg_data.rename(columns={zone_id_col: rename_zone_id_col})
         # Infill NaNs with 0
         agg_data = agg_data.fillna(0)
 
         return agg_data
-    
+
     @staticmethod
     def accumulated_growth(
-            site_data: pd.DataFrame,
-            build_out_columns: list,
-            column_prefixes: list
-        )-> pd.DataFrame:
+        site_data: pd.DataFrame, build_out_columns: list, column_prefixes: list
+    ) -> pd.DataFrame:
         """
         Computes accumulated sum for each group of columns in column_prefixes.
-        
+
         Parameters:
             df (pd.DataFrame): The input DataFrame.
             build_out_columns: Future year columns.
             column_prefixes (list): List of column name patterns (e.g., "", "_large", "_small").
-        
+
         Returns:
             pd.DataFrame: DataFrame with accumulated values.
         """
@@ -1497,12 +1577,11 @@ class SiteZoneProcessor(BaseZoneHandler):
         for prefix in column_prefixes:
             # Create column names based on year and prefix
             cols = [f"{year}{prefix}" for year in build_out_columns]
-            
+
             # Apply cumulative sum across the rows (axis=1)
             df_accumulated[cols] = site_data[cols].cumsum(axis=1)
-        
+
         return df_accumulated
-        
 
     def merge_zonal_attributes(
         self, site_data: pd.DataFrame, by_data: pd.DataFrame
@@ -1522,18 +1601,20 @@ class SiteZoneProcessor(BaseZoneHandler):
         pd.DataFrame
             Merged DataFrame with additional zonal attributes.
         """
-        return site_data.merge(by_data, on=self.zone_info["zone_gdf_id_col"], how="left")
+        return site_data.merge(
+            by_data, on=self.zone_info["zone_gdf_id_col"], how="left"
+        )
 
     def calculate_distance_to_zone_centroids(
         self, site_data: pd.DataFrame, centroid_type: str
     ) -> pd.DataFrame:
         """
         Compute the distance of each site to its corresponding zone centroid.
-        
+
         Parameters:
         site_data (pd.DataFrame): DataFrame with site details.
         centroid_type (str): Type of centroid (hh, emp or pop).
-        
+
         Returns:
         pd.Series: Distance values from sites to zone centroids.
         """
@@ -1567,7 +1648,7 @@ class SiteZoneProcessor(BaseZoneHandler):
         Parameters:
         site_data (pd.DataFrame): DataFrame with site details.
         centroid_type (str): Type of centroid (hh, emp or pop).
-        Return: 
+        Return:
         DataFrame with updated centroid coordinates and shift distances.
         """
         if self.geo_boundary not in self.zone_info_map:
@@ -1632,9 +1713,7 @@ class SiteZoneProcessor(BaseZoneHandler):
         return site_data
 
     def streamline_dataset(
-        self,
-        site_data: pd.DataFrame,
-        key_columns: list[str]
+        self, site_data: pd.DataFrame, key_columns: list[str]
     ) -> pd.DataFrame:
         """
         Streamline the site data with necessary columns and renaming.
@@ -1653,7 +1732,8 @@ class SiteZoneProcessor(BaseZoneHandler):
 
         # Select necessary columns
         streamlined_data = site_data[
-            key_columns + [
+            key_columns
+            + [
                 zone_column,
                 "prob_val",
                 "value_estimated",
@@ -1670,6 +1750,7 @@ class SiteZoneProcessor(BaseZoneHandler):
         ].rename(columns=rename_mapping)
 
         return streamlined_data
+
 
 class LargeSites:
     """Class to handle site data processing, including calculating statistics, z-scores,
@@ -1689,7 +1770,7 @@ class LargeSites:
         """
         self.site_data = site_data
         self.columns_to_explore = columns_to_explore
-    
+
     def large_sites_selection(
         self,
         category: str = "residential",
@@ -1731,11 +1812,12 @@ class LargeSites:
         site_counts = self._count_sites(data_weightindex, index_col)
         # Filter large sites based on the threshold
         merged_sites, large_sites, large_sites_list = self._large_sites(
-            data_weightindex, index_col, index_threshold,
+            data_weightindex,
+            index_col,
+            index_threshold,
         )
         return site_counts, merged_sites, large_sites, large_sites_list
-   
-        
+
     def _calculate_statistics(self):
         """Calculates basic statistics for the given columns.
 
@@ -1748,7 +1830,7 @@ class LargeSites:
         """
         site_stats = stats.basic_statistics(self.site_data, self.columns_to_explore)
         return site_stats
-    
+
     def _calculate_z_scores(self):
         """Computes z-scores for the given columns.
 
@@ -1761,7 +1843,6 @@ class LargeSites:
         """
         site_z_scores = stats.compute_z_scores(self.site_data, self.columns_to_explore)
         return site_z_scores
-    
 
     def _cal_site_weight(
         self,
@@ -1804,7 +1885,7 @@ class LargeSites:
         )
         # Define the columns with the chosen suffix (e.g., '_zscore', '_robust_zscore', '_modified_zscore')
         columns_z_score = [f"{col}_{zscore_suffix}" for col in columns_to_explore]
-        
+
         # Apply transformations based on category
         if category.lower() == "residential":
             for col in columns_z_score:
@@ -1824,7 +1905,9 @@ class LargeSites:
                 else:
                     data[new_col_name] = data[col]
         else:
-            raise ValueError(f"Unknown category: {category}. Please specify 'residential' or 'employment'.")
+            raise ValueError(
+                f"Unknown category: {category}. Please specify 'residential' or 'employment'."
+            )
 
         # Define weight dictionary for new columns if not provided
         if weight_dict is None:
@@ -1882,8 +1965,31 @@ class LargeSites:
             A summary DataFrame showing the total count and counts for each threshold.
         """
         thresholds = [
-            -5, -4, -3, -2, -1, 0, 0.2, 0.4, 0.6, 0.8, 1, 1.1, 1.2, 1.3, 1.4, 1.5,
-            1.6, 1.7, 1.8, 1.9, 2, 3, 4, 5, 10
+            -5,
+            -4,
+            -3,
+            -2,
+            -1,
+            0,
+            0.2,
+            0.4,
+            0.6,
+            0.8,
+            1,
+            1.1,
+            1.2,
+            1.3,
+            1.4,
+            1.5,
+            1.6,
+            1.7,
+            1.8,
+            1.9,
+            2,
+            3,
+            4,
+            5,
+            10,
         ]
         summary = {"Total Records": len(df)}
 
@@ -1893,7 +1999,6 @@ class LargeSites:
         summary_df = pd.DataFrame(summary.items(), columns=[df_name, var_name])
 
         return summary_df
-    
 
     def _large_sites(
         self,
@@ -1932,59 +2037,72 @@ class LargeSites:
 
         return merged_sites, large_sites, large_site_ids
 
+
 class PrepTripends:
-    
-    CATEGORIES = ['', '_large']
+
+    CATEGORIES = ["", "_large"]
+    # CATEGORIES = [""]
 
     def __init__(self, config: inputs.DLitConfig) -> None:
         """Initialize the class with dynamic YEARS based on the base year."""
-        self.base_year_int = int(config.dev_pattern.base_year) 
-        self.end_year_int = int(config.dev_pattern.end_year) # Ensure config has base_year_int
-        self.years = range(self.base_year_int + 1, self.end_year_int + 1)  
-
+        self.base_year_int = int(config.dev_pattern.base_year)
+        self.end_year_int = int(
+            config.dev_pattern.end_year
+        )  # Ensure config has base_year_int
+        self.years = range(self.base_year_int + 1, self.end_year_int + 1)
+        # self.years = range(self.base_year_int, self.base_year_int + 1)
         self.data_config = {
             "soc_sic_emp": {
-                "index_cols": ['sic_2_digit', 'soc'],
-                "rename_cols": {'sic_2d': 'sic_2_digit'},
-                "segments": ['sic_2_digit', 'soc']
+                "index_cols": ["sic_2_digit", "soc"],
+                "rename_cols": {"sic_2d": "sic_2_digit"},
+                "segments": ["sic_2_digit", "soc"],
             },
             "tt_pop": {
-                "index_cols": ['tt'],
-                "segments": ['gender_3', 'aws', 'soc', 'ns_sec', 'hh_type'],
+                "index_cols": ["tt"],
+                "segments": ["gender_3", "aws", "soc", "ns_sec", "hh_type"],
             },
             "hh": {
-                "index_cols": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
-                "segments": ['accom_h', 'ns_sec', 'adults', 'car_availability', 'children'],
-            }
+                "index_cols": [
+                    "accom_h",
+                    "ns_sec",
+                    "adults",
+                    "car_availability",
+                    "children",
+                ],
+                "segments": [
+                    "accom_h",
+                    "ns_sec",
+                    "adults",
+                    "car_availability",
+                    "children",
+                ],
+            },
         }
-        self.cols_to_merge = ['gender_3', 'aws', 'ns_sec', 'soc', 'hh_type']
+        self.cols_to_merge = ["gender_3", "aws", "ns_sec", "soc", "hh_type"]
         self.rename_mapping = {
-            'gender': 'gender_3',
-            'aws': 'aws',
-            'ns': 'ns_sec',
-            'soc': 'soc',
-            'hh_type': 'hh_type'
+            "gender": "gender_3",
+            "aws": "aws",
+            "ns": "ns_sec",
+            "soc": "soc",
+            "hh_type": "hh_type",
         }
         # Initialize the BaseZoneHandler for geo_boundary and other zone info
         self.base_zone_handler = BaseZoneHandler(config)
         self.zone_info = self.base_zone_handler.zone_info
         self.zone_id = self.zone_info["group_by_column"]
 
-    def merge_and_rename(self, 
-                         data: pd.DataFrame, 
-                         lookup: pd.DataFrame) -> pd.DataFrame:
-        
+    def merge_and_rename(
+        self, data: pd.DataFrame, lookup: pd.DataFrame
+    ) -> pd.DataFrame:
         """Merge and rename columns for tt_pop data."""
 
-        return data.merge(lookup, on='tt', how='left').rename(columns=self.rename_mapping)
+        return data.merge(lookup, on="tt", how="left").rename(
+            columns=self.rename_mapping
+        )
 
     def process_data(
-            self, 
-            data: pd.DataFrame, 
-            data_type: str, 
-            lookup: pd.DataFrame = None
+        self, data: pd.DataFrame, data_type: str, lookup: pd.DataFrame = None
     ) -> Dict[str, pd.DataFrame]:
-        
         """Process data for a given type and pivot it per year and category."""
 
         if data_type not in self.data_config:
@@ -1998,50 +2116,53 @@ class PrepTripends:
 
         if data_type == "tt_pop" and lookup is not None:
             data = self.merge_and_rename(data, lookup)
-            index_cols = self.cols_to_merge  
+            index_cols = self.cols_to_merge
 
         if self.zone_id in data.columns:
-            data[self.zone_id] = data[self.zone_id].astype('int64')
+            data[self.zone_id] = data[self.zone_id].astype("int64")
 
         processed_data = {
-            f"{year}{category}": data.pivot_table(index=index_cols, columns=self.zone_id, values=f"{year}{category}", fill_value=0)
-            for year in self.years for category in self.CATEGORIES if f"{year}{category}" in data.columns
+            f"{year}{category}": data.pivot_table(
+                index=index_cols,
+                columns=self.zone_id,
+                values=f"{year}{category}",
+                fill_value=0,
+            )
+            for year in self.years
+            for category in self.CATEGORIES
+            if f"{year}{category}" in data.columns
         }
 
         return processed_data
 
-    def prepare_segmentation_input(self, 
-                                   data_type: str) -> cb.SegmentationInput:
-        
+    def prepare_segmentation_input(self, data_type: str) -> cb.SegmentationInput:
         """Prepare segmentation input based on data type."""
 
         if data_type not in self.data_config:
 
             raise ValueError(f"Unknown data type for segmentation: {data_type}")
-        
-        return cb.SegmentationInput(enum_segments=self.data_config[data_type]["segments"], naming_order=self.data_config[data_type]["segments"])
+
+        return cb.SegmentationInput(
+            enum_segments=self.data_config[data_type]["segments"],
+            naming_order=self.data_config[data_type]["segments"],
+        )
 
     def perform_segmentation_and_zoning(
-            self, 
-            data: pd.DataFrame, 
-            data_type: str,
-            output_path: Path
+        self, data: pd.DataFrame, data_type: str, output_path: Path
     ):
-        
         """Perform segmentation and zoning, then save the result."""
 
         seg = cb.Segmentation(self.prepare_segmentation_input(data_type))
-        zoning = cb.ZoningSystem.get_zoning('normits')
+        zoning = cb.ZoningSystem.get_zoning("normits")
 
         dvec = DVector(import_data=data, zoning_system=zoning, segmentation=seg)
-        if data_type == "tt_pop" :
-            dvec = dvec.add_segments(['adult_nssec'])
+        if data_type == "tt_pop":
+            dvec = dvec.add_segments(["adult_nssec"])
 
-        if data_type == "hh" :
-            dvec = dvec.add_segments(['adult_nssec', 'total'])
+        if data_type == "hh":
+            dvec = dvec.add_segments(["adult_nssec", "total"])
 
         dvec.save(output_path)
-
 
 
 def get_site_reference_ids(
@@ -2073,8 +2194,6 @@ def get_site_reference_ids(
     return estimated_sites["site_reference_id"].tolist()
 
 
-
-
 def process_site_data(
     site_data: pd.DataFrame,
     by_data: pd.DataFrame,
@@ -2095,7 +2214,7 @@ def process_site_data(
     -----------
     site_data : pd.DataFrame
         A DataFrame containing site data, including columns for proposed development and other site-related attributes.
-    
+
     by_data : pd.DataFrame
         A DataFrame containing base year zonal attributes to be merged with the site data.
 
@@ -2144,9 +2263,7 @@ def process_site_data(
     LOG.info(f"Processing {site_type} site data")
 
     # Create a new column 'sum_proposed' which is the sum of the columns from 2024 to the last year
-    site_data["sum_proposed"] = site_data.loc[:, build_out_columns].sum(
-        axis=1
-    )
+    site_data["sum_proposed"] = site_data.loc[:, build_out_columns].sum(axis=1)
     columns_to_keep = key_columns + [
         "sum_proposed",
     ]
@@ -2156,7 +2273,9 @@ def process_site_data(
     if use_prob_for_size:
         site_data["sum_proposed"] = site_data["prob_val"] * site_data["sum_proposed"]
     # Map development sites to pre-defined zone
-    site_zone_sites = sitezone_processor.zone_site_geospatial_lookup(site_data, site_geometry_col="geometry")
+    site_zone_sites = sitezone_processor.zone_site_geospatial_lookup(
+        site_data, site_geometry_col="geometry"
+    )
 
     LOG.info(f"Getting attributes associated with {site_type} development sites")
     # Add the 'value_estimated' column for zone sites
@@ -2190,8 +2309,9 @@ def process_site_data(
             site_zone_sites["sum_proposed"] / site_zone_sites["jobs"]
         )
     # Replace inf, -inf, and NaN with zero in n_e_ratio
-    site_zone_sites[ratio_column] = site_zone_sites[ratio_column].replace([np.inf, -np.inf], 0).fillna(0)
-
+    site_zone_sites[ratio_column] = (
+        site_zone_sites[ratio_column].replace([np.inf, -np.inf], 0).fillna(0)
+    )
 
     LOG.info(f"Calculating centroid shift caused by {site_type} sites")
     centroid_types = ["hh", "emp"]
@@ -2202,12 +2322,16 @@ def process_site_data(
         )
 
     ctrd_shift_ratio_col = "ctrd_shift_ratio"
-    site_zone_sites[ctrd_shift_ratio_col] = site_zone_sites["centroid_shift"]/site_zone_sites["diameter"]
+    site_zone_sites[ctrd_shift_ratio_col] = (
+        site_zone_sites["centroid_shift"] / site_zone_sites["diameter"]
+    )
 
-    site_zone_sites = sitezone_processor.streamline_dataset(site_zone_sites, key_columns)
-
+    site_zone_sites = sitezone_processor.streamline_dataset(
+        site_zone_sites, key_columns
+    )
 
     return site_zone_sites
+
 
 class TotalsComparison:
     def __init__(self, build_out_columns: List[str]):
@@ -2245,12 +2369,18 @@ class TotalsComparison:
         pd.DataFrame
             DataFrame with total values for each year.
         """
-        df = pd.DataFrame({
-            f"{label_prefix}_Zonal": df_predisagg[self.build_out_columns].sum(),
-            f"{label_prefix}_Segmented": df_postdisagg[self.build_out_columns].sum()
-        })
+        df = pd.DataFrame(
+            {
+                f"{label_prefix}_Zonal": df_predisagg[self.build_out_columns].sum(),
+                f"{label_prefix}_Segmented": df_postdisagg[
+                    self.build_out_columns
+                ].sum(),
+            }
+        )
 
-        df[f"{label_prefix}_AbsDiff"] = df[f"{label_prefix}_Segmented"] - df[f"{label_prefix}_Zonal"]
+        df[f"{label_prefix}_AbsDiff"] = (
+            df[f"{label_prefix}_Segmented"] - df[f"{label_prefix}_Zonal"]
+        )
         df[f"{label_prefix}_PctDiff"] = (
             100 * df[f"{label_prefix}_AbsDiff"] / df[f"{label_prefix}_Zonal"]
         ).replace([float("inf"), -float("inf")], pd.NA)
@@ -2292,7 +2422,6 @@ class TotalsComparison:
         return summary
 
 
-
 def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     """runs process for converting DLOG to zone build out profiles
 
@@ -2319,19 +2448,27 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # Create probability values for each certainty
     probability_dict_df = pd.read_csv(config.land_use.web_tag_certainty_path)
     # Convert it to a dictionary
-    probability_dict = dict(zip(probability_dict_df["web_tag_certainty"], probability_dict_df["probability"]))
+    probability_dict = dict(
+        zip(
+            probability_dict_df["web_tag_certainty"], probability_dict_df["probability"]
+        )
+    )
 
     # Create res_weight_dict directly by loading the relevant columns and converting them into a dictionary
     res_weight_dict_df = pd.read_csv(
-        config.dev_pattern.index_weights_path, usecols=['variables', 'residential']
+        config.dev_pattern.index_weights_path, usecols=["variables", "residential"]
     )
-    
-    res_weight_dict = dict(zip(res_weight_dict_df['variables'], res_weight_dict_df['residential']))
+
+    res_weight_dict = dict(
+        zip(res_weight_dict_df["variables"], res_weight_dict_df["residential"])
+    )
     # Create emp_weight_dict directly by loading the relevant columns and converting them into a dictionary
     emp_weight_dict_df = pd.read_csv(
-        config.dev_pattern.index_weights_path, usecols=['variables', 'employment']
+        config.dev_pattern.index_weights_path, usecols=["variables", "employment"]
     )
-    emp_weight_dict = dict(zip(emp_weight_dict_df['variables'], emp_weight_dict_df['employment']))
+    emp_weight_dict = dict(
+        zip(emp_weight_dict_df["variables"], emp_weight_dict_df["employment"])
+    )
 
     site_assessment = lu.disagg_mixed(utilities.to_dict(input_data))
     emp_sites = pd.read_csv(config.dev_pattern.emp_site_data)
@@ -2354,14 +2491,14 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "car_availability",
         "children",
         "lsoa2021_id",
-        "household"
+        "household",
     ]
     hh_type_columns = [
         "accom_h",
         "ns_sec",
         "adults",
-        "car_availability", #no car, 1 car, 2+ cars
-        "children"
+        "car_availability",  # no car, 1 car, 2+ cars
+        "children",
     ]
     lsoa_pop_by_tt_column_names = [
         "lsoa2021_id",
@@ -2375,7 +2512,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "soc",
         "ns",
         "hh_type",
-        "car_ownership", # without and with car
+        "car_ownership",  # without and with car
     ]
 
     lsoa_jobs_column_names = [
@@ -2390,49 +2527,52 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     ]
 
     by_lsoa_hh_type = pd.read_csv(
-        config.land_use.lsoa_hh_types_path, 
-        names=lsoa_hh_column_names, 
-        header=0, 
-        index_col=None
+        config.land_use.lsoa_hh_types_path,
+        names=lsoa_hh_column_names,
+        header=0,
+        index_col=None,
     )
 
     by_lsoa_pop_tt = pd.read_csv(
         config.land_use.lsoa_traveller_type_path,
         names=lsoa_pop_by_tt_column_names,
         header=0,
-        index_col=None
+        index_col=None,
     )
-    by_lsoa_pop_tt = by_lsoa_pop_tt.merge(
-        tfn_tt, on="tt", how="left"
-    )[["lsoa2021_id", "population"] + pop_type_columns[:-1] ]
+    by_lsoa_pop_tt = by_lsoa_pop_tt.merge(tfn_tt, on="tt", how="left")[
+        ["lsoa2021_id", "population"] + pop_type_columns[:-1]
+    ]
 
     # Define the mapping
     without_car = [1, 3, 6]
     by_lsoa_pop_tt["car_ownership"] = by_lsoa_pop_tt["hh_type"].apply(
         lambda x: 1 if x in without_car else 2
     )
-    by_lsoa_pop_tt = by_lsoa_pop_tt[["lsoa2021_id"] + pop_type_columns +  ["population"]]
+    by_lsoa_pop_tt = by_lsoa_pop_tt[["lsoa2021_id"] + pop_type_columns + ["population"]]
 
     by_lsoa_jobs_sic_soc = pd.read_csv(
-        config.land_use.lsoa_jobs_path, 
-        names=lsoa_jobs_column_names, 
-        header=0, 
-        index_col=None
+        config.land_use.lsoa_jobs_path,
+        names=lsoa_jobs_column_names,
+        header=0,
+        index_col=None,
     )
 
-    # Define the mapping for household car    
+    # Define the mapping for household car
     # Key parameter and paths
     model_zone = config.dev_pattern.geo_boundary.value
     base_year = config.dev_pattern.base_year
     base_year_int = int(base_year)
+    end_year = config.dev_pattern.end_year
+    end_year_int = int(end_year)
     key_output_path = config.output_folder / f"05_{model_zone}"
     key_output_path.mkdir(exist_ok=True)
     key_agg_path = config.output_folder / f"05_aggregation"
     key_agg_path.mkdir(exist_ok=True)
-   
 
     key_columns = ["site_reference_id", "easting", "northing", "web_tag_certainty"]
-    build_out_columns = [str(year) for year in range(base_year_int + 1, 2067)]
+    build_out_columns = [
+        str(year) for year in range(base_year_int + 1, end_year_int + 1)
+    ]
 
     LOG.info("Creating list of sites with estimated development values")
     # list of residential sites with estimated values
@@ -2460,25 +2600,27 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     if model_zone == inputs.GeoBoundary.LSOA:
         by_data_processed = zone_translator.merge_data(
             by_data=by_data_tot,
-            columns_to_process = ["household", "population", "jobs"], 
-            merge_translation_data = False,
-            aggregate_by_zone = False,
-            compute_area = True, 
-            calculate_density = True,
-            model_zone_data= False
+            columns_to_process=["household", "population", "jobs"],
+            merge_translation_data=False,
+            aggregate_by_zone=False,
+            compute_area=True,
+            calculate_density=True,
+            model_zone_data=False,
         )
     else:
         by_data_processed = zone_translator.merge_data(
             by_data=by_data_tot,
-            columns_to_process = ["household", "population", "jobs"], 
-            merge_translation_data = True,
-            aggregate_by_zone = True,
-            compute_area = True, 
-            calculate_density = True,
-            model_zone_data= False
+            columns_to_process=["household", "population", "jobs"],
+            merge_translation_data=True,
+            aggregate_by_zone=True,
+            compute_area=True,
+            calculate_density=True,
+            model_zone_data=False,
         )
 
-    LOG.info("Checking base year totals before and after converting LSOA to the pre-defined model zone")
+    LOG.info(
+        "Checking base year totals before and after converting LSOA to the pre-defined model zone"
+    )
     # get totals after zone translation and other calculations
     by_tot_hhs_post = by_data_processed["household"].sum()
     by_tot_pops_post = by_data_processed["population"].sum()
@@ -2489,12 +2631,16 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     totals_dict = {
         "Category": ["Household", "Population", "Jobs"],
         "Before Translation": [by_tot_hhs_prev, by_tot_pops_prev, by_tot_jobs_prev],
-        "After Translation": [by_tot_hhs_post, by_tot_pops_post, by_tot_jobs_post]
+        "After Translation": [by_tot_hhs_post, by_tot_pops_post, by_tot_jobs_post],
     }
     totals_df = pd.DataFrame(totals_dict)
     # Format the numbers with commas as thousand separators
-    totals_df["Before Translation"] = totals_df["Before Translation"].apply(lambda x: "{:,}".format(x))
-    totals_df["After Translation"] = totals_df["After Translation"].apply(lambda x: "{:,}".format(x))
+    totals_df["Before Translation"] = totals_df["Before Translation"].apply(
+        lambda x: "{:,}".format(x)
+    )
+    totals_df["After Translation"] = totals_df["After Translation"].apply(
+        lambda x: "{:,}".format(x)
+    )
     # Specify the output file path
     totals_df_file = f"totals_before_after_{model_zone}_translation.csv"
 
@@ -2528,7 +2674,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         use_prob_for_size=False,
     ).fillna(0)
     print("res_zone_sites column headers", res_zone_sites.columns)
-    
+
     emp_zone_sites = process_site_data(
         emp_sites,
         by_data_processed,
@@ -2552,26 +2698,34 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "n_e_ratio",
         "ctrd_shift_ratio",
     ]
-    zscore_suffix = 'zscore' #'zscore', 'robust_zscore', 'modified_zscore'
+    zscore_suffix = "zscore"  #'zscore', 'robust_zscore', 'modified_zscore'
 
     index_col = "weighted_index"
-    large_sites_res = LargeSites(site_data=res_zone_sites, columns_to_explore=columns_to_explore)
-    large_sites_emp = LargeSites(site_data=emp_zone_sites, columns_to_explore=columns_to_explore)
+    large_sites_res = LargeSites(
+        site_data=res_zone_sites, columns_to_explore=columns_to_explore
+    )
+    large_sites_emp = LargeSites(
+        site_data=emp_zone_sites, columns_to_explore=columns_to_explore
+    )
 
     LOG.info("Procesing stats and calculating zscores of each attribute")
-    res_site_count, res_site_zone, res_large_site_zone, res_large_site_list = large_sites_res.large_sites_selection(
-        category="residential",
-        zscore_suffix=zscore_suffix,
-        weight_dict=res_weight_dict,
-        index_col=index_col,
-        index_threshold=1.5,
+    res_site_count, res_site_zone, res_large_site_zone, res_large_site_list = (
+        large_sites_res.large_sites_selection(
+            category="residential",
+            zscore_suffix=zscore_suffix,
+            weight_dict=res_weight_dict,
+            index_col=index_col,
+            index_threshold=1.5,
+        )
     )
-    emp_site_count, emp_site_zone, emp_large_site_zone, emp_large_site_list = large_sites_emp.large_sites_selection(
-        category="employment",
-        zscore_suffix=zscore_suffix,
-        weight_dict=emp_weight_dict,
-        index_col=index_col,
-        index_threshold=0.4,
+    emp_site_count, emp_site_zone, emp_large_site_zone, emp_large_site_list = (
+        large_sites_emp.large_sites_selection(
+            category="employment",
+            zscore_suffix=zscore_suffix,
+            weight_dict=emp_weight_dict,
+            index_col=index_col,
+            index_threshold=0.4,
+        )
     )
 
     LOG.info("Exporting key outputs by sites")
@@ -2599,10 +2753,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_output_path / large_emp_sites_file_name, emp_large_site_zone
     )
 
-
     LOG.info("Calculating statistics for residential and employment sites")
     res_stats = large_sites_res._calculate_statistics()
-    emp_stats= large_sites_emp._calculate_statistics()
+    emp_stats = large_sites_emp._calculate_statistics()
 
     res_stats_file = f"residential_sites_stats_{model_zone}.csv"
     emp_stats_file = f"employment_sites_stats_{model_zone}.csv"
@@ -2635,8 +2788,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             emp_zone_sites, columns_to_explore, plot_path, category="emp_val"
         )
 
-   
-    LOG.info("Processing base year data to get profiles for household, population and jobs")
+    LOG.info(
+        "Processing base year data to get profiles for household, population and jobs"
+    )
     # Process base year data for household, population and jobs with required dimensions
     # Translate LSOA to pre-defined model zone
     by_zone_hh_type_data = zone_translator.merge_data(
@@ -2693,7 +2847,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     if not zone_info:
         LOG.error(f"No zone information found for zone {cal_ratios.geo_boundary}")
         return
-    
 
     zone_id = zone_info.get("group_by_column")
 
@@ -2719,48 +2872,55 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         hh_type_columns,
     )
     print("by_zone_hh_type_ratio", by_zone_hh_type_ratio)
-    by_zone_hh_car_ratio = cal_ratios.zone_hh_type_ratios(
-        by_zone_hh_type_data,
-        ["car_availability"],
-    ).drop(columns=["household"]).rename(columns={"ratios": base_year})
+    by_zone_hh_car_ratio = (
+        cal_ratios.zone_hh_type_ratios(
+            by_zone_hh_type_data,
+            ["car_availability"],
+        )
+        .drop(columns=["household"])
+        .rename(columns={"ratios": base_year})
+    )
 
     by_zone_pop_tt_ratio = cal_ratios.zone_traveller_type_ratios(
         by_zone_pop_tt_data,
         pop_type_columns,
     )
     print("by_zone_pop_tt_ratio", by_zone_pop_tt_ratio)
-    by_zone_pop_car_ratio = cal_ratios.zone_traveller_type_ratios(
-        by_zone_pop_tt_data,
-        ["car_ownership"],
-    ).drop(columns=["population"]).rename(columns={"ratios": base_year})
+    by_zone_pop_car_ratio = (
+        cal_ratios.zone_traveller_type_ratios(
+            by_zone_pop_tt_data,
+            ["car_ownership"],
+        )
+        .drop(columns=["population"])
+        .rename(columns={"ratios": base_year})
+    )
     # Calculate default soc ratios for jobs
     by_gb_job_soc_ratio = cal_ratios.gb_job_type_ratios(
         by_zone_job_sic_soc_data,
         ["soc"],
     )
-    by_gb_job_soc_ratio = by_gb_job_soc_ratio.rename(columns={"ratios": "default_ratio"})
-
+    by_gb_job_soc_ratio = by_gb_job_soc_ratio.rename(
+        columns={"ratios": "default_ratio"}
+    )
 
     by_zone_job_soc_over_sic_ratio = cal_ratios.zone_soc_over_sic_ratios(
         by_zone_job_sic_soc_data,
         job_type_columns,
     )
 
-
     by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.merge(
         by_gb_job_soc_ratio,
         on="soc",
-        how="left",        
+        how="left",
     )
     # infill nan with default ratio
-    by_zone_job_soc_over_sic_ratio["ratios"] = by_zone_job_soc_over_sic_ratio["ratios"].fillna(
-        by_zone_job_soc_over_sic_ratio["default_ratio"]
-    )
+    by_zone_job_soc_over_sic_ratio["ratios"] = by_zone_job_soc_over_sic_ratio[
+        "ratios"
+    ].fillna(by_zone_job_soc_over_sic_ratio["default_ratio"])
     by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.drop(
         columns=["default_ratio"]
     )
     print("by_zone_job_sic_soc_ratio", by_zone_job_soc_over_sic_ratio)
-
 
     # Define filenames and corresponding DataFrames
     by_gb_ratios = [
@@ -2771,17 +2931,13 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     for filename, df in by_gb_ratios:
         utilities.write_to_csv(key_output_path / filename, df)
     # utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
- 
-    LOG.info("Extract future year trend of ntem car profile change for pop and household")
-    trend_of_pop_car = cal_ratios.ntem_pop_car_ratios(
-        base_year,
-        build_out_columns
+
+    LOG.info(
+        "Extract future year trend of ntem car profile change for pop and household"
     )
+    trend_of_pop_car = cal_ratios.ntem_pop_car_ratios(base_year, build_out_columns)
     print("trend_of_pop_car", trend_of_pop_car)
-    trend_of_hh_car = cal_ratios.ntem_hh_car_ratios(
-        base_year,
-        build_out_columns
-    )
+    trend_of_hh_car = cal_ratios.ntem_hh_car_ratios(base_year, build_out_columns)
     print("trend_of_hh_car", trend_of_hh_car)
 
     # Generate future year car ownership ratios for population
@@ -2804,49 +2960,63 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     print("zone_pop_car_ratio", zone_pop_car_ratio)
     print("zone_hh_car_ratio", zone_hh_car_ratio)
 
-    LOG.info("Processing zonal household, population and jobs based on D-log data")   
+    LOG.info("Processing zonal household, population and jobs based on D-log data")
     site_size_column = "site_size"
     # Add the site size column to the dataframes
-    res_sites[site_size_column] = np.where(res_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    res_sites[site_size_column] = np.where(
+        res_sites["site_reference_id"].isin(res_large_site_list), "large", "small"
+    )
     res_sites["prob_val"] = res_sites["web_tag_certainty"].map(probability_dict)
-    res_sites[build_out_columns] = res_sites[build_out_columns].multiply(res_sites["prob_val"], axis=0)
+    res_sites[build_out_columns] = res_sites[build_out_columns].multiply(
+        res_sites["prob_val"], axis=0
+    )
 
-    pop_sites[site_size_column] =  np.where(pop_sites["site_reference_id"].isin(res_large_site_list), "large", "small")
+    pop_sites[site_size_column] = np.where(
+        pop_sites["site_reference_id"].isin(res_large_site_list), "large", "small"
+    )
     pop_sites["prob_val"] = pop_sites["web_tag_certainty"].map(probability_dict)
-    pop_sites[build_out_columns] = pop_sites[build_out_columns].multiply(pop_sites["prob_val"], axis=0)
+    pop_sites[build_out_columns] = pop_sites[build_out_columns].multiply(
+        pop_sites["prob_val"], axis=0
+    )
 
-    emp_sites[site_size_column] =  np.where(emp_sites["site_reference_id"].isin(emp_large_site_list), "large", "small")
+    emp_sites[site_size_column] = np.where(
+        emp_sites["site_reference_id"].isin(emp_large_site_list), "large", "small"
+    )
     emp_sites["prob_val"] = emp_sites["web_tag_certainty"].map(probability_dict)
-    emp_sites[build_out_columns] = emp_sites[build_out_columns].multiply(emp_sites["prob_val"], axis=0)
+    emp_sites[build_out_columns] = emp_sites[build_out_columns].multiply(
+        emp_sites["prob_val"], axis=0
+    )
 
-    job_sic_sites[site_size_column] =  np.where(job_sic_sites["site_reference_id"].isin(emp_large_site_list), "large", "small")
+    job_sic_sites[site_size_column] = np.where(
+        job_sic_sites["site_reference_id"].isin(emp_large_site_list), "large", "small"
+    )
     job_sic_sites["prob_val"] = job_sic_sites["web_tag_certainty"].map(probability_dict)
-    job_sic_sites[build_out_columns] = job_sic_sites[build_out_columns].multiply(job_sic_sites["prob_val"], axis=0)
+    job_sic_sites[build_out_columns] = job_sic_sites[build_out_columns].multiply(
+        job_sic_sites["prob_val"], axis=0
+    )
 
     site_zone_processer = SiteZoneProcessor(config)
-    hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(res_sites, site_geometry_col="geometry")
-    pop_sites_zone = site_zone_processer.zone_site_geospatial_lookup(pop_sites, site_geometry_col="geometry")
-    job_sites_zone = site_zone_processer.zone_site_geospatial_lookup(emp_sites, site_geometry_col="geometry")
-    job_sic_sites_zone = site_zone_processer.zone_site_geospatial_lookup(job_sic_sites, site_geometry_col="geometry")
-    hh_zone = site_zone_processer.agg_zonal_data(
-        hh_sites_zone,
-        build_out_columns,
-        site_size_column,
-        dimension_columns=None
+    hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(
+        res_sites, site_geometry_col="geometry"
     )
-
+    pop_sites_zone = site_zone_processer.zone_site_geospatial_lookup(
+        pop_sites, site_geometry_col="geometry"
+    )
+    job_sites_zone = site_zone_processer.zone_site_geospatial_lookup(
+        emp_sites, site_geometry_col="geometry"
+    )
+    job_sic_sites_zone = site_zone_processer.zone_site_geospatial_lookup(
+        job_sic_sites, site_geometry_col="geometry"
+    )
+    hh_zone = site_zone_processer.agg_zonal_data(
+        hh_sites_zone, build_out_columns, site_size_column, dimension_columns=None
+    )
 
     pop_zone = site_zone_processer.agg_zonal_data(
-        pop_sites_zone,
-        build_out_columns,
-        site_size_column,
-        dimension_columns=None
+        pop_sites_zone, build_out_columns, site_size_column, dimension_columns=None
     )
     job_zone = site_zone_processer.agg_zonal_data(
-        job_sites_zone,
-        build_out_columns,
-        site_size_column,
-        dimension_columns=None
+        job_sites_zone, build_out_columns, site_size_column, dimension_columns=None
     )
 
     job_sic_zone = site_zone_processer.agg_zonal_data(
@@ -2855,22 +3025,28 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         site_size_column,
         dimension_columns=["sic_2d"],
     )
-    
-    zonal_household_grth, zonal_population_grth, zonal_job_grth, zonal_household, zonal_population, zonal_job = zone_translator.merge_data(
+
+    (
+        zonal_household_grth,
+        zonal_population_grth,
+        zonal_job_grth,
+        zonal_household,
+        zonal_population,
+        zonal_job,
+    ) = zone_translator.merge_data(
         by_data=by_data_tot,
         columns_to_process=["household", "population", "jobs"],
         by_column=base_year,
         fy_columns=build_out_columns,
-        new_hh_data=hh_zone, 
-        new_pop_data=pop_zone, 
+        new_hh_data=hh_zone,
+        new_pop_data=pop_zone,
         new_job_data=job_zone,
-        merge_translation_data = True,
-        aggregate_by_zone = True,
-        compute_area=False, 
+        merge_translation_data=True,
+        aggregate_by_zone=True,
+        compute_area=False,
         calculate_density=False,
         model_zone_data=True,
     )
-
     zonal_job_sic_grth = zone_translator._model_zone_data_with_dim(
         by_data=by_zone_job_sic_data,
         new_data=job_sic_zone,
@@ -2884,21 +3060,66 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
 
     # zone containing large sites
-    zone_hh_largesites_fy = zonal_household_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_household_grth.columns]]
-    zone_pop_largesites_fy = zonal_population_grth[[zone_id] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_population_grth.columns]]
-    zone_job_sic_largesites_fy = zonal_job_sic_grth[[zone_id, "sic_2d"] + [f"{year}_large" for year in build_out_columns if f"{year}_large" in zonal_job_sic_grth.columns]]
+    zone_hh_largesites_fy = zonal_household_grth[
+        [zone_id]
+        + [
+            f"{year}_large"
+            for year in build_out_columns
+            if f"{year}_large" in zonal_household_grth.columns
+        ]
+    ]
+    zone_pop_largesites_fy = zonal_population_grth[
+        [zone_id]
+        + [
+            f"{year}_large"
+            for year in build_out_columns
+            if f"{year}_large" in zonal_population_grth.columns
+        ]
+    ]
+    zone_job_sic_largesites_fy = zonal_job_sic_grth[
+        [zone_id, "sic_2d"]
+        + [
+            f"{year}_large"
+            for year in build_out_columns
+            if f"{year}_large" in zonal_job_sic_grth.columns
+        ]
+    ]
     # rename year columns
-    zone_hh_largesites_fy = zone_hh_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_household_grth.columns})
-    zone_pop_largesites_fy = zone_pop_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_population_grth.columns})
-    zone_job_sic_largesites_fy = zone_job_sic_largesites_fy.rename(columns={f"{year}_large": f"{year}" for year in build_out_columns if f"{year}_large" in zonal_job_sic_grth.columns})
+    zone_hh_largesites_fy = zone_hh_largesites_fy.rename(
+        columns={
+            f"{year}_large": f"{year}"
+            for year in build_out_columns
+            if f"{year}_large" in zonal_household_grth.columns
+        }
+    )
+    zone_pop_largesites_fy = zone_pop_largesites_fy.rename(
+        columns={
+            f"{year}_large": f"{year}"
+            for year in build_out_columns
+            if f"{year}_large" in zonal_population_grth.columns
+        }
+    )
+    zone_job_sic_largesites_fy = zone_job_sic_largesites_fy.rename(
+        columns={
+            f"{year}_large": f"{year}"
+            for year in build_out_columns
+            if f"{year}_large" in zonal_job_sic_grth.columns
+        }
+    )
 
-    LOG.info("Disaggregating zonal data into required dimensions for household, population and jobs based on D-log data")
+    LOG.info(
+        "Disaggregating zonal data into required dimensions for household, population and jobs based on D-log data"
+    )
     zone_hh_fy = zonal_household[[zone_id] + build_out_columns]
     zone_pop_fy = zonal_population[[zone_id] + build_out_columns]
     zone_job_sic_fy = zonal_job_sic[[zone_id, "sic_2d"] + build_out_columns]
 
-    zone_hh_car_ratio_fy = zone_hh_car_ratio[[zone_id, "car_availability"] + build_out_columns]
-    zone_pop_car_ratio_fy = zone_pop_car_ratio[[zone_id, "car_ownership"] + build_out_columns]
+    zone_hh_car_ratio_fy = zone_hh_car_ratio[
+        [zone_id, "car_availability"] + build_out_columns
+    ]
+    zone_pop_car_ratio_fy = zone_pop_car_ratio[
+        [zone_id, "car_ownership"] + build_out_columns
+    ]
 
     # Get target zonal values for household and population segmented by car ownership for future year
     zone_hh_car_target = cal_ratios.expand_by_dimension(
@@ -2923,17 +3144,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         hh_type_columns,
         by_zone_hh_type_ratio,
     )
-
-
-
     zonal_pop_segmented = cal_ratios.apply_ratio(
         zone_pop_fy,
         build_out_columns,
         pop_type_columns,
         by_zone_pop_tt_ratio,
     )
-
-
     zonal_job_sic_segmented = cal_ratios.apply_soc_over_sic_ratio(
         zone_job_sic_fy,
         build_out_columns,
@@ -2992,7 +3208,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     print("zone_hh_segmented_scaled", zone_hh_segmented_scaled)
     print("zone_pop_segmented_scaled", zone_pop_segmented_scaled)
 
-    LOG.info("Checking totals across future years before and after disaggregating zonal data into dimensions")
+    LOG.info(
+        "Checking totals across future years before and after disaggregating zonal data into dimensions"
+    )
     # Instantiate with your build-out year columns
     comparator = TotalsComparison(build_out_columns)
 
@@ -3008,7 +3226,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     summary_file = f"fy_totals_comparison_{model_zone}.csv"
     utilities.write_to_csv(key_output_path / summary_file, summary_df)
 
-    LOG.info("Calculating zonal ratios for segmented zonal data for household, population and jobs for future years")
+    LOG.info(
+        "Calculating zonal ratios for segmented zonal data for household, population and jobs for future years"
+    )
     # Work out the ratios (profile) of dimensions based on scaled zonal data for household and population, and the segmetned jobs for future year
     fy_zone_hh_type_ratio = cal_ratios.zone_ratios_by_type_fy(
         zone_hh_segmented_scaled,
@@ -3027,7 +3247,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         zonal_job_sic_segmented,
         job_type_columns,
         build_out_columns,
-        [0,1],
+        [0, 1],
     )
     print("fy_zone_hh_type_ratio", fy_zone_hh_type_ratio)
     print("fy_zone_traveller_type_ratio", fy_zone_traveller_type_ratio)
@@ -3037,7 +3257,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     zone_hh_largesites_fy_seg = cal_ratios.expand_by_dimension(
         zone_hh_largesites_fy,
         fy_zone_hh_type_ratio,
-        build_out_columns,        
+        build_out_columns,
         hh_type_columns,
     )
     zone_pop_largesites_fy_seg = cal_ratios.expand_by_dimension(
@@ -3053,12 +3273,20 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         by_zone_job_soc_over_sic_ratio,
     )
 
-    LOG.info("Checking totals across future years before and after disaggregating zonal data into dimensions for large sites")
+    LOG.info(
+        "Checking totals across future years before and after disaggregating zonal data into dimensions for large sites"
+    )
 
     # Add comparisons
-    comparator.add_comparison("Household", zone_hh_largesites_fy, zone_hh_largesites_fy_seg)
-    comparator.add_comparison("Population", zone_pop_largesites_fy, zone_pop_largesites_fy_seg)
-    comparator.add_comparison("Jobs", zone_job_sic_largesites_fy, zone_job_sic_largesites_fy_seg)
+    comparator.add_comparison(
+        "Household", zone_hh_largesites_fy, zone_hh_largesites_fy_seg
+    )
+    comparator.add_comparison(
+        "Population", zone_pop_largesites_fy, zone_pop_largesites_fy_seg
+    )
+    comparator.add_comparison(
+        "Jobs", zone_job_sic_largesites_fy, zone_job_sic_largesites_fy_seg
+    )
 
     # Get summary
     summary_df = comparator.get_summary()
@@ -3067,60 +3295,97 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     summary_file = f"fy_largesitetotals_comparison_{model_zone}.csv"
     utilities.write_to_csv(key_output_path / summary_file, summary_df)
 
-    LOG.info("Combining zonal total and growth from large sites into a single data frame for segmented household, population and jobs for future year")
+    LOG.info(
+        "Combining zonal total and growth from large sites into a single data frame for segmented household, population and jobs for future year"
+    )
     # rename the column for year in build_out_columns
-    zone_hh_largesites_fy_seg = zone_hh_largesites_fy_seg.rename(columns={year: f"{year}_large" for year in build_out_columns})
-    zone_pop_largesites_fy_seg = zone_pop_largesites_fy_seg.rename(columns={year: f"{year}_large" for year in build_out_columns})
-    zone_job_sic_largesites_fy_seg = zone_job_sic_largesites_fy_seg.rename(columns={year: f"{year}_large" for year in build_out_columns})
-    # Combine the dataframes
-    final_zonal_hh_segmented = zone_hh_segmented_scaled.merge(
+    zone_hh_largesites_fy_seg = zone_hh_largesites_fy_seg.rename(
+        columns={year: f"{year}_large" for year in build_out_columns}
+    )
+    zone_pop_largesites_fy_seg = zone_pop_largesites_fy_seg.rename(
+        columns={year: f"{year}_large" for year in build_out_columns}
+    )
+    zone_job_sic_largesites_fy_seg = zone_job_sic_largesites_fy_seg.rename(
+        columns={year: f"{year}_large" for year in build_out_columns}
+    )
+    # Combine the base year with future year  dataframes
+    by_zone_hh_type_data = by_zone_hh_type_data.rename(columns={"household": "2023"})
+    by_zone_pop_tt_data = by_zone_pop_tt_data.rename(
+        columns={"population": "2023"}
+    ).drop(columns=pop_type_columns[1:])
+    by_zone_job_sic_soc_data = by_zone_job_sic_soc_data.rename(columns={"jobs": "2023"})
+
+    # combined_zone_hh_segmented = zone_hh_segmented_scaled.merge(
+    #     by_zone_hh_type_data,
+    #     on=[zone_id] + hh_type_columns,
+    #     how="left",
+    # )
+    # zone_hh_grth_segmented = zone_translator._cumulative_yearly_growth(
+    #     combined_zone_hh_segmented, base_year, build_out_columns
+    # )
+
+    # final_zone_hh_grth_seged = zone_hh_grth_segmented.merge(
+    #     zone_hh_largesites_fy_seg,
+    #     on=[zone_id] + hh_type_columns,
+    #     how="left",
+    # )
+    # print("combined_zone_hh_segmented", combined_zone_hh_segmented)
+    # print("zone_hh_grth_segmented", zone_hh_grth_segmented)
+    # print("final_zonal_hh_segmented", final_zone_hh_grth_seged)
+
+    final_zone_hh_seged = zone_hh_segmented_scaled.merge(
         zone_hh_largesites_fy_seg,
         on=[zone_id] + hh_type_columns,
         how="left",
     )
 
-    zone_pop_segmented_scaled = zone_pop_segmented_scaled[[zone_id, "tt"] + build_out_columns]
-    final_zonal_pop_segmented = zone_pop_segmented_scaled.merge(
+    # combined_zone_pop_segmented = zone_pop_segmented_scaled.merge(
+    #     by_zone_pop_tt_data, on=[zone_id, "tt"], how="left"
+    # )
+
+    # zone_pop_grth_segmented = zone_translator._cumulative_yearly_growth(
+    #     combined_zone_pop_segmented, base_year, build_out_columns
+    # )
+    # final_zone_pop_grth_seged = zone_pop_grth_segmented.merge(
+    #     zone_pop_largesites_fy_seg,
+    #     on=[zone_id, "tt"],
+    #     how="left",
+    # )
+    # print("combined_zone_pop_segmented", combined_zone_pop_segmented)
+    # print("zone_pop_grth_segmented", zone_pop_grth_segmented)
+    # print("final_zone_pop_segmented", final_zone_pop_grth_seged)
+
+    # zone_pop_segmented_scaled = zone_pop_segmented_scaled[[zone_id, "tt"] + build_out_columns]
+    final_zone_pop_seged = zone_pop_segmented_scaled.merge(
         zone_pop_largesites_fy_seg,
         on=[zone_id, "tt"],
         how="left",
-    )
+    ).drop(columns=pop_type_columns[1:])
 
-    final_zonal_job_segmented = zonal_job_sic_segmented.merge(
+    # combined_zone_job_segmented = zonal_job_sic_segmented.merge(
+    #     by_zone_job_sic_data, on=[zone_id] + job_type_columns, how="left"
+    # )
+    # zone_job_grth_segmented = zone_translator._cumulative_yearly_growth(
+    #     combined_zone_job_segmented, base_year, build_out_columns
+    # )
+
+    # final_zone_job_grth_seged = zone_job_grth_segmented.merge(
+    #     zone_job_sic_largesites_fy_seg,
+    #     on=[zone_id] + job_type_columns,
+    #     how="left",
+    # )
+    # print("combined_zone_pop_segmented", combined_zone_job_segmented)
+    # print("zone_pop_grth_segmented", zone_job_grth_segmented)
+    # print("final_zone_pop_segmented", final_zone_job_grth_seged)
+
+    final_zone_job_seged = zonal_job_sic_segmented.merge(
         zone_job_sic_largesites_fy_seg,
         on=[zone_id] + job_type_columns,
         how="left",
     )
-    print("final_zonal_hh_segmented", final_zonal_hh_segmented)
-    print("final_zonal_pop_segmented", final_zonal_pop_segmented)
-    print("final_zonal_job_sic_segmented", final_zonal_job_segmented)
-
-    # LOG.info("Calculating accumulated growth for future year based on segmented zonal data for household, population and jobs")
-    # # zonal_growth_hh_type = zone_translator._cumulative_yearly_growth(
-    # #     zonal_hh_segmented.reset_index(),
-    # #     base_year,
-    # #     build_out_columns,
-    # # )    
-    # # zonal_growth_pop_type = zone_translator._cumulative_yearly_growth(
-    # #     zonal_pop_segmented.reset_index(),
-    # #     base_year,
-    # #     build_out_columns,
-    # # )
-    # # zonal_growth_job_type = zone_translator._cumulative_yearly_growth(
-    # #     zonal_job_sic_segmented.reset_index(),
-    # #     base_year,
-    # #     build_out_columns,
-    # # )
-
-    # zonal_outputs = [
-    #     (f"{model_zone}_zonal_household.csv", zonal_household),
-    #     (f"{model_zone}_zonal_population.csv", zonal_population),
-    #     (f"{model_zone}_zonal_job.csv", zonal_job),
-    # ]
-
-    # # Write each output to CSV
-    # for file_name, df in zonal_outputs:
-    #     utilities.write_to_csv(key_output_path / file_name, df)
+    print("final_zone_hh_seged", final_zone_hh_seged)
+    print("final_zone_pop_seged", final_zone_pop_seged)
+    print("final_zone_job_seged", final_zone_job_seged)
 
     LOG.info("Aggregating zonal household, population and jobs to LAD")
     lad_household_ab_growth, lad_household = zone_translator.lad_summary(
@@ -3134,7 +3399,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         build_out_columns,
     )
     lad_job_ab_growth, lad_job = zone_translator.lad_summary(
-        zonal_job_grth, 
+        zonal_job_grth,
         base_year,
         build_out_columns,
     )
@@ -3153,38 +3418,37 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     for file_name, df in lad_outputs:
         utilities.write_to_csv(key_agg_path / file_name, df)
 
-
-    
     LOG.info("Further transforming and processing land use data for tripend module")
     data_frames = {
-        "soc_sic_emp": final_zonal_job_segmented,
-        "tt_pop": final_zonal_pop_segmented,
+        "soc_sic_emp": final_zone_job_seged,  # final_zone_job_seged- for future year total; by_zone_job_sic_soc_data for base year total
+        "tt_pop": final_zone_pop_seged,  # final_zone_pop_seged- for future year total; by_zone_pop_tt_data for base year total
         "tfn_tt": tfn_tt,
-        "hh": final_zonal_hh_segmented,
+        "hh": final_zone_hh_seged,  # final_zone_hh_seged- for future year total; by_zone_hh_type_data for base year total
     }
 
     output_folders = {
         "soc_sic_emp": key_output_path / "dlog_soc_sic_emp",
         "tt_pop": key_output_path / "dlog_tt_pop",
-        "hh": key_output_path / "dlog_hh"
+        "hh": key_output_path / "dlog_hh",
     }
 
     for folder in output_folders.values():
         folder.mkdir(exist_ok=True)
-    
 
     LOG.info("Transforming and processing land use data for tripend module")
     prep_teinput = PrepTripends(config)
 
     for dtype in ["soc_sic_emp", "tt_pop", "hh"]:
         processed_data = prep_teinput.process_data(
-            data_frames[dtype], 
-            dtype, 
-            data_frames["tfn_tt"] if dtype == "tt_pop" else None
+            data_frames[dtype],
+            dtype,
+            data_frames["tfn_tt"] if dtype == "tt_pop" else None,
         )
 
         for year_col, pivot_df in processed_data.items():
-            category = next((cat for cat in prep_teinput.CATEGORIES if cat in year_col), '')
+            category = next(
+                (cat for cat in prep_teinput.CATEGORIES if cat in year_col), ""
+            )
 
             output_folder = output_folders[dtype] / f"{dtype}{category}"
             output_folder.mkdir(exist_ok=True)
@@ -3193,5 +3457,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             prep_teinput.perform_segmentation_and_zoning(pivot_df, dtype, output_file)
 
     LOG.info("Ending Development Pattern Module")
+
 
 # if __name__ == "__main__":
