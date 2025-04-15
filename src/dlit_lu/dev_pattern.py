@@ -2480,9 +2480,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         )
 
     LOG.info("Initialising Development Pattern Module")
-
     config.output_folder.mkdir(exist_ok=True)
-    LOG.info("Loading Key Inputs")
+
+    LOG.info("Loading key inputs")
     # Create probability values for each certainty
     probability_dict_df = pd.read_csv(config.land_use.web_tag_certainty_path)
     # Convert it to a dictionary
@@ -3247,7 +3247,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )[[zone_id] + hh_type_columns + [base_year] + build_out_columns]
     combined_zone_pop_segmented = zone_pop_segmented_scaled.merge(
         by_zone_pop_tt_data, on=[zone_id, "tt"], how="left"
-    )[[zone_id, pop_type_columns, base_year] + build_out_columns]
+    )[[zone_id] + pop_type_columns + [base_year] + build_out_columns]
 
     combined_zone_job_segmented = zonal_job_sic_segmented.merge(
         by_zone_job_sic_soc_data, on=[zone_id] + job_type_columns, how="left"
@@ -3352,18 +3352,20 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
 
     # Add comparisons
-    comparator.add_comparison(
+    # Instantiate with your build-out year columns
+    ls_comparator = TotalsComparison(build_out_columns)
+    ls_comparator.add_comparison(
         "Household", zone_hh_largesites_fy, zone_hh_largesites_fy_seg
     )
-    comparator.add_comparison(
+    ls_comparator.add_comparison(
         "Population", zone_pop_largesites_fy, zone_pop_largesites_fy_seg
     )
-    comparator.add_comparison(
+    ls_comparator.add_comparison(
         "Jobs", zone_job_sic_largesites_fy, zone_job_sic_largesites_fy_seg
     )
 
     # Get summary
-    summary_df = comparator.get_summary()
+    summary_df = ls_comparator.get_summary()
 
     # Export if needed
     summary_file = f"fy_largesitetotals_comparison_{model_zone}.csv"
