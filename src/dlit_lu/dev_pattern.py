@@ -2200,7 +2200,12 @@ class PrepTripends:
         if data_type == "hh":
             dvec = dvec.add_segments(["adult_nssec", "total"])
 
+        if data_type == "soc_sic_emp":
+            dvec = dvec.add_segments(["sic_1_digit"])
+
         dvec.save(output_path)
+        df = dvec.data
+        df.to_csv(output_path)
 
 
 def get_site_reference_ids(
@@ -3267,7 +3272,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     summary_file = f"fy_totals_comparison_{model_zone}.csv"
     utilities.write_to_csv(key_output_path / summary_file, summary_df)
 
-    LOG.info("Get subset of zonal totals with full dimensions and export the csv files")
+    LOG.info(
+        "Getting subset of zonal totals with full dimensions and export the csv files"
+    )
     # Store your DataFrames in a dictionary
     comb_dfs = {
         "hh": combined_zone_hh_segmented,
@@ -3327,7 +3334,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     print("fy_zone_traveller_type_ratio", fy_zone_traveller_type_ratio)
     print("fy_zone_job_type_ratio", fy_zone_job_type_ratio)
 
-    LOG.info("Expand zonal data derived from large sites to full dimensions")
+    LOG.info("Expanding zonal data derived from large sites to full dimensions")
     zone_hh_largesites_fy_seg = cal_ratios.expand_by_dimension(
         zone_hh_largesites_fy,
         fy_zone_hh_type_ratio,
@@ -3446,17 +3453,26 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     print("final_zone_job_seged", final_zone_job_seged)
 
     LOG.info(
-        "Export complete zonal results on future year totals and large site growth"
+        "Exporting complete zonal results on future year totals and large site growth"
     )
+
+    write_large_files = False  # Set to False if you want to skip the big files
+
     zonal_outputs = [
         (f"{model_zone}_zonal_household.csv", zonal_household),
         (f"{model_zone}_zonal_population.csv", zonal_population),
         (f"{model_zone}_zonal_job.csv", zonal_job),
-        (f"{model_zone}_zonal_fy_hh_by_type.csv.bz2", final_zone_hh_seged),
-        (f"{model_zone}_zonal_fy_pop_by_tt.csv.bz2", final_zone_pop_seged),
-        (f"{model_zone}_zonal_fy_job_by_sic_soc.csv.bz2", final_zone_job_seged),
     ]
-    # Write each output to CSV
+
+    if write_large_files:
+        zonal_outputs.extend(
+            [
+                (f"{model_zone}_zonal_fy_hh_by_type.csv.bz2", final_zone_hh_seged),
+                (f"{model_zone}_zonal_fy_pop_by_tt.csv.bz2", final_zone_pop_seged),
+                (f"{model_zone}_zonal_fy_job_by_sic_soc.csv.bz2", final_zone_job_seged),
+            ]
+        )
+
     for file_name, df in zonal_outputs:
         utilities.write_to_csv(key_output_path / file_name, df)
 
@@ -3508,7 +3524,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     for folder in output_folders.values():
         folder.mkdir(exist_ok=True)
 
-    LOG.info("Transforming and processing land use data for tripend module")
     prep_teinput = PrepTripends(config)
 
     for dtype in ["soc_sic_emp", "tt_pop", "hh"]:
