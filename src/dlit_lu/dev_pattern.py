@@ -2204,8 +2204,8 @@ class PrepTripends:
             dvec = dvec.add_segments(["sic_1_digit"])
 
         dvec.save(output_path)
-        df = dvec.data
-        df.to_csv(output_path)
+        # df = dvec.data
+        # df.to_csv(output_path)
 
 
 def get_site_reference_ids(

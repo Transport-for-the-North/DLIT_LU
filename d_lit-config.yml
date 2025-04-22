@@ -1,7 +1,7 @@
 #Set Up Parameters
 run_infill: False
 run_land_use: False
-run_dev_pattern: True
+run_dev_pattern: False
 run_constraint: False
 run_tripend: True
 
@@ -11,9 +11,9 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v6.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\existing_luc_split_path.csv
 
 
 infill:
@@ -26,11 +26,11 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\user_input.xlsx
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\user_input.xlsx
   gfa_infill_method: regression_no_negatives # mean, median, glbaverage, regression, regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\03_post_fixes\post_fix_data.xlsx
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\03_post_fixes\post_fix_data.xlsx
 
   lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
   lsoa_hh_types_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output P13.3.csv
@@ -52,15 +52,15 @@ dev_pattern:
   geo_boundary: normits # lsoa, normits, noham, norms, mosa
   viz_distribution: False
   index_weights_path : inputs\variable_index_weights.csv
-  lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\tot_by_data_out.csv
-  assessment_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
-  emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
-  res_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
-  pop_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\population_sites_uncertainty_build_out.csv
-  emp_sic_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\jobs_sic_sites_uncertainty_build_out.csv
-  hh_type_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\household_segmented_sites_uncertainty_build_out.csv.bz2
-  pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
-  emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
+  lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\tot_by_data_out.csv
+  assessment_input: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
+  emp_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
+  res_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
+  pop_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\population_sites_uncertainty_build_out.csv
+  emp_sic_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\jobs_sic_sites_uncertainty_build_out.csv
+  hh_type_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\household_segmented_sites_uncertainty_build_out.csv.bz2
+  pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
+  emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
 
   # shape file paths
   normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
@@ -125,12 +125,14 @@ constraint:
   ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
   ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
   # Inputs from previous module dev_pattern
-  dlog_hh: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_aggregation\lad_household.csv
-  dlog_emp: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_aggregation\lad_job.csv
-  dlog_pop: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn\05_aggregation\lad_population.csv
+  dlog_hh: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\05_aggregation\lad_household.csv
+  dlog_emp: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\05_aggregation\lad_job.csv
+  dlog_pop: I:\Data\D-Log\DLIT\Outputs\Test18_DLog24_v0.15_rnn - Copy\05_aggregation\lad_population.csv
   ntem_hh: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Households.csv
   ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
   ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
+  # Ratio value to determing the proportion of Dlog growth. E,g, 0.75 means the 75% percent of target growth from constraint will from Dlog pattern
+  cap_ratio: 0.95
 
 tripend:
   # ntem_scenario: core #High #Low etc
@@ -138,13 +140,18 @@ tripend:
   future_years:
     - 2024  # list[int]
   # key input paths from dev_pattern
-  dlog_hb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\hb_productions\hb_normits_tem_segmented.csv.bz2
-  dlog_hb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\hb_attractions\hb_normits_tem_segmented.csv.bz2
-  dlog_nhb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_productions\nhb_normits_tem_segmented.csv.bz2
-  dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_attractions\nhb_normits_tem_segmented.csv.bz2
+  # dlog_hb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\hb_productions\hb_normits_tem_segmented.csv.bz2
+  # dlog_hb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\hb_attractions\hb_normits_tem_segmented.csv.bz2
+  # dlog_nhb_prod: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_productions\nhb_normits_tem_segmented.csv.bz2
+  # dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_attractions\nhb_normits_tem_segmented.csv.bz2
+
+  # key input paths from future year trip end
+  fy_fr_hb: I:\NorMITs NoTEM\yk_test\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  fy_to_hb: I:\NorMITs NoTEM\yk_test\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  fy_nhb: I:\NorMITs NoTEM\yk_test\tripend\NorMITs_tripend_2024_nhb.csv.bz2 
   # key input paths from base year trip end
   by_fr_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
-  by_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
+  by_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_to_adjusted.csv.bz2
   by_nhb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_nhb_adjusted.csv.bz2
   # key input paths from ntem trip end
   ntem_zone_hb_prod: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_production_hb.csv.bz2

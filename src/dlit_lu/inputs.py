@@ -47,6 +47,7 @@ class Sector(enum.Enum):
     COMBINED_LAD = "combined_lad"
     LAD = "lad"
 
+
 # Define sector-specific metadata at the module level
 SECTOR_INFO_MAP: Dict[Sector, Dict[str, Any]] = {
     Sector.REGION: {
@@ -57,13 +58,14 @@ SECTOR_INFO_MAP: Dict[Sector, Dict[str, Any]] = {
         "sector_name": None,  # Key to fetch from config.constraint
     },
     Sector.LAD: {
-        "lookup_path": None, # Path to the translation file from config.constraint or config.tripend
-        "zone_id": None, # Will be dynamically assigned, column name in translation file
-        "sector_id": None, # Will be dynamically assigned, column name in translation file
-        "zone_to_sector_prop_col": None, # Will be dynamically assigned, column name in translation file
-        "sector_name": None, # Key to fetch from config.constraint
+        "lookup_path": None,  # Path to the translation file from config.constraint or config.tripend
+        "zone_id": None,  # Will be dynamically assigned, column name in translation file
+        "sector_id": None,  # Will be dynamically assigned, column name in translation file
+        "zone_to_sector_prop_col": None,  # Will be dynamically assigned, column name in translation file
+        "sector_name": None,  # Key to fetch from config.constraint
     },
 }
+
 
 @dataclasses.dataclass
 class SummaryInputs:
@@ -347,6 +349,7 @@ class ConstraintConfig:
     dlog_pop : Optional[pathlib.Path], default=None
         Path to the DLOG population data, if available.
     """
+
     sector: Sector
     lad_to_region_file: pydantic.FilePath
     lad_name: pydantic.FilePath
@@ -356,6 +359,7 @@ class ConstraintConfig:
     ntem_hh: pydantic.FilePath
     ntem_pop: pydantic.FilePath
     ntem_emp: pydantic.FilePath
+    cap_ratio: float
     dlog_hh: Optional[pathlib.Path] = None
     dlog_emp: Optional[pathlib.Path] = None
     dlog_pop: Optional[pathlib.Path] = None
@@ -367,7 +371,7 @@ class TripendsConfig:
 
     This class holds the configuration for trip-end data, including paths to various files
     that describe trip production and attraction for different zones and regions, as well as
-    data for households, employment, and populations. Additionally, it includes options for 
+    data for households, employment, and populations. Additionally, it includes options for
     exporting data for visualization and optional DLOG data related to trip ends.
 
     Attributes
@@ -409,6 +413,7 @@ class TripendsConfig:
     dlog_nhb_attr : Optional[pathlib.Path], default=None
         Path to the DLOG non-household attraction data, if available.
     """
+
     sector: Sector
     future_years: list[int]
     # pop2023: pydantic.FilePath
@@ -424,10 +429,13 @@ class TripendsConfig:
     ntem_lad_nhb_prod: pydantic.FilePath
     ntem_lad_nhb_attr: pydantic.FilePath
     export_for_viz: bool
-    dlog_hb_prod: Optional[pathlib.Path] = None
-    dlog_hb_attr: Optional[pathlib.Path] = None
-    dlog_nhb_prod: Optional[pathlib.Path] = None
-    dlog_nhb_attr: Optional[pathlib.Path] = None
+    fy_fr_hb: Optional[pathlib.Path] = None
+    fy_to_hb: Optional[pathlib.Path] = None
+    fy_nhb: Optional[pathlib.Path] = None
+    # dlog_hb_prod: Optional[pathlib.Path] = None
+    # dlog_hb_attr: Optional[pathlib.Path] = None
+    # dlog_nhb_prod: Optional[pathlib.Path] = None
+    # dlog_nhb_attr: Optional[pathlib.Path] = None
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -534,7 +542,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("tripend is required if run_tripend is true")
 
         if not values.get("run_constraint") and not all(
-            [value.dlog_hb_prod, value.dlog_hb_attr]
+            [value.fy_fr_hb, value.fy_nhb]
+            # [value.dlog_hb_prod, value.dlog_hb_attr]
         ):
             raise ValueError(
                 "dlog_hb_prod, dlog_hb_attr are required if not running constraint module"

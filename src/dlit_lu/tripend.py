@@ -353,6 +353,7 @@ def run(config: inputs.DLitConfig):
     base_year_column = str(base_year)
     future_years = config.tripend.future_years
     future_year_columns = [str(year) for year in future_years]
+    future_year_column = str(2024)
     key_te_folder = config.output_folder / "07_tripend"
     key_te_folder.mkdir(exist_ok=True)
     model_zone = config.dev_pattern.geo_boundary.value
@@ -372,22 +373,22 @@ def run(config: inputs.DLitConfig):
     calc = constraint.ConstraintCalculation()
     LOG.info("Loading and transforming base year trip end data")
     # Load datasets
-    datasets = {
+    by_datasets = {
         "by_hb": pd.read_csv(config.tripend.by_fr_hb),
-        # "by_hb_to": pd.read_csv(config.tripend.by_to_hb),
+        "by_hb_to": pd.read_csv(config.tripend.by_to_hb),
         "by_nhb": pd.read_csv(config.tripend.by_nhb),
     }
 
     # Process each dataset
     by_zone_te = {}
     summary_by_zone_te = []  # Initialize summary table outside the loop
-    for name, df in datasets.items():
-        total_prod_before = (
-            df["prod"].sum() / 5
-        )  # Divide by 5 to get average week day totals
-        total_attr_before = (
-            df["attr"].sum() / 5
-        )  # Divide by 5 to get average week day totals
+    for name, df in by_datasets.items():
+        total_prod_before = df[
+            "prod"
+        ].sum()  # Divide by 5 to get average week day totals
+        total_attr_before = df[
+            "attr"
+        ].sum()  # Divide by 5 to get average week day totals
         transformer = ByTeTransformation(df, base_year_column)
 
         # Store transformed DataFrame
@@ -416,8 +417,8 @@ def run(config: inputs.DLitConfig):
         )
 
     # Convert summary data to DataFrame
-    summary_df = pd.DataFrame(summary_by_zone_te)
-    utilities.write_to_csv(key_te_folder / "by_te_summary.csv", summary_df)
+    summary_by_df = pd.DataFrame(summary_by_zone_te)
+    utilities.write_to_csv(key_te_folder / "by_te_summary.csv", summary_by_df)
     utilities.write_to_csv(
         key_te_folder / "by_hb_production.csv", by_zone_te["by_hb"]["prod"]
     )
@@ -444,15 +445,72 @@ def run(config: inputs.DLitConfig):
     LOG.info("Generating or Loading Dlog trip end data")
 
     # Load data into a dictionary
-    dlog_zone_te = {
-        key: df.rename(columns={"zone": "normits_v3.3_id"})
-        for key, df in {
-            "dlog_hb_prod": pd.read_csv(config.tripend.dlog_hb_prod),
-            "dlog_hb_attr": pd.read_csv(config.tripend.dlog_hb_attr),
-            "dlog_nhb_prod": pd.read_csv(config.tripend.dlog_nhb_prod),
-            "dlog_nhb_attr": pd.read_csv(config.tripend.dlog_nhb_attr),
-        }.items()
+
+    # Load datasets
+    dlog_datasets = {
+        "fy_hb": pd.read_csv(config.tripend.fy_fr_hb),
+        "fy_hb_to": pd.read_csv(config.tripend.fy_to_hb),
+        "fy_nhb": pd.read_csv(config.tripend.fy_nhb),
     }
+
+    # Process each dataset
+    dlog_zone_te = {}
+    summary_dlog_zone_te = []  # Initialize summary table outside the loop
+    for name, df in dlog_datasets.items():
+        total_prod_before = df[
+            "prod"
+        ].sum()  # Divide by 5 to get average week day totals
+        total_attr_before = df[
+            "attr"
+        ].sum()  # Divide by 5 to get average week day totals
+        transformer = ByTeTransformation(df, future_year_column)
+
+        # Store transformed DataFrame
+        dlog_zone_te[name] = {
+            "total_prod_before": total_prod_before,
+            "total_attr_before": total_attr_before,
+            "prod": transformer.groupby_sum("prod"),
+            "attr": transformer.groupby_sum("attr"),
+        }
+
+    # Summary table to check total before and after transformation
+    for name in dlog_zone_te.keys():
+        # Get total sum from aggregated "prod" and "attr"
+        total_prod = dlog_zone_te[name]["prod"][future_year_column].sum()
+        total_attr = dlog_zone_te[name]["attr"][future_year_column].sum()
+
+        # Store summary data
+        summary_dlog_zone_te.append(
+            {
+                "dataset": name,
+                "total_prod_beforetrans": dlog_zone_te[name]["total_prod_before"],
+                "total_attr_beforetrans": dlog_zone_te[name]["total_attr_before"],
+                "total_prod": total_prod,
+                "total_attr": total_attr,
+            }
+        )
+
+    # Convert summary data to DataFrame
+    summary_dlog_df = pd.DataFrame(summary_dlog_zone_te)
+    utilities.write_to_csv(key_te_folder / "dlog_te_summary.csv", summary_dlog_df)
+    utilities.write_to_csv(
+        key_te_folder / "dlog_hb_production.csv", dlog_zone_te["fy_hb"]["prod"]
+    )
+    utilities.write_to_csv(
+        key_te_folder / "dlog_hb_attraction.csv", dlog_zone_te["fy_hb"]["attr"]
+    )
+    # Check the shape of the by_zone_te
+    print(dlog_zone_te["fy_hb"]["prod"].shape)
+    print(dlog_zone_te["fy_hb"]["attr"].shape)
+    # dlog_zone_te = {
+    #     key: df.rename(columns={"zone": "normits_v3.3_id"})
+    #     for key, df in {
+    #         "dlog_hb_prod": pd.read_csv(config.tripend.dlog_hb_prod),
+    #         "dlog_hb_attr": pd.read_csv(config.tripend.dlog_hb_attr),
+    #         "dlog_nhb_prod": pd.read_csv(config.tripend.dlog_nhb_prod),
+    #         "dlog_nhb_attr": pd.read_csv(config.tripend.dlog_nhb_attr),
+    #     }.items()
+    # }
     ntem_zone_te = {
         "ntem_hb_prod": pd.read_csv(config.tripend.ntem_zone_hb_prod)[
             [zone_id, "p", "m", base_year_column] + future_year_columns
@@ -482,7 +540,8 @@ def run(config: inputs.DLitConfig):
             # Merge zone data for each category and data type
             merged_data = te_cp.merge_zone_data(
                 by_zone_te[f"by_{category}"][data_type],
-                dlog_zone_te[f"dlog_{category}_{data_type}"],
+                dlog_zone_te[f"fy_{category}"][data_type],
+                # dlog_zone_te[f"dlog_{category}_{data_type}"],
                 zone_index_columns,
             )
             # Fill NaN values with 0 in merged_data before further processing
