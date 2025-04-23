@@ -354,6 +354,7 @@ def run(config: inputs.DLitConfig):
     future_years = config.tripend.future_years
     future_year_columns = [str(year) for year in future_years]
     future_year_column = str(2024)
+    cap_ratio = config.constraint.cap_ratio
     key_te_folder = config.output_folder / "07_tripend"
     key_te_folder.mkdir(exist_ok=True)
     model_zone = config.dev_pattern.geo_boundary.value
@@ -453,6 +454,12 @@ def run(config: inputs.DLitConfig):
         "fy_nhb": pd.read_csv(config.tripend.fy_nhb),
     }
 
+    dlog_grth_datasets = {
+        "fy_grth_hb": pd.read_csv(config.tripend.fy_grth_fr_hb),
+        "fy_grth_hb_to": pd.read_csv(config.tripend.fy_grth_to_hb),
+        "fy_grth_nhb": pd.read_csv(config.tripend.fy_grth_nhb),
+    }
+
     # Process each dataset
     dlog_zone_te = {}
     summary_dlog_zone_te = []  # Initialize summary table outside the loop
@@ -502,6 +509,59 @@ def run(config: inputs.DLitConfig):
     # Check the shape of the by_zone_te
     print(dlog_zone_te["fy_hb"]["prod"].shape)
     print(dlog_zone_te["fy_hb"]["attr"].shape)
+
+    # Process each dataset
+    dlog_zone_te_grth = {}
+    summary_dlog_zone_te_grth = []  # Initialize summary table outside the loop
+    for name, df in dlog_grth_datasets.items():
+        total_prod_before = df[
+            "prod"
+        ].sum()  # Divide by 5 to get average week day totals
+        total_attr_before = df[
+            "attr"
+        ].sum()  # Divide by 5 to get average week day totals
+        transformer = ByTeTransformation(df, future_year_column)
+
+        transformer = ByTeTransformation(df, future_year_column)
+
+        # Store transformed DataFrame
+        dlog_zone_te_grth[name] = {
+            "total_prod_before": total_prod_before,
+            "total_attr_before": total_attr_before,
+            "prod": transformer.groupby_sum("prod"),
+            "attr": transformer.groupby_sum("attr"),
+        }
+    # Summary table to check total before and after transformation
+    for name in dlog_zone_te_grth.keys():
+        # Get total sum from aggregated "prod" and "attr"
+        total_prod = dlog_zone_te_grth[name]["prod"][future_year_column].sum()
+        total_attr = dlog_zone_te_grth[name]["attr"][future_year_column].sum()
+
+        # Store summary data
+        summary_dlog_zone_te_grth.append(
+            {
+                "dataset": name,
+                "total_prod_beforetrans": dlog_zone_te_grth[name]["total_prod_before"],
+                "total_attr_beforetrans": dlog_zone_te_grth[name]["total_attr_before"],
+                "total_prod": total_prod,
+                "total_attr": total_attr,
+            }
+        )
+
+    # Convert summary data to DataFrame
+    summary_dlog_grth_df = pd.DataFrame(summary_dlog_zone_te_grth)
+    utilities.write_to_csv(
+        key_te_folder / "dlog_te_grth_summary.csv", summary_dlog_grth_df
+    )
+    utilities.write_to_csv(
+        key_te_folder / "dlog_hb_production_grth.csv",
+        dlog_zone_te_grth["fy_grth_hb"]["prod"],
+    )
+    utilities.write_to_csv(
+        key_te_folder / "dlog_hb_attraction_grth.csv",
+        dlog_zone_te_grth["fy_grth_hb"]["attr"],
+    )
+
     # dlog_zone_te = {
     #     key: df.rename(columns={"zone": "normits_v3.3_id"})
     #     for key, df in {
@@ -531,7 +591,7 @@ def run(config: inputs.DLitConfig):
     te = ["prod", "attr"]
     sources = ["dlog", "ntem"]
 
-    LOG.info("Combining Dlog growth with base year data")
+    LOG.info("Combining Dlog fy data (or fy growth) with base year data")
     # Initialize an empty dictionary to hold the processed data
     dlog_zone_te_processed = {}
 
@@ -540,6 +600,7 @@ def run(config: inputs.DLitConfig):
             # Merge zone data for each category and data type
             merged_data = te_cp.merge_zone_data(
                 by_zone_te[f"by_{category}"][data_type],
+                # dlog_zone_te_grth[f"fy_grth_{category}"][data_type],
                 dlog_zone_te[f"fy_{category}"][data_type],
                 # dlog_zone_te[f"dlog_{category}_{data_type}"],
                 zone_index_columns,
@@ -557,6 +618,8 @@ def run(config: inputs.DLitConfig):
             # # Fill NaN values with 0 in processed_data_type after yearly totals
             # processed_data_type = processed_data_type.fillna(0)
 
+            # # Store the processed data in the dictionary
+            # dlog_zone_te_processed[f"dlog_{category}_{data_type}"] = processed_data_type
             # Store the processed data in the dictionary
             dlog_zone_te_processed[f"dlog_{category}_{data_type}"] = merged_data
 
@@ -765,7 +828,7 @@ def run(config: inputs.DLitConfig):
                 sector_target_growth.columns[:sector_index_column_count]
             )
             print(sector_index_columns)
-            cap_ratio = 0.95  # the sector level total estimated growth should not exceed 95% of total target growth
+
             sector_ratio = calc.calculate_ratio(
                 cap_ratio,
                 sector_target_growth,
@@ -992,74 +1055,5 @@ def run(config: inputs.DLitConfig):
                 # Export without filtering if sector_list is empty
                 for key, value in data_files_and_names.items():
                     utilities.write_to_csv(key_te_folder / value["file"], value["data"])
-
-            # if sector_list:
-            #     # Filter sector data
-            #     sector_target_growth_filtered = sector_target_growth[sector_target_growth[f"{sector}nm"].isin(sector_list)]
-            #     sector_estimated_growth_filtered = sector_estimated_growth[sector_estimated_growth[f"{sector}nm"].isin(sector_list)]
-            #     sector_bg_growth_filtered = sector_bg_growth[sector_bg_growth[f"{sector}nm"].isin(sector_list)]
-            #     zone_target_growth_filtered = zone_target_growth[zone_target_growth[f"{sector}nm"].isin(sector_list)]
-            #     zone_bg_growth_filtered = zone_bg_growth[zone_bg_growth[f"{sector}nm"].isin(sector_list)]
-            #     agg_zone_bg_growth_filtered = agg_zone_bg_growth[agg_zone_bg_growth[f"{sector}nm"].isin(sector_list)]
-            #     zone_estimated_growth_filtered = zone_estimated_growth[zone_estimated_growth[f"{sector}nm"].isin(sector_list)]
-            #     zone_scaler_filtered = zone_scaler[zone_scaler[f"{sector}nm"].isin(sector_list)]
-            #     zone_scaled_etmt_growth_filtered = zone_scaled_etmt_growth[zone_scaled_etmt_growth[f"{sector}nm"].isin(sector_list)]
-            #     zone_adjusted_growth_filtered = zone_adjusted_growth[zone_adjusted_growth[f"{sector}nm"].isin(sector_list)]
-            #     agg_zone_adj_growth_filtered = agg_zone_adj_growth[agg_zone_adj_growth[f"{sector}nm"].isin(sector_list)]
-            #     zone_forecast_filtered = zone_forecast[zone_forecast[f"{sector}nm"].isin(sector_list)]
-            #     agg_zone_forecast_filtered = agg_zone_forecast[agg_zone_forecast[f"{sector}nm"].isin(sector_list)]
-            #     sector_target_tot_filtered = sector_target_tot[sector_target_tot[f"{sector}nm"].isin(sector_list)]
-            #     zone_target_tot_filtered = zone_target_tot[zone_target_tot[f"{sector}nm"].isin(sector_list)]
-
-            #     sector_target_growth_file = f"{sector}_target_growth_{id}.csv"
-            #     sector_estimated_growth_file = f"{sector}_estimated_growth_{id}.csv"
-            #     sector_bg_growth_file = f"{sector}_background_growth_{id}.csv"
-            #     zone_target_growth_file = f"lad_target_growth_{id}.csv"
-            #     zone_bg_growth_file = f"lad_background_growth_{id}.csv"
-            #     agg_zone_bg_growth_file = f"agg_lad_background_growth_{id}.csv"
-            #     zone_estimated_growth_file = f"lad_estimated_growth_{id}.csv"
-            #     zone_scaler_file = f"lad_scaler_{id}.csv"
-            #     zone_scaled_etmt_growth_file = f"lad_scaled_estimated_growth_{id}.csv"
-            #     zone_adjusted_growth_file = f"lad_adjusted_growth_{id}.csv"
-            #     agg_zone_adj_growth_file = f"agg_lad_adjusted_growth_{id}.csv"
-            #     zone_forecast_file = f"lad_forecast_{id}.csv"
-            #     agg_zone_forecast_file = f"agg_lad_forecast_{id}.csv"
-            #     sector_target_tot_file = f"{sector}_target_tot_{id}.csv"
-            #     zone_target_tot_file = f"lad_target_tot_{id}.csv"
-
-            #     # Export filtered zone and sector data to CSV
-            #     utilities.write_to_csv(key_te_folder / sector_target_growth_file, sector_target_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / sector_estimated_growth_file, sector_estimated_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / sector_bg_growth_file, sector_bg_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_target_growth_file, zone_target_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_bg_growth_file, zone_bg_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / agg_zone_bg_growth_file, agg_zone_bg_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_estimated_growth_file, zone_estimated_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_scaler_file, zone_scaler_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_scaled_etmt_growth_file, zone_scaled_etmt_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_adjusted_growth_file, zone_adjusted_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / agg_zone_adj_growth_file, agg_zone_adj_growth_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_forecast_file, zone_forecast_filtered)
-            #     utilities.write_to_csv(key_te_folder / agg_zone_forecast_file, agg_zone_forecast_filtered)
-            #     utilities.write_to_csv(key_te_folder / sector_target_tot_file, sector_target_tot_filtered)
-            #     utilities.write_to_csv(key_te_folder / zone_target_tot_file, zone_target_tot_filtered)
-
-            # else:
-            #     # Export without filtering if sector_list is empty
-            #     utilities.write_to_csv(key_te_folder / sector_target_growth_file, sector_target_growth)
-            #     utilities.write_to_csv(key_te_folder / sector_estimated_growth_file, sector_estimated_growth)
-            #     utilities.write_to_csv(key_te_folder / sector_bg_growth_file, sector_bg_growth)
-            #     utilities.write_to_csv(key_te_folder / zone_target_growth_file, zone_target_growth)
-            #     utilities.write_to_csv(key_te_folder / zone_bg_growth_file, zone_bg_growth)
-            #     utilities.write_to_csv(key_te_folder / agg_zone_bg_growth_file, agg_zone_bg_growth)
-            #     utilities.write_to_csv(key_te_folder / zone_estimated_growth_file, zone_estimated_growth)
-            #     utilities.write_to_csv(key_te_folder / zone_scaler_file, zone_scaler)
-            #     utilities.write_to_csv(key_te_folder / zone_scaled_etmt_growth_file, zone_scaled_etmt_growth)
-            #     utilities.write_to_csv(key_te_folder / zone_adjusted_growth_file, zone_adjusted_growth)
-            #     utilities.write_to_csv(key_te_folder / agg_zone_adj_growth_file, agg_zone_adj_growth)
-            #     utilities.write_to_csv(key_te_folder / zone_forecast_file, zone_forecast)
-            #     utilities.write_to_csv(key_te_folder / agg_zone_forecast_file, agg_zone_forecast)
-            #     utilities.write_to_csv(key_te_folder / sector_target_tot_file, sector_target_tot)
-            #     utilities.write_to_csv(key_te_folder / zone_target_tot_file, zone_target_tot)
 
     LOG.info("Data processing completed")

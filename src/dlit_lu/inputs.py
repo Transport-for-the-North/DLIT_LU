@@ -432,6 +432,9 @@ class TripendsConfig:
     fy_fr_hb: Optional[pathlib.Path] = None
     fy_to_hb: Optional[pathlib.Path] = None
     fy_nhb: Optional[pathlib.Path] = None
+    fy_grth_fr_hb: Optional[pathlib.Path] = None
+    fy_grth_to_hb: Optional[pathlib.Path] = None
+    fy_grth_nhb: Optional[pathlib.Path] = None
     # dlog_hb_prod: Optional[pathlib.Path] = None
     # dlog_hb_attr: Optional[pathlib.Path] = None
     # dlog_nhb_prod: Optional[pathlib.Path] = None

@@ -1,9 +1,9 @@
 #Set Up Parameters
 run_infill: False
 run_land_use: False
-run_dev_pattern: False
+run_dev_pattern: True
 run_constraint: False
-run_tripend: True
+run_tripend: False
 
 #Mandatory Parameters
 #--str
@@ -146,9 +146,12 @@ tripend:
   # dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_attractions\nhb_normits_tem_segmented.csv.bz2
 
   # key input paths from future year trip end
-  fy_fr_hb: I:\NorMITs NoTEM\yk_test\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
-  fy_to_hb: I:\NorMITs NoTEM\yk_test\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
-  fy_nhb: I:\NorMITs NoTEM\yk_test\tripend\NorMITs_tripend_2024_nhb.csv.bz2 
+  fy_fr_hb: I:\NorMITs NoTEM\yk_bypt\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  fy_to_hb: I:\NorMITs NoTEM\yk_bypt\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  fy_nhb: I:\NorMITs NoTEM\yk_bypt\tripend\NorMITs_tripend_2024_nhb.csv.bz2
+  fy_grth_fr_hb: I:\NorMITs NoTEM\yk_grth\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  fy_grth_to_hb: I:\NorMITs NoTEM\yk_grth\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  fy_grth_nhb: I:\NorMITs NoTEM\yk_grth\tripend\NorMITs_tripend_2024_nhb.csv.bz2
   # key input paths from base year trip end
   by_fr_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
   by_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_to_adjusted.csv.bz2

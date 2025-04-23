@@ -1318,7 +1318,7 @@ class Ratios(BaseZoneHandler):
     def expand_by_dimension(
         self,
         zone_data: pd.DataFrame,
-        zone_car_ratio: pd.DataFrame,
+        zone_ratio: pd.DataFrame,
         build_out_columns: list[str],
         dimension_columns: list[str],
     ) -> pd.DataFrame:
@@ -1331,7 +1331,7 @@ class Ratios(BaseZoneHandler):
             DataFrame with total projected households per zone and year.
             Expected columns: [zone_id] + build_out_columns.
 
-        zone_car_ratio : pd.DataFrame
+        zone_ratio : pd.DataFrame
             DataFrame with ratios per zone and dimension (e.g., car availability) for each year.
             Expected columns: [zone_id, *dimension_columns] + build_out_columns.
 
@@ -1360,19 +1360,19 @@ class Ratios(BaseZoneHandler):
         data_long = zone_data.melt(
             id_vars=id_list,
             value_vars=build_out_columns,
-            var_name="year",
+            var_name="year_variant",
             value_name="vals",
         )
 
-        ratio_long = zone_car_ratio.melt(
+        ratio_long = zone_ratio.melt(
             id_vars=id_list + dimension_columns,
             value_vars=build_out_columns,
-            var_name="year",
+            var_name="year_variant",
             value_name="ratios",
         )
 
         # Merge on zone_id and year
-        merged = data_long.merge(ratio_long, on=id_list + ["year"], how="left")
+        merged = data_long.merge(ratio_long, on=id_list + ["year_variant"], how="left")
 
         # Calculate households by car availability
         merged["val_by_dimension"] = merged["vals"].astype(float) * merged[
@@ -1381,7 +1381,9 @@ class Ratios(BaseZoneHandler):
 
         # Pivot to wide format (optional)
         wide = merged.pivot_table(
-            index=id_list + dimension_columns, columns="year", values="val_by_dimension"
+            index=id_list + dimension_columns,
+            columns="year_variant",
+            values="val_by_dimension",
         ).reset_index()
 
         wide.columns.name = None  # Clean up column index name
@@ -1596,7 +1598,7 @@ class SiteZoneProcessor(BaseZoneHandler):
 
     @staticmethod
     def accumulated_growth(
-        site_data: pd.DataFrame, build_out_columns: list, column_prefixes: list
+        data: pd.DataFrame, build_out_columns: list, column_prefixes: list
     ) -> pd.DataFrame:
         """
         Computes accumulated sum for each group of columns in column_prefixes.
@@ -1609,7 +1611,7 @@ class SiteZoneProcessor(BaseZoneHandler):
         Returns:
             pd.DataFrame: DataFrame with accumulated values.
         """
-        df_accumulated = site_data.copy()
+        df_accumulated = data.copy()
 
         # Loop through each prefix to compute cumulative sum for the columns with the given prefix
         for prefix in column_prefixes:
@@ -1617,7 +1619,7 @@ class SiteZoneProcessor(BaseZoneHandler):
             cols = [f"{year}{prefix}" for year in build_out_columns]
 
             # Apply cumulative sum across the rows (axis=1)
-            df_accumulated[cols] = site_data[cols].cumsum(axis=1)
+            df_accumulated[cols] = data[cols].cumsum(axis=1)
 
         return df_accumulated
 
@@ -2078,8 +2080,8 @@ class LargeSites:
 
 class PrepTripends:
 
-    CATEGORIES = ["", "_large"]
-    # CATEGORIES = [""]
+    # CATEGORIES = ["", "_large"]
+    CATEGORIES = [""]
 
     def __init__(self, config: inputs.DLitConfig) -> None:
         """Initialize the class with dynamic YEARS based on the base year."""
@@ -2891,12 +2893,13 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     zone_to_lad_path = zone_info.get("zone_to_lad_path")
     lad_id = zone_info.get("lad_id_col")
     zone_to_lad_prop = zone_info.get("zone_to_lad_prop")
-
+    # Calculating zonal ratio by each household type
     by_zone_hh_type_ratio = cal_ratios.zone_hh_type_ratios(
         by_zone_hh_type_data,
         hh_type_columns,
     )
     print("by_zone_hh_type_ratio", by_zone_hh_type_ratio)
+    # Calculating zonal ratio by household car availability
     by_zone_hh_car_ratio = (
         cal_ratios.zone_hh_type_ratios(
             by_zone_hh_type_data,
@@ -2905,12 +2908,13 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         .drop(columns=["household"])
         .rename(columns={"ratios": base_year})
     )
-
+    # Calculating zonal ratio by population traveller type
     by_zone_pop_tt_ratio = cal_ratios.zone_traveller_type_ratios(
         by_zone_pop_tt_data,
         pop_type_columns,
     )
     print("by_zone_pop_tt_ratio", by_zone_pop_tt_ratio)
+    # Calculating zonal ratio by population's household car ownership
     by_zone_pop_car_ratio = (
         cal_ratios.zone_traveller_type_ratios(
             by_zone_pop_tt_data,
@@ -2919,7 +2923,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         .drop(columns=["population"])
         .rename(columns={"ratios": base_year})
     )
-    # Calculate default soc ratios for jobs
+    # Calculate default soc ratios for jobs (for whole gb)
     by_gb_job_soc_ratio = cal_ratios.gb_job_type_ratios(
         by_zone_job_sic_soc_data,
         ["soc"],
@@ -2927,7 +2931,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     by_gb_job_soc_ratio = by_gb_job_soc_ratio.rename(
         columns={"ratios": "default_ratio"}
     )
-
+    # Calculate zonal soc over sic ratio
     by_zone_job_soc_over_sic_ratio = cal_ratios.zone_soc_over_sic_ratios(
         by_zone_job_sic_soc_data,
         job_type_columns,
@@ -2948,12 +2952,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     print("by_zone_job_sic_soc_ratio", by_zone_job_soc_over_sic_ratio)
 
     # Define filenames and corresponding DataFrames
-    by_gb_ratios = [
+    by_zone_ratios = [
         (f"by_zone_hh_car_ratio_{model_zone}.csv", by_zone_hh_car_ratio),
         (f"by_zone_pop_car_ratio_{model_zone}.csv", by_zone_pop_car_ratio),
     ]
     # Save each DataFrame to a CSV file
-    for filename, df in by_gb_ratios:
+    for filename, df in by_zone_ratios:
         utilities.write_to_csv(key_output_path / filename, df)
     # utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
 
@@ -3084,8 +3088,27 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         build_out_columns,
     )
 
-    # zone containing large sites
-    zone_hh_largesites_fy = zonal_household_grth[
+    # Call function for accumulated sum
+    column_prefixes = ["", "_large", "_small"]
+    hh_grth_zone_fy = site_zone_processer.accumulated_growth(
+        zonal_household_grth, build_out_columns, column_prefixes
+    )
+    pop_grth_zone_fy = site_zone_processer.accumulated_growth(
+        zonal_population_grth, build_out_columns, column_prefixes
+    )
+    job_sic_grth_zone_fy = site_zone_processer.accumulated_growth(
+        zonal_job_sic_grth, build_out_columns, column_prefixes
+    )
+    print("hh_grth_zone_fy:", hh_grth_zone_fy)
+    print("job_sic_grth_zone_fy:", job_sic_grth_zone_fy)
+    # zone containing all sites growth
+    zone_hh_totgrth_fy = hh_grth_zone_fy[[zone_id] + build_out_columns]
+    zone_pop_totgrth_fy = pop_grth_zone_fy[[zone_id] + build_out_columns]
+    zone_job_sic_totgrth_fy = job_sic_grth_zone_fy[
+        [zone_id, "sic_2d"] + build_out_columns
+    ]
+    # zone containing large sites growth
+    zone_hh_largesites_fy = hh_grth_zone_fy[
         [zone_id]
         + [
             f"{year}_large"
@@ -3093,7 +3116,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             if f"{year}_large" in zonal_household_grth.columns
         ]
     ]
-    zone_pop_largesites_fy = zonal_population_grth[
+    zone_pop_largesites_fy = pop_grth_zone_fy[
         [zone_id]
         + [
             f"{year}_large"
@@ -3101,7 +3124,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             if f"{year}_large" in zonal_population_grth.columns
         ]
     ]
-    zone_job_sic_largesites_fy = zonal_job_sic_grth[
+    zone_job_sic_largesites_fy = job_sic_grth_zone_fy[
         [zone_id, "sic_2d"]
         + [
             f"{year}_large"
@@ -3109,6 +3132,30 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             if f"{year}_large" in zonal_job_sic_grth.columns
         ]
     ]
+    # zone_hh_largesites_fy = zonal_household_grth[
+    #     [zone_id]
+    #     + [
+    #         f"{year}_large"
+    #         for year in build_out_columns
+    #         if f"{year}_large" in zonal_household_grth.columns
+    #     ]
+    # ]
+    # zone_pop_largesites_fy = zonal_population_grth[
+    #     [zone_id]
+    #     + [
+    #         f"{year}_large"
+    #         for year in build_out_columns
+    #         if f"{year}_large" in zonal_population_grth.columns
+    #     ]
+    # ]
+    # zone_job_sic_largesites_fy = zonal_job_sic_grth[
+    #     [zone_id, "sic_2d"]
+    #     + [
+    #         f"{year}_large"
+    #         for year in build_out_columns
+    #         if f"{year}_large" in zonal_job_sic_grth.columns
+    #     ]
+    # ]
     # rename year columns
     zone_hh_largesites_fy = zone_hh_largesites_fy.rename(
         columns={
@@ -3245,18 +3292,32 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     ).drop(columns=pop_type_columns[1:])
     by_zone_job_sic_soc_data = by_zone_job_sic_soc_data.rename(columns={"jobs": "2023"})
 
-    combined_zone_hh_segmented = zone_hh_segmented_scaled.merge(
+    combined_zone_hh_segmented = zonal_hh_segmented.merge(
         by_zone_hh_type_data,
         on=[zone_id] + hh_type_columns,
         how="left",
     )[[zone_id] + hh_type_columns + [base_year] + build_out_columns]
-    combined_zone_pop_segmented = zone_pop_segmented_scaled.merge(
+
+    combined_zone_pop_segmented = zonal_pop_segmented.merge(
         by_zone_pop_tt_data, on=[zone_id, "tt"], how="left"
     )[[zone_id] + pop_type_columns + [base_year] + build_out_columns]
 
     combined_zone_job_segmented = zonal_job_sic_segmented.merge(
         by_zone_job_sic_soc_data, on=[zone_id] + job_type_columns, how="left"
     )[[zone_id] + job_type_columns + [base_year] + build_out_columns]
+
+    # combined_zone_hh_segmented = zone_hh_segmented_scaled.merge(
+    #     by_zone_hh_type_data,
+    #     on=[zone_id] + hh_type_columns,
+    #     how="left",
+    # )[[zone_id] + hh_type_columns + [base_year] + build_out_columns]
+    # combined_zone_pop_segmented = zone_pop_segmented_scaled.merge(
+    #     by_zone_pop_tt_data, on=[zone_id, "tt"], how="left"
+    # )[[zone_id] + pop_type_columns + [base_year] + build_out_columns]
+
+    # combined_zone_job_segmented = zonal_job_sic_segmented.merge(
+    #     by_zone_job_sic_soc_data, on=[zone_id] + job_type_columns, how="left"
+    # )[[zone_id] + job_type_columns + [base_year] + build_out_columns]
 
     # Add comparisons
     comparator.add_comparison("Household", zonal_household, combined_zone_hh_segmented)
@@ -3275,6 +3336,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info(
         "Getting subset of zonal totals with full dimensions and export the csv files"
     )
+    subset_output_path = key_output_path / f"subset_zonal_seged_data"
+    subset_output_path.mkdir(exist_ok=True)
     # Store your DataFrames in a dictionary
     comb_dfs = {
         "hh": combined_zone_hh_segmented,
@@ -3305,7 +3368,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     ]
     # Write each LAD-level output to CSV
     for file_name, df in subset_zone_outputs:
-        utilities.write_to_csv(key_output_path / file_name, df)
+        utilities.write_to_csv(subset_output_path / file_name, df)
 
     LOG.info(
         "Calculating zonal ratios for segmented zonal data for household, population and jobs for future years"
@@ -3334,6 +3397,65 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     print("fy_zone_traveller_type_ratio", fy_zone_traveller_type_ratio)
     print("fy_zone_job_type_ratio", fy_zone_job_type_ratio)
 
+    LOG.info("Expanding zonal growth from Dlog to full dimensions")
+
+    # zone_hh_totgrth_fy_seg = cal_ratios.expand_by_dimension(
+    #     zone_hh_totgrth_fy,
+    #     fy_zone_hh_type_ratio,
+    #     build_out_columns,
+    #     hh_type_columns,
+    # )
+    # zone_pop_totgrwth_fy_seg = cal_ratios.expand_by_dimension(
+    #     zone_pop_totgrth_fy,
+    #     fy_zone_traveller_type_ratio,
+    #     build_out_columns,
+    #     ["tt"],
+    # )
+
+    zone_hh_totgrth_fy_seg = cal_ratios.apply_ratio(
+        zone_hh_totgrth_fy,
+        build_out_columns,
+        hh_type_columns,
+        by_zone_hh_type_ratio,
+    )
+
+    zone_pop_totgrwth_fy_seg = cal_ratios.apply_ratio(
+        zone_pop_totgrth_fy,
+        build_out_columns,
+        pop_type_columns,
+        by_zone_pop_tt_ratio,
+    )
+
+    zone_job_sic_totgrth_fy_seg = cal_ratios.apply_soc_over_sic_ratio(
+        zone_job_sic_totgrth_fy,
+        build_out_columns,
+        job_type_columns,
+        by_zone_job_soc_over_sic_ratio,
+    )
+    print("zone_hh_totgrth_fy_seg:", zone_hh_totgrth_fy_seg)
+    print("zone_pop_totgrwth_fy_seg:", zone_pop_totgrwth_fy_seg)
+    print("zone_job_sic_totgrth_fy_seg:", zone_job_sic_totgrth_fy_seg)
+    LOG.info(
+        "Checking totals across future years before and after disaggregating zonal data into dimensions for aoll sites"
+    )
+
+    # Add comparisons
+    # Instantiate with your build-out year columns
+    as_comparator = TotalsComparison(build_out_columns)
+    as_comparator.add_comparison("Household", hh_grth_zone_fy, zone_hh_totgrth_fy_seg)
+    as_comparator.add_comparison(
+        "Population", pop_grth_zone_fy, zone_pop_totgrwth_fy_seg
+    )
+    as_comparator.add_comparison(
+        "Jobs", job_sic_grth_zone_fy, zone_job_sic_totgrth_fy_seg
+    )
+
+    # Get summary
+    summary_df = as_comparator.get_summary()
+
+    # Export if needed
+    summary_file = f"fy_allsitetotals_comparison_{model_zone}.csv"
+    utilities.write_to_csv(key_output_path / summary_file, summary_df)
     LOG.info("Expanding zonal data derived from large sites to full dimensions")
     zone_hh_largesites_fy_seg = cal_ratios.expand_by_dimension(
         zone_hh_largesites_fy,
@@ -3396,7 +3518,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     #     combined_zone_hh_segmented, base_year, build_out_columns
     # )
 
-    # final_zone_hh_grth_seged = zone_hh_grth_segmented.merge(
+    # final_zone_hh_grth_seged_2 = zone_hh_grth_segmented.merge(
     #     zone_hh_largesites_fy_seg,
     #     on=[zone_id] + hh_type_columns,
     #     how="left",
@@ -3404,6 +3526,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # print("combined_zone_hh_segmented", combined_zone_hh_segmented)
     # print("zone_hh_grth_segmented", zone_hh_grth_segmented)
     # print("final_zonal_hh_segmented", final_zone_hh_grth_seged)
+
+    final_zone_hh_grth_seged = zone_hh_totgrth_fy_seg.merge(
+        zone_hh_largesites_fy_seg,
+        on=[zone_id] + hh_type_columns,
+        how="left",
+    )
 
     final_zone_hh_seged = zone_hh_segmented_scaled.merge(
         zone_hh_largesites_fy_seg,
@@ -3414,7 +3542,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # zone_pop_grth_segmented = zone_translator._cumulative_yearly_growth(
     #     combined_zone_pop_segmented, base_year, build_out_columns
     # )
-    # final_zone_pop_grth_seged = zone_pop_grth_segmented.merge(
+    # final_zone_pop_grth_seged_2 = zone_pop_grth_segmented.merge(
     #     zone_pop_largesites_fy_seg,
     #     on=[zone_id, "tt"],
     #     how="left",
@@ -3424,6 +3552,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # print("final_zone_pop_segmented", final_zone_pop_grth_seged)
 
     # zone_pop_segmented_scaled = zone_pop_segmented_scaled[[zone_id, "tt"] + build_out_columns]
+    final_zone_pop_grth_seged = zone_pop_totgrwth_fy_seg.merge(
+        zone_pop_largesites_fy_seg,
+        on=[zone_id, "tt"],
+        how="left",
+    )
+
     final_zone_pop_seged = zone_pop_segmented_scaled.merge(
         zone_pop_largesites_fy_seg,
         on=[zone_id, "tt"],
@@ -3442,6 +3576,11 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # print("combined_zone_pop_segmented", combined_zone_job_segmented)
     # print("zone_pop_grth_segmented", zone_job_grth_segmented)
     # print("final_zone_pop_segmented", final_zone_job_grth_seged)
+    final_zone_job_grth_seged = zone_job_sic_totgrth_fy_seg.merge(
+        zone_job_sic_largesites_fy_seg,
+        on=[zone_id] + job_type_columns,
+        how="left",
+    )
 
     final_zone_job_seged = zonal_job_sic_segmented.merge(
         zone_job_sic_largesites_fy_seg,
@@ -3508,17 +3647,30 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         utilities.write_to_csv(key_agg_path / file_name, df)
 
     LOG.info("Further transforming and processing land use data for tripend module")
+    # data_frames = {
+    #     "soc_sic_emp": final_zone_job_seged,  # final_zone_job_seged- for future year total; by_zone_job_sic_soc_data for base year total
+    #     "tt_pop": final_zone_pop_seged,  # final_zone_pop_seged- for future year total; by_zone_pop_tt_data for base year total
+    #     "tfn_tt": tfn_tt,
+    #     "hh": final_zone_hh_seged,  # final_zone_hh_seged- for future year total; by_zone_hh_type_data for base year total
+    # }
     data_frames = {
-        "soc_sic_emp": final_zone_job_seged,  # final_zone_job_seged- for future year total; by_zone_job_sic_soc_data for base year total
-        "tt_pop": final_zone_pop_seged,  # final_zone_pop_seged- for future year total; by_zone_pop_tt_data for base year total
+        "soc_sic_emp": zone_job_sic_totgrth_fy_seg,  # final_zone_job_seged- for future year total; by_zone_job_sic_soc_data for base year total
+        "tt_pop": zone_pop_totgrwth_fy_seg.drop(
+            columns=pop_type_columns[1:]
+        ),  # final_zone_pop_seged- for future year total; by_zone_pop_tt_data for base year total
         "tfn_tt": tfn_tt,
-        "hh": final_zone_hh_seged,  # final_zone_hh_seged- for future year total; by_zone_hh_type_data for base year total
+        "hh": zone_hh_totgrth_fy_seg,  # final_zone_hh_seged- for future year total; by_zone_hh_type_data for base year total
     }
 
+    # output_folders = {
+    #     "soc_sic_emp": key_output_path / "dlog_soc_sic_emp",
+    #     "tt_pop": key_output_path / "dlog_tt_pop",
+    #     "hh": key_output_path / "dlog_hh",
+    # }
     output_folders = {
-        "soc_sic_emp": key_output_path / "dlog_soc_sic_emp",
-        "tt_pop": key_output_path / "dlog_tt_pop",
-        "hh": key_output_path / "dlog_hh",
+        "soc_sic_emp": key_output_path / "dlog_soc_sic_emp_byptgrth",
+        "tt_pop": key_output_path / "dlog_tt_pop_byptgrth",
+        "hh": key_output_path / "dlog_hh_byptgrth",
     }
 
     for folder in output_folders.values():
