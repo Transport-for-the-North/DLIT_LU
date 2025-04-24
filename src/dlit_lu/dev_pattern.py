@@ -38,6 +38,8 @@ class BaseZoneHandler:
                 "group_by_column": "lsoa2021_id",
                 "zone_gdf_id_col": "LSOA21CD",
                 "prop_column": None,  # No proportion column needed for LSOA
+                "prop_column_res": None,  # No proportion column needed for LSOA
+                "prop_column_emp": None,  # No proportion column needed for LSOA
                 "translation_path": None,  # No translation needed for LSOA
                 "centroid_files": {
                     "hh": config.dev_pattern.lsoa_hh_centroids,
@@ -52,7 +54,9 @@ class BaseZoneHandler:
                 "shapefile_path": config.dev_pattern.normits_shapefile_path,
                 "group_by_column": "normits_v3.3_id",
                 "zone_gdf_id_col": "normits_id",
-                "prop_column": "lsoa2021_to_normits_v3.3",
+                "prop_column": "lsoa21_to_normits_v3.3_spatial",
+                "prop_column_res": "lsoa21_to_normits_v3.3_pop",
+                "prop_column_emp": "lsoa21_to_normits_v3.3_emp",
                 "translation_path": config.dev_pattern.lsoa_to_normits,
                 "centroid_files": {
                     "hh": config.dev_pattern.normits_hh_centroids,
@@ -71,6 +75,8 @@ class BaseZoneHandler:
                 "group_by_column": "noham_v3.7_id",
                 "zone_gdf_id_col": "ZONE ID_v3",
                 "prop_column": "lsoa2021_to_noham_v3.7",
+                "prop_column_res": None,  # not available for now
+                "prop_column_emp": None,  # not available for now
                 "translation_path": config.dev_pattern.lsoa_to_noham,
                 "centroid_files": {
                     "hh": config.dev_pattern.noham_hh_centroids,
@@ -86,6 +92,8 @@ class BaseZoneHandler:
                 "group_by_column": "norms_v3.3_id",
                 "zone_gdf_id_col": "unique_id",
                 "prop_column": "lsoa2021_to_norms_v3.3",
+                "prop_column_res": None,  # not available for now
+                "prop_column_emp": None,  # not available for now
                 "translation_path": config.dev_pattern.lsoa_to_norms,
                 "centroid_files": {
                     "hh": config.dev_pattern.norms_hh_centroids,
@@ -101,6 +109,8 @@ class BaseZoneHandler:
                 "group_by_column": "msoa2021_id",
                 "zone_gdf_id_col": "MSOA21CD",
                 "prop_column": "lsoa2021_to_msoa2021",
+                "prop_column_res": None,  # not available for now
+                "prop_column_emp": None,  # not available for now
                 "translation_path": config.dev_pattern.lsoa_to_msoa,
                 "centroid_files": {
                     "hh": config.dev_pattern.msoa_hh_centroids,
@@ -124,18 +134,126 @@ class ZoneTranslator(BaseZoneHandler):
     def __init__(self, config):
         super().__init__(config)
 
+    def translate_data(
+        self,
+        data: pd.DataFrame,
+        columns_to_process: Optional[list[str]] = None,
+        dimension_columns: Optional[list] = None,
+    ) -> pd.DataFrame:
+        """
+        Merge zone translation data and perform aggregation.
+
+        Parameters
+        ----------
+        input_data : pd.DataFrame
+            Input data containing zone-level information.
+
+
+        Returns
+        -------
+        pd.DataFrame
+            returns a single processed DataFrame.
+        """
+        zone_id = self.zone_info["group_by_column"]
+        group_by_columns = (
+            [zone_id] if dimension_columns is None else [zone_id] + dimension_columns
+        )
+        # zone_gdf_id_col = self.zone_info["zone_gdf_id_col"]
+        translation_path = self.zone_info["translation_path"]
+        # Dynamically assign the appropriate proportional column
+        if (
+            columns_to_process == ["household"]
+            or columns_to_process == ["population"]
+            or columns_to_process == ["household", "population"]
+        ):
+            prop_column = (
+                self.zone_info.get("prop_column_res")
+                if self.zone_info.get("prop_column_res") is not None
+                else self.zone_info["prop_column"]
+            )
+        elif columns_to_process == ["jobs"]:
+            prop_column = (
+                self.zone_info.get("prop_column_emp")
+                if self.zone_info.get("prop_column_emp") is not None
+                else self.zone_info["prop_column"]
+            )
+        else:
+            prop_column = self.zone_info["prop_column"]
+        # Merge data with translation if needed
+        data = self._merge_translation_data(
+            data,
+            translation_path,
+            columns_to_process,
+            prop_column,
+            group_by_columns,
+        )
+
+        # Perform aggregation by group
+        data = self._aggregate_by_zone(data, group_by_columns, columns_to_process)
+        return data
+
+    def _merge_translation_data(
+        self,
+        data: pd.DataFrame,
+        translation_path: str,
+        columns_to_process: list,
+        prop_column: str,
+        group_by_columns: list[str],
+    ) -> pd.DataFrame:
+        """Merge the zone translation data with the input dataframe."""
+        if translation_path:
+            # Load translation data
+            zone_translation = pd.read_csv(translation_path)
+            # Merge and process data
+            data = data.merge(zone_translation, on="lsoa2021_id", how="left").set_index(
+                ["lsoa2021_id"] + group_by_columns
+            )
+            # Apply proportional adjustment and reset index
+            data = data.loc[:, columns_to_process].multiply(data[prop_column], axis=0)
+
+        return data.reset_index()
+
+    def _aggregate_by_zone(
+        self,
+        by_data: pd.DataFrame,
+        group_by_columns: list[str],
+        columns_to_process: list,
+    ) -> pd.DataFrame:
+        """
+        Group data by the zone and aggregate specified columns.
+
+        Parameters
+        ----------
+        by_data : pd.DataFrame
+            Dataframe containing zone-level information.
+        group_by_column : str
+            Column used for grouping.
+        columns_to_process : List[str]
+            List of columns to aggregate.
+
+        Returns
+        -------
+        pd.DataFrame
+            Aggregated DataFrame grouped by the specified column.
+        """
+        aggregated_df = by_data.groupby(group_by_columns, as_index=False)[
+            columns_to_process
+        ].sum()
+        return aggregated_df
+
+
+class ZoneProcessor(BaseZoneHandler):
+    def __init__(self, config):
+        super().__init__(config)
+
     def merge_data(
         self,
         by_data: pd.DataFrame,
-        columns_to_process: Optional[list[str]] = None,
+        column_to_process: str,
         dimension_columns: Optional[list] = None,
         by_column: Optional[str] = None,
+        new_data: Optional[pd.DataFrame] = None,
         fy_columns: Optional[list[str]] = None,
-        new_hh_data: Optional[pd.DataFrame] = None,
-        new_pop_data: Optional[pd.DataFrame] = None,
-        new_job_data: Optional[pd.DataFrame] = None,
-        merge_translation_data: bool = True,
-        aggregate_by_zone: bool = True,
         compute_area: bool = True,
         calculate_density: bool = True,
         model_zone_data: bool = True,
@@ -151,12 +269,8 @@ class ZoneTranslator(BaseZoneHandler):
             Column name used for aggregation (e.g., financial year).
         fy_columns : Optional[list[str]], default=None
             List of financial year columns for cumulative calculations.
-        new_hh_data : Optional[pd.DataFrame], default=None
-            DataFrame with updated household data.
-        new_pop_data : Optional[pd.DataFrame], default=None
-            DataFrame with updated population data.
-        new_job_data : Optional[pd.DataFrame], default=None
-            DataFrame with updated job data.
+        new_data : Optional[pd.DataFrame], default=None
+            DataFrame with updated Dlog data on future year.
         merge_translation_data : bool, default=True
             Whether to merge zone translation data.
         aggregate_by_zone : bool, default=True
@@ -182,20 +296,20 @@ class ZoneTranslator(BaseZoneHandler):
         translation_path = self.zone_info["translation_path"]
         prop_column = self.zone_info["prop_column"]
         # Merge data with translation if needed
-        if merge_translation_data:
-            by_data = self._merge_translation_data(
-                by_data,
-                translation_path,
-                columns_to_process,
-                prop_column,
-                group_by_columns,
-            )
+        # if merge_translation_data:
+        #     by_data = self._merge_translation_data(
+        #         by_data,
+        #         translation_path,
+        #         columns_to_process,
+        #         prop_column,
+        #         group_by_columns,
+        #     )
 
-        # Perform aggregation by group
-        if aggregate_by_zone:
-            by_data = self._aggregate_by_zone(
-                by_data, group_by_columns, columns_to_process
-            )
+        # # Perform aggregation by group
+        # if aggregate_by_zone:
+        #     by_data = self._aggregate_by_zone(
+        #         by_data, group_by_columns, columns_to_process
+        #     )
 
         # Compute zonal area if enabled
         if compute_area:
@@ -205,41 +319,24 @@ class ZoneTranslator(BaseZoneHandler):
 
         # Calculate density if enabled
         if calculate_density:
-            by_data = self._calculate_density(by_data, columns_to_process)
+            by_data = self._calculate_density(by_data, [column_to_process])
 
         # Merge zonal data if enabled
         if model_zone_data:
-            zonal_household_growth, zonal_population_growth, zonal_job_growth = (
-                self._model_zone_data(
-                    by_data,
-                    new_hh_data,
-                    new_pop_data,
-                    new_job_data,
-                    zone_id,
-                )
+            zonal_growth = self._model_zone_data_flex(
+                by_data,
+                new_data,
+                column_to_process,
+                dimension_columns,
             )
-            zonal_household = self._cumulative_yearly_totals(
-                zonal_household_growth,
-                by_column,
-                fy_columns,
-            )
-            zonal_population = self._cumulative_yearly_totals(
-                zonal_population_growth,
-                by_column,
-                fy_columns,
-            )
-            zonal_job = self._cumulative_yearly_totals(
-                zonal_job_growth,
+            zonal_total = self._cumulative_yearly_totals(
+                zonal_growth,
                 by_column,
                 fy_columns,
             )
             return (
-                zonal_household_growth,
-                zonal_population_growth,
-                zonal_job_growth,
-                zonal_household,
-                zonal_population,
-                zonal_job,
+                zonal_growth,
+                zonal_total,
             )
 
         return by_data
@@ -292,57 +389,6 @@ class ZoneTranslator(BaseZoneHandler):
             future_year_columns,
         )
         return lad_data_annualgrowth, lad_data_annualtot
-
-    def _merge_translation_data(
-        self,
-        by_data: pd.DataFrame,
-        translation_path: str,
-        columns_to_process: list,
-        prop_column: str,
-        group_by_columns: list[str],
-    ) -> pd.DataFrame:
-        """Merge the zone translation data with the input dataframe."""
-        if translation_path:
-            # Load translation data
-            zone_translation = pd.read_csv(translation_path)
-            # Merge and process data
-            by_data = by_data.merge(
-                zone_translation, on="lsoa2021_id", how="left"
-            ).set_index(["lsoa2021_id"] + group_by_columns)
-            # Apply proportional adjustment and reset index
-            by_data = by_data.loc[:, columns_to_process].multiply(
-                by_data[prop_column], axis=0
-            )
-
-        return by_data.reset_index()
-
-    def _aggregate_by_zone(
-        self,
-        by_data: pd.DataFrame,
-        group_by_columns: list[str],
-        columns_to_process: list,
-    ) -> pd.DataFrame:
-        """
-        Group data by the zone and aggregate specified columns.
-
-        Parameters
-        ----------
-        by_data : pd.DataFrame
-            Dataframe containing zone-level information.
-        group_by_column : str
-            Column used for grouping.
-        columns_to_process : List[str]
-            List of columns to aggregate.
-
-        Returns
-        -------
-        pd.DataFrame
-            Aggregated DataFrame grouped by the specified column.
-        """
-        aggregated_df = by_data.groupby(group_by_columns, as_index=False)[
-            columns_to_process
-        ].sum()
-        return aggregated_df
 
     def _compute_zonal_area_dia(
         self,
@@ -496,12 +542,12 @@ class ZoneTranslator(BaseZoneHandler):
             zonal_job.fillna(0),
         )
 
-    def _model_zone_data_with_dim(
+    def _model_zone_data_flex(
         self,
         by_data: pd.DataFrame,
         new_data: pd.DataFrame,
         column_to_process: str,
-        dimension_columns: list[str],
+        dimension_columns: Optional[list[str]],
     ) -> pd.DataFrame:
         """
         Merge new dwelling, population, and job data into the existing zonal data.
@@ -510,27 +556,26 @@ class ZoneTranslator(BaseZoneHandler):
         ----------
         by_data : pd.DataFrame
             Existing zonal data to be updated.
-        new_ata : pd.DataFrame
+        new_data : pd.DataFrame
             DataFrame containing new future year data with a zone column.
         column_to_process : str
             The column name to be processed, such as household, population, or jobs.
-        dimension_columns : list[str]
-            The list of columns containing dimensions.
+        dimension_columns : list[str], optional
+            Optional list of dimension columns (e.g. ['SIC_2d']).
+
         Returns
         -------
         pd.DataFrame
             Updated zonal data with merged dwelling, population, and job information.
         """
-        # Merging by_data with new__data to create zonal_jobs segmented by sic_2d
         zone_id = self.zone_info["group_by_column"]
+        if dimension_columns is None:
+            dimension_columns = []
+
         zone_col_in_by = [zone_id] + dimension_columns
-        zonal_data = by_data.merge(
-            new_data,
-            on=zone_col_in_by,
-            # left_on=zone_col_in_by,
-            # right_on=zone_col_in_new,
-            how="left",
-        )
+
+        zonal_data = by_data.merge(new_data, on=zone_col_in_by, how="left")
+
         zonal_data = zonal_data[
             zone_col_in_by + [column_to_process] + new_data.columns.to_list()
         ]
@@ -538,6 +583,49 @@ class ZoneTranslator(BaseZoneHandler):
         zonal_data = zonal_data.loc[:, ~zonal_data.columns.duplicated()]
 
         return zonal_data.fillna(0)
+
+    # def _model_zone_data_with_dim(
+    #     self,
+    #     by_data: pd.DataFrame,
+    #     new_data: pd.DataFrame,
+    #     column_to_process: str,
+    #     dimension_columns: list[str],
+    # ) -> pd.DataFrame:
+    #     """
+    #     Merge new dwelling, population, and job data into the existing zonal data.
+
+    #     Parameters
+    #     ----------
+    #     by_data : pd.DataFrame
+    #         Existing zonal data to be updated.
+    #     new_ata : pd.DataFrame
+    #         DataFrame containing new future year data with a zone column.
+    #     column_to_process : str
+    #         The column name to be processed, such as household, population, or jobs.
+    #     dimension_columns : list[str]
+    #         The list of columns containing dimensions.
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         Updated zonal data with merged dwelling, population, and job information.
+    #     """
+    #     # Merging by_data with new__data to create zonal_jobs segmented by sic_2d
+    #     zone_id = self.zone_info["group_by_column"]
+    #     zone_col_in_by = [zone_id] + dimension_columns
+    #     zonal_data = by_data.merge(
+    #         new_data,
+    #         on=zone_col_in_by,
+    #         # left_on=zone_col_in_by,
+    #         # right_on=zone_col_in_new,
+    #         how="left",
+    #     )
+    #     zonal_data = zonal_data[
+    #         zone_col_in_by + [column_to_process] + new_data.columns.to_list()
+    #     ]
+    #     zonal_data = zonal_data.rename(columns={column_to_process: "2023"})
+    #     zonal_data = zonal_data.loc[:, ~zonal_data.columns.duplicated()]
+
+    #     return zonal_data.fillna(0)
 
     def _get_ladcd(
         self,
@@ -2618,6 +2706,19 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     build_out_columns = [
         str(year) for year in range(base_year_int + 1, end_year_int + 1)
     ]
+    # instantiate the key classes
+    zt = ZoneTranslator(config)
+    zp = ZoneProcessor(config)
+    cal_ratios = Ratios(config)
+    zone_info = cal_ratios.zone_info_map.get(cal_ratios.geo_boundary, {})
+    if not zone_info:
+        LOG.error(f"No zone information found for zone {cal_ratios.geo_boundary}")
+        return
+
+    zone_id = zone_info.get("group_by_column")
+    zone_to_lad_path = zone_info.get("zone_to_lad_path")
+    lad_id = zone_info.get("lad_id_col")
+    zone_to_lad_prop = zone_info.get("zone_to_lad_prop")
 
     LOG.info("Creating list of sites with estimated development values")
     # list of residential sites with estimated values
@@ -2641,35 +2742,119 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info(
         f"Sum of Input Totals-- Total Household: {by_tot_hhs_prev}, Total Population: {by_tot_pops_prev}, Total Jobs: {by_tot_jobs_prev}"
     )
-    zone_translator = ZoneTranslator(config)
-    if model_zone == inputs.GeoBoundary.LSOA:
-        by_data_processed = zone_translator.merge_data(
-            by_data=by_data_tot,
-            columns_to_process=["household", "population", "jobs"],
-            merge_translation_data=False,
-            aggregate_by_zone=False,
-            compute_area=True,
-            calculate_density=True,
-            model_zone_data=False,
-        )
-    else:
-        by_data_processed = zone_translator.merge_data(
-            by_data=by_data_tot,
-            columns_to_process=["household", "population", "jobs"],
-            merge_translation_data=True,
-            aggregate_by_zone=True,
+
+    # Prepare the base data depending on zone type
+    by_translated_data = {}
+    by_processed_data = {}
+
+    for col in ["household", "population", "jobs"]:
+        base_df = by_data_tot[["lsoa2021_id", col]]
+
+        if model_zone == inputs.GeoBoundary.LSOA:
+            translated = base_df
+        else:
+            translated = zt.translate_data(base_df, [col])
+
+        by_translated_data[col] = translated
+
+        # Process the translated data
+        by_processed_data[col] = zp.merge_data(
+            by_data=translated,
+            column_to_process=col,
             compute_area=True,
             calculate_density=True,
             model_zone_data=False,
         )
 
+    by_hh = by_processed_data["household"]
+    by_pop = by_processed_data["population"]
+    by_job = by_processed_data["jobs"]
+
+    # Concatenate the DataFrames along the columns
+    combined_by = pd.concat([by_hh, by_pop, by_job], axis=1)
+    by_columns_stats = [
+        "household",
+        "population",
+        "jobs",
+        "ho_den",
+        "po_den",
+        "jo_den",
+    ]
+    # Optionally, remove duplicate columns if they exist
+    combined_by = combined_by.loc[:, ~combined_by.columns.duplicated()]
+    # combined_by = combined_by[[zone_id, "area_sqm"] + by_columns_stats]
+
+    print(combined_by)
+
+    # zt = ZoneTranslator(config)
+    # zp = ZoneProcessor(config)
+
+    # if model_zone == inputs.GeoBoundary.LSOA:
+    #     by_hh_translated = by_data_tot["lsoa2021_id", "household"]
+    #     by_pop_translated = by_data_tot["lsoa2021_id", "population"]
+    #     by_job_translated = by_data_tot["lsoa2021_id", "jobs"]
+    #     by_hh = zp.merge_data(
+    #         by_data=by_hh_translated,
+    #         columns_to_process=["household"],
+    #         compute_area=True,
+    #         calculate_density=True,
+    #         model_zone_data=False,
+    #     )
+    #     by_pop = zp.merge_data(
+    #         by_data=by_pop_translated,
+    #         columns_to_process=["population"],
+    #         compute_area=True,
+    #         calculate_density=True,
+    #         model_zone_data=False,
+    #     )
+    #     by_job = zp.merge_data(
+    #         by_data=by_job_translated,
+    #         columns_to_process=["jobs"],
+    #         compute_area=True,
+    #         calculate_density=True,
+    #         model_zone_data=False,
+    #     )
+    # else:
+    #     by_hh_translated = zt.translate_data(
+    #         by_data_tot["lsoa2021_id", "household"],
+    #         ["household"],
+    #     )
+    #     by_pop_translated = zt.translate_data(
+    #         by_data_tot["lsoa2021_id", "population"],
+    #         ["population"],
+    #     )
+    #     by_job_translated = zt.translate_data(
+    #         by_data_tot["lsoa2021_id", "jobs"],
+    #     )
+    #     by_hh = zp.merge_data(
+    #         by_data=by_hh_translated,
+    #         columns_to_process=["household"],
+    #         compute_area=True,
+    #         calculate_density=True,
+    #         model_zone_data=False,
+    #     )
+    #     by_pop = zp.merge_data(
+    #         by_data=by_pop_translated,
+    #         columns_to_process=["population"],
+    #         compute_area=True,
+    #         calculate_density=True,
+    #         model_zone_data=False,
+    #     )
+    #     by_job = zp.merge_data(
+    #         by_data=by_job_translated,
+    #         columns_to_process=["jobs"],
+    #         compute_area=True,
+    #         calculate_density=True,
+    #         model_zone_data=False,
+    #     )
+
     LOG.info(
         "Checking base year totals before and after converting LSOA to the pre-defined model zone"
     )
     # get totals after zone translation and other calculations
-    by_tot_hhs_post = by_data_processed["household"].sum()
-    by_tot_pops_post = by_data_processed["population"].sum()
-    by_tot_jobs_post = by_data_processed["jobs"].sum()
+    by_tot_hhs_post = by_processed_data["household"]["household"].sum()
+    by_tot_pops_post = by_processed_data["population"]["population"].sum()
+    by_tot_jobs_post = by_processed_data["jobs"]["jobs"].sum()
     LOG.info(
         f"Sum of Totals after translating LSOA to pre-defined zone-- Total Household: {by_tot_hhs_post}, Total Population: {by_tot_pops_post}, Total Jobs: {by_tot_jobs_post}"
     )
@@ -2692,24 +2877,17 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # Save the DataFrame to a CSV file
     utilities.write_to_csv(key_output_path / totals_df_file, totals_df)
     LOG.info("Processing base year zonal data and stats")
-    by_columns_stats = [
-        "household",
-        "population",
-        "jobs",
-        "ho_den",
-        "po_den",
-        "jo_den",
-    ]
-    by_data_stats = stats.basic_statistics(by_data_processed, by_columns_stats)
+
+    by_data_stats = stats.basic_statistics(combined_by, by_columns_stats)
     by_data_file = f"by_{model_zone}_data.csv"
     by_data_stats_file = f"by_{model_zone}_data_stats.csv"
-    utilities.write_to_csv(key_output_path / by_data_file, by_data_processed)
+    utilities.write_to_csv(key_output_path / by_data_file, combined_by)
     utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Processing site data for year 2024 upwards")
     res_zone_sites = process_site_data(
         res_sites,
-        by_data_processed,
+        combined_by,
         "Residential",
         resi_estsite_reference_ids,
         key_columns,
@@ -2722,7 +2900,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     emp_zone_sites = process_site_data(
         emp_sites,
-        by_data_processed,
+        combined_by,
         "Employment",
         emp_estsite_reference_ids,
         key_columns,
@@ -2838,61 +3016,72 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
     # Process base year data for household, population and jobs with required dimensions
     # Translate LSOA to pre-defined model zone
-    by_zone_hh_type_data = zone_translator.merge_data(
-        by_data=by_lsoa_hh_type,
-        columns_to_process=["household"],
-        dimension_columns=hh_type_columns,
-        merge_translation_data=True,
-        aggregate_by_zone=True,
-        compute_area=False,
-        calculate_density=False,
-        model_zone_data=False,
+    by_zone_hh_type_data = zt.translate_data(
+        by_lsoa_hh_type,
+        ["household"],
+        hh_type_columns,
     )
+    by_zone_pop_tt_data = zt.translate_data(
+        by_lsoa_pop_tt,
+        ["population"],
+        pop_type_columns,
+    )
+    by_zone_job_sic_soc_data = zt.translate_data(
+        by_lsoa_jobs_sic_soc,
+        ["jobs"],
+        job_type_columns,
+    )
+    by_zone_job_sic_data = zt.translate_data(
+        by_lsoa_jobs_sic_soc,
+        ["jobs"],
+        ["sic_2d"],
+    )
+    # by_zone_hh_type_data = zp.merge_data(
+    #     by_data=by_lsoa_hh_type,
+    #     columns_to_process=["household"],
+    #     dimension_columns=hh_type_columns,
+    #     merge_translation_data=True,
+    #     aggregate_by_zone=True,
+    #     compute_area=False,
+    #     calculate_density=False,
+    #     model_zone_data=False,
+    # )
 
-    by_zone_pop_tt_data = zone_translator.merge_data(
-        by_data=by_lsoa_pop_tt,
-        columns_to_process=["population"],
-        dimension_columns=pop_type_columns,
-        merge_translation_data=True,
-        aggregate_by_zone=True,
-        compute_area=False,
-        calculate_density=False,
-        model_zone_data=False,
-    )
+    # by_zone_pop_tt_data = zp.merge_data(
+    #     by_data=by_lsoa_pop_tt,
+    #     columns_to_process=["population"],
+    #     dimension_columns=pop_type_columns,
+    #     merge_translation_data=True,
+    #     aggregate_by_zone=True,
+    #     compute_area=False,
+    #     calculate_density=False,
+    #     model_zone_data=False,
+    # )
 
-    by_zone_job_sic_soc_data = zone_translator.merge_data(
-        by_data=by_lsoa_jobs_sic_soc,
-        columns_to_process=["jobs"],
-        dimension_columns=job_type_columns,
-        merge_translation_data=True,
-        aggregate_by_zone=True,
-        compute_area=False,
-        calculate_density=False,
-        model_zone_data=False,
-    )
+    # by_zone_job_sic_soc_data = zp.merge_data(
+    #     by_data=by_lsoa_jobs_sic_soc,
+    #     columns_to_process=["jobs"],
+    #     dimension_columns=job_type_columns,
+    #     merge_translation_data=True,
+    #     aggregate_by_zone=True,
+    #     compute_area=False,
+    #     calculate_density=False,
+    #     model_zone_data=False,
+    # )
 
-    by_zone_job_sic_data = zone_translator.merge_data(
-        by_data=by_lsoa_jobs_sic_soc,
-        columns_to_process=["jobs"],
-        dimension_columns=["sic_2d"],
-        merge_translation_data=True,
-        aggregate_by_zone=True,
-        compute_area=False,
-        calculate_density=False,
-        model_zone_data=False,
-    )
+    # by_zone_job_sic_data = zone_translator.merge_data(
+    #     by_data=by_lsoa_jobs_sic_soc,
+    #     columns_to_process=["jobs"],
+    #     dimension_columns=["sic_2d"],
+    #     merge_translation_data=True,
+    #     aggregate_by_zone=True,
+    #     compute_area=False,
+    #     calculate_density=False,
+    #     model_zone_data=False,
+    # )
 
     # Calculate ratios across dimensions for base year household, population and jobs
-    cal_ratios = Ratios(config)
-    zone_info = cal_ratios.zone_info_map.get(cal_ratios.geo_boundary, {})
-    if not zone_info:
-        LOG.error(f"No zone information found for zone {cal_ratios.geo_boundary}")
-        return
 
-    zone_id = zone_info.get("group_by_column")
-    zone_to_lad_path = zone_info.get("zone_to_lad_path")
-    lad_id = zone_info.get("lad_id_col")
-    zone_to_lad_prop = zone_info.get("zone_to_lad_prop")
     # Calculating zonal ratio by each household type
     by_zone_hh_type_ratio = cal_ratios.zone_hh_type_ratios(
         by_zone_hh_type_data,
@@ -3057,36 +3246,68 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     # get zonal total for future years, and growth of large site for future years
     (
         zonal_household_grth,
-        zonal_population_grth,
-        zonal_job_grth,
         zonal_household,
-        zonal_population,
-        zonal_job,
-    ) = zone_translator.merge_data(
-        by_data=by_data_tot,
-        columns_to_process=["household", "population", "jobs"],
+    ) = zp.merge_data(
+        by_data=by_processed_data["household"],
+        column_to_process="household",
         by_column=base_year,
+        new_data=hh_zone,
         fy_columns=build_out_columns,
-        new_hh_data=hh_zone,
-        new_pop_data=pop_zone,
-        new_job_data=job_zone,
-        merge_translation_data=True,
-        aggregate_by_zone=True,
         compute_area=False,
         calculate_density=False,
         model_zone_data=True,
     )
-    zonal_job_sic_grth = zone_translator._model_zone_data_with_dim(
+    (
+        zonal_population_grth,
+        zonal_population,
+    ) = zp.merge_data(
+        by_data=by_processed_data["population"],
+        column_to_process="population",
+        by_column=base_year,
+        new_data=pop_zone,
+        fy_columns=build_out_columns,
+        compute_area=False,
+        calculate_density=False,
+        model_zone_data=True,
+    )
+    (
+        zonal_job_grth,
+        zonal_job,
+    ) = zp.merge_data(
+        by_data=by_processed_data["jobs"],
+        column_to_process="jobs",
+        by_column=base_year,
+        new_data=job_zone,
+        fy_columns=build_out_columns,
+        compute_area=False,
+        calculate_density=False,
+        model_zone_data=True,
+    )
+    (
+        zonal_job_sic_grth,
+        zonal_job_sic,
+    ) = zp.merge_data(
         by_data=by_zone_job_sic_data,
-        new_data=job_sic_zone,
         column_to_process="jobs",
         dimension_columns=["sic_2d"],
+        by_column=base_year,
+        new_data=job_sic_zone,
+        fy_columns=build_out_columns,
+        compute_area=False,
+        calculate_density=False,
+        model_zone_data=True,
     )
-    zonal_job_sic = zone_translator._cumulative_yearly_totals(
-        zonal_job_sic_grth,
-        base_year,
-        build_out_columns,
-    )
+    # zonal_job_sic_grth = zone_translator._model_zone_data_with_dim(
+    #     by_data=by_zone_job_sic_data,
+    #     new_data=job_sic_zone,
+    #     column_to_process="jobs",
+    #     dimension_columns=["sic_2d"],
+    # )
+    # zonal_job_sic = zone_translator._cumulative_yearly_totals(
+    #     zonal_job_sic_grth,
+    #     base_year,
+    #     build_out_columns,
+    # )
 
     # Call function for accumulated sum
     column_prefixes = ["", "_large", "_small"]
@@ -3351,7 +3572,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     # Loop through each dataframe and apply the transformation and filtering
     for key, df in comb_dfs.items():
-        merged_df = zone_translator._get_ladcd(
+        merged_df = zp._get_ladcd(
             df,
             zone_to_lad_path,
             zone_id,
@@ -3616,17 +3837,17 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         utilities.write_to_csv(key_output_path / file_name, df)
 
     LOG.info("Aggregating zonal household, population and jobs to LAD")
-    lad_household_ab_growth, lad_household = zone_translator.lad_summary(
+    lad_household_ab_growth, lad_household = zp.lad_summary(
         zonal_household_grth,
         base_year,
         build_out_columns,
     )
-    lad_population_ab_growth, lad_population = zone_translator.lad_summary(
+    lad_population_ab_growth, lad_population = zp.lad_summary(
         zonal_population_grth,
         base_year,
         build_out_columns,
     )
-    lad_job_ab_growth, lad_job = zone_translator.lad_summary(
+    lad_job_ab_growth, lad_job = zp.lad_summary(
         zonal_job_grth,
         base_year,
         build_out_columns,
