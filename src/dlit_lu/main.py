@@ -1,13 +1,13 @@
 """DLit DLog land use analysis and repair tool: Version 0.0.0: 09/12/2021
 
-    This tool reads the DLog excel spreadsheet and analyses the data
-    for any invalid data, returning the findings in a excel
-    spradsheet. Any fixes that can be perfomed automatically will be
-    performed. Any issues that require user intervention will be
-    outputted to the user, to be infilled manually, read back in and
-    intergrated with the DLog
+This tool reads the DLog excel spreadsheet and analyses the data
+for any invalid data, returning the findings in a excel
+spradsheet. Any fixes that can be perfomed automatically will be
+performed. Any issues that require user intervention will be
+outputted to the user, to be infilled manually, read back in and
+intergrated with the DLog
 
-    Kieran Fishwick: kieran.fishwick@wsp.com
+Kieran Fishwick: kieran.fishwick@wsp.com
 """
 
 # standard imports
@@ -19,7 +19,16 @@ import argparse
 from tqdm.contrib import logging as tqdm_log
 
 # local imports
-from dlit_lu import constraint, infilling, inputs, utilities, land_use, parser, dev_pattern, tripend
+from dlit_lu import (
+    constraint,
+    infilling,
+    inputs,
+    utilities,
+    land_use,
+    parser,
+    dev_pattern,
+    tripend,
+)
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -65,12 +74,7 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     #     te_inputs = parser.parse_tripend_input(config)
 
     if config.run_constraint:
-       constraint.run(config)
+        constraint.run(config)
 
     if config.run_tripend:
         tripend.run(config)
-        
-
-        
-        
-

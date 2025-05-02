@@ -1,9 +1,9 @@
 #Set Up Parameters
 run_infill: False
 run_land_use: False
-run_dev_pattern: True
+run_dev_pattern: False
 run_constraint: False
-run_tripend: False
+run_tripend: True
 
 #Mandatory Parameters
 #--str
@@ -146,16 +146,27 @@ tripend:
   # dlog_nhb_attr: T:\Yan_Kavana\TEM DLOG\Outputs\11042025_All\dlog\nhb_attractions\nhb_normits_tem_segmented.csv.bz2
 
   # key input paths from future year trip end
-  fy_fr_hb: I:\NorMITs NoTEM\yk_bypt\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
-  fy_to_hb: I:\NorMITs NoTEM\yk_bypt\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
-  fy_nhb: I:\NorMITs NoTEM\yk_bypt\tripend\NorMITs_tripend_2024_nhb.csv.bz2
-  fy_grth_fr_hb: I:\NorMITs NoTEM\yk_grth\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
-  fy_grth_to_hb: I:\NorMITs NoTEM\yk_grth\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
-  fy_grth_nhb: I:\NorMITs NoTEM\yk_grth\tripend\NorMITs_tripend_2024_nhb.csv.bz2
+  # fy_fr_hb: T:\Yan_Kavana\TE_tests\yk_2024_test\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  # fy_to_hb: T:\Yan_Kavana\TE_tests\yk_2024_test\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  # fy_nhb: T:\Yan_Kavana\TE_tests\yk_2024_test\tripend\NorMITs_tripend_2024_nhb.csv.bz2
+  # fy_grth_fr_hb: T:\Yan_Kavana\TE_tests\yk_grth\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  # fy_grth_to_hb: T:\Yan_Kavana\TE_tests\yk_grth\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  # fy_grth_nhb: T:\Yan_Kavana\TE_tests\yk_grth\tripend\NorMITs_tripend_2024_nhb.csv.bz2
+  fy_fr_hb: T:\Yan_Kavana\TE_tests\yk_2024_test\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  fy_to_hb: T:\Yan_Kavana\TE_tests\yk_2024_test\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  fy_nhb: T:\Yan_Kavana\TE_tests\yk_2024_test\tripend\NorMITs_tripend_2024_nhb.csv.bz2
+  # # key input paths from future year trip end growth
+  # fy_grth_fr_hb: T:\Yan_Kavana\TE_tests\yk_grth\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  # fy_grth_to_hb: T:\Yan_Kavana\TE_tests\yk_grth\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  # fy_grth_nhb: T:\Yan_Kavana\TE_tests\yk_grth\tripend\NorMITs_tripend_2024_nhb.csv.bz2
+  # key input paths from future year trip end growth from large sites
+  fy_ls_grth_fr_hb: T:\Yan_Kavana\TE_tests\yk_2024_large_test\tripend\NorMITs_tripend_2024_hb_fr.csv.bz2
+  fy_ls_grth_to_hb: T:\Yan_Kavana\TE_tests\yk_2024_large_test\tripend\NorMITs_tripend_2024_hb_to.csv.bz2
+  fy_ls_grth_nhb: T:\Yan_Kavana\TE_tests\yk_2024_large_test\tripend\NorMITs_tripend_2024_nhb.csv.bz2  
   # key input paths from base year trip end
-  by_fr_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_fr_adjusted.csv.bz2
-  by_to_hb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_hb_to_adjusted.csv.bz2
-  by_nhb: I:\NorMITs NoTEM\voa_gb_2023_uni\tripend\NorMITs_tripend_2023_nhb_adjusted.csv.bz2
+  by_fr_hb: I:\NorMITs NoTEM\yk_2023_by\tripend\NorMITs_tripend_2023_hb_fr.csv.bz2
+  by_to_hb: I:\NorMITs NoTEM\yk_2023_by\tripend\NorMITs_tripend_2023_hb_to.csv.bz2
+  by_nhb: I:\NorMITs NoTEM\yk_2023_by\tripend\NorMITs_tripend_2023_nhb.csv.bz2
   # key input paths from ntem trip end
   ntem_zone_hb_prod: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_production_hb.csv.bz2
   ntem_zone_hb_attr: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_attraction_hb.csv.bz2

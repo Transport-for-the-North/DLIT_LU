@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 # Local imports
-from dlit_lu import inputs, dev_pattern, constraint, utilities
+from dlit_lu import constraint, inputs, dev_pattern, utilities
 from caf.base.data_structures import DVector
 import caf.base as cb
 
@@ -341,6 +341,89 @@ class ByTeTransformation:
         return grouped_df
 
 
+class ForecastComparator:
+    def __init__(
+        self,
+        df1,
+        df2,
+        key_columns,
+        year_columns,
+        df1_label="target",
+        df2_label="output",
+        use_tolerance=False,
+        tol=1e-6,
+    ):
+        """
+        Initialize the comparator with two dataframes and comparison settings.
+
+        :param df1: First DataFrame (e.g., sector_target_tot)
+        :param df2: Second DataFrame (e.g., agg_zone_forecast)
+        :param key_columns: Columns to join on (common identifiers)
+        :param year_columns: List of year columns to compare
+        :param df1_label: Label suffix for df1
+        :param df2_label: Label suffix for df2
+        :param use_tolerance: Whether to use np.isclose for comparison
+        :param tol: Tolerance level for np.isclose
+        """
+        self.df1 = df1
+        self.df2 = df2
+        self.key_columns = key_columns
+        self.year_columns = year_columns
+        self.df1_label = df1_label
+        self.df2_label = df2_label
+        self.use_tolerance = use_tolerance
+        self.tol = tol
+        self.merged = None
+        self.differences = []
+
+    def merge_data(self):
+        self.merged = pd.merge(
+            self.df1,
+            self.df2,
+            on=self.key_columns,
+            suffixes=(f"_{self.df1_label}", f"_{self.df2_label}"),
+            how="outer",
+            indicator=True,
+        )
+
+    def compare(self):
+        self.merge_data()
+        self.differences.clear()
+        for year in self.year_columns:
+            col1 = f"{year}_{self.df1_label}"
+            col2 = f"{year}_{self.df2_label}"
+            if self.use_tolerance:
+                mismatch = self.merged[
+                    ~np.isclose(
+                        self.merged[col1],
+                        self.merged[col2],
+                        atol=self.tol,
+                        equal_nan=True,
+                    )
+                ]
+            else:
+                mismatch = self.merged[self.merged[col1] != self.merged[col2]]
+            if not mismatch.empty:
+                self.differences.append(
+                    (year, mismatch[[*self.key_columns, col1, col2]])
+                )
+
+    def report(self):
+        if self.differences:
+            for year, df in self.differences:
+                print(f"❌ Mismatch found in year '{year}':")
+                print(df)
+            print(
+                "⚠️ Discrepancies found between input dataframes, but the process will continue."
+            )
+        else:
+            print("✅ All values match across future year columns.")
+
+    def run_comparison(self):
+        self.compare()
+        self.report()
+
+
 def run(config: inputs.DLitConfig):
     """Main function to run the Tripends processing."""
 
@@ -427,8 +510,8 @@ def run(config: inputs.DLitConfig):
         key_te_folder / "by_hb_attraction.csv", by_zone_te["by_hb"]["attr"]
     )
     # Check the shape of the by_zone_te
-    print(by_zone_te["by_hb"]["prod"].shape)
-    print(by_zone_te["by_hb"]["attr"].shape)
+    print(by_zone_te["by_nhb"]["prod"].shape)
+    print(by_zone_te["by_nhb"]["attr"].shape)
 
     # # Rename key "by_hb_fr" to "by_hb"
     # if "by_hb_fr" in by_zone_te:
@@ -439,7 +522,7 @@ def run(config: inputs.DLitConfig):
         base_year_column
     )
 
-    zone_index_columns = list(
+    zone_index_columns_initial = list(
         by_zone_te["by_hb"]["prod"].columns[:zone_index_column_count]
     )
 
@@ -450,16 +533,21 @@ def run(config: inputs.DLitConfig):
     # Load datasets
     dlog_datasets = {
         "fy_hb": pd.read_csv(config.tripend.fy_fr_hb),
-        "fy_hb_to": pd.read_csv(config.tripend.fy_to_hb),
+        # "fy_hb_to": pd.read_csv(config.tripend.fy_to_hb),
         "fy_nhb": pd.read_csv(config.tripend.fy_nhb),
     }
 
-    dlog_grth_datasets = {
-        "fy_grth_hb": pd.read_csv(config.tripend.fy_grth_fr_hb),
-        "fy_grth_hb_to": pd.read_csv(config.tripend.fy_grth_to_hb),
-        "fy_grth_nhb": pd.read_csv(config.tripend.fy_grth_nhb),
-    }
+    # dlog_grth_datasets = {
+    #     "fy_grth_hb": pd.read_csv(config.tripend.fy_grth_fr_hb),
+    #     "fy_grth_hb_to": pd.read_csv(config.tripend.fy_grth_to_hb),
+    #     "fy_grth_nhb": pd.read_csv(config.tripend.fy_grth_nhb),
+    # }
 
+    dlog_ls_grth_datasets = {
+        "fy_ls_grth_hb": pd.read_csv(config.tripend.fy_ls_grth_fr_hb),
+        # "fy_ls_grth_hb_to": pd.read_csv(config.tripend.fy_ls_grth_to_hb),
+        "fy_ls_grth_nhb": pd.read_csv(config.tripend.fy_ls_grth_nhb),
+    }
     # Process each dataset
     dlog_zone_te = {}
     summary_dlog_zone_te = []  # Initialize summary table outside the loop
@@ -507,13 +595,13 @@ def run(config: inputs.DLitConfig):
         key_te_folder / "dlog_hb_attraction.csv", dlog_zone_te["fy_hb"]["attr"]
     )
     # Check the shape of the by_zone_te
-    print(dlog_zone_te["fy_hb"]["prod"].shape)
-    print(dlog_zone_te["fy_hb"]["attr"].shape)
+    print(dlog_zone_te["fy_nhb"]["prod"].shape)
+    print(dlog_zone_te["fy_nhb"]["attr"].shape)
 
     # Process each dataset
-    dlog_zone_te_grth = {}
-    summary_dlog_zone_te_grth = []  # Initialize summary table outside the loop
-    for name, df in dlog_grth_datasets.items():
+    dlog_zone_te_ls_grth = {}
+    summary_dlog_zone_te_ls_grth = []  # Initialize summary table outside the loop
+    for name, df in dlog_ls_grth_datasets.items():
         total_prod_before = df[
             "prod"
         ].sum()  # Divide by 5 to get average week day totals
@@ -525,41 +613,45 @@ def run(config: inputs.DLitConfig):
         transformer = ByTeTransformation(df, future_year_column)
 
         # Store transformed DataFrame
-        dlog_zone_te_grth[name] = {
+        dlog_zone_te_ls_grth[name] = {
             "total_prod_before": total_prod_before,
             "total_attr_before": total_attr_before,
             "prod": transformer.groupby_sum("prod"),
             "attr": transformer.groupby_sum("attr"),
         }
     # Summary table to check total before and after transformation
-    for name in dlog_zone_te_grth.keys():
+    for name in dlog_zone_te_ls_grth.keys():
         # Get total sum from aggregated "prod" and "attr"
-        total_prod = dlog_zone_te_grth[name]["prod"][future_year_column].sum()
-        total_attr = dlog_zone_te_grth[name]["attr"][future_year_column].sum()
+        total_prod = dlog_zone_te_ls_grth[name]["prod"][future_year_column].sum()
+        total_attr = dlog_zone_te_ls_grth[name]["attr"][future_year_column].sum()
 
         # Store summary data
-        summary_dlog_zone_te_grth.append(
+        summary_dlog_zone_te_ls_grth.append(
             {
                 "dataset": name,
-                "total_prod_beforetrans": dlog_zone_te_grth[name]["total_prod_before"],
-                "total_attr_beforetrans": dlog_zone_te_grth[name]["total_attr_before"],
+                "total_prod_beforetrans": dlog_zone_te_ls_grth[name][
+                    "total_prod_before"
+                ],
+                "total_attr_beforetrans": dlog_zone_te_ls_grth[name][
+                    "total_attr_before"
+                ],
                 "total_prod": total_prod,
                 "total_attr": total_attr,
             }
         )
 
     # Convert summary data to DataFrame
-    summary_dlog_grth_df = pd.DataFrame(summary_dlog_zone_te_grth)
+    summary_dlog_ls_grth_df = pd.DataFrame(summary_dlog_zone_te_ls_grth)
     utilities.write_to_csv(
-        key_te_folder / "dlog_te_grth_summary.csv", summary_dlog_grth_df
+        key_te_folder / "dlog_te_ls_grth_summary.csv", summary_dlog_ls_grth_df
     )
     utilities.write_to_csv(
-        key_te_folder / "dlog_hb_production_grth.csv",
-        dlog_zone_te_grth["fy_grth_hb"]["prod"],
+        key_te_folder / "dlog_hb_production_ls_grth.csv",
+        dlog_zone_te_ls_grth["fy_ls_grth_nhb"]["prod"],
     )
     utilities.write_to_csv(
-        key_te_folder / "dlog_hb_attraction_grth.csv",
-        dlog_zone_te_grth["fy_grth_hb"]["attr"],
+        key_te_folder / "dlog_hb_attraction_ls_grth.csv",
+        dlog_zone_te_ls_grth["fy_ls_grth_nhb"]["attr"],
     )
 
     # dlog_zone_te = {
@@ -587,8 +679,8 @@ def run(config: inputs.DLitConfig):
     }
 
     # Lists of categories and data types
-    categories = ["hb"]  # ["hb", "nhb"]
-    te = ["prod", "attr"]
+    categories = ["hb"]  # ["hb", "nhb"],["hb"], ["nhb"]
+    tes = ["prod", "attr"]
     sources = ["dlog", "ntem"]
 
     LOG.info("Combining Dlog fy data (or fy growth) with base year data")
@@ -596,39 +688,39 @@ def run(config: inputs.DLitConfig):
     dlog_zone_te_processed = {}
 
     for category in categories:
-        for data_type in te:
+        for te in tes:
             # Merge zone data for each category and data type
             merged_data = te_cp.merge_zone_data(
-                by_zone_te[f"by_{category}"][data_type],
-                # dlog_zone_te_grth[f"fy_grth_{category}"][data_type],
-                dlog_zone_te[f"fy_{category}"][data_type],
-                # dlog_zone_te[f"dlog_{category}_{data_type}"],
-                zone_index_columns,
+                by_zone_te[f"by_{category}"][te],
+                # dlog_zone_te_grth[f"fy_grth_{category}"][te],
+                dlog_zone_te[f"fy_{category}"][te],
+                # dlog_zone_te[f"dlog_{category}_{te}"],
+                zone_index_columns_initial,
             )
             # Fill NaN values with 0 in merged_data before further processing
             merged_data = merged_data.fillna(0)
 
             # # Apply yearly totals for the merged data
-            # processed_data_type = growth_calculator.yearly_totals_from_base(
+            # processed_te = growth_calculator.yearly_totals_from_base(
             #     merged_data,
             #     base_year_column,
             #     future_year_columns,
             # )
 
-            # # Fill NaN values with 0 in processed_data_type after yearly totals
-            # processed_data_type = processed_data_type.fillna(0)
+            # # Fill NaN values with 0 in processed_te after yearly totals
+            # processed_te = processed_te.fillna(0)
 
             # # Store the processed data in the dictionary
-            # dlog_zone_te_processed[f"dlog_{category}_{data_type}"] = processed_data_type
+            # dlog_zone_te_processed[f"dlog_{category}_{te}"] = processed_te
             # Store the processed data in the dictionary
-            dlog_zone_te_processed[f"dlog_{category}_{data_type}"] = merged_data
+            dlog_zone_te_processed[f"dlog_{category}_{te}"] = merged_data
 
     LOG.info("Aggregating zonal data to sector level")
     zone_data_sets = {}
     for source in sources:
         for category in categories:
-            for data_type in te:
-                key = f"{source}_{category}_{data_type}"
+            for te in tes:
+                key = f"{source}_{category}_{te}"
 
                 if source == "dlog":
                     # Access dictionary variable, not a formatted string
@@ -637,19 +729,19 @@ def run(config: inputs.DLitConfig):
                     zone_data_sets[key] = ntem_zone_te[key]
 
     # Check the shape of the by_zone_te
-    print(zone_data_sets["dlog_hb_prod"])
-    print(zone_data_sets["dlog_hb_attr"])
-    print(zone_data_sets["ntem_hb_prod"])
-    print(zone_data_sets["ntem_hb_attr"])
+    # print(zone_data_sets["dlog_nhb_prod"])
+    # print(zone_data_sets["dlog_nhb_attr"])
+    # print(zone_data_sets["ntem_nhb_prod"])
+    # print(zone_data_sets["ntem_nhb_attr"])
 
     sector_data_sets = {}
     for key, df in zone_data_sets.items():
         sector_data_sets[key] = te_cp.aggregate_to_sector_p_m(
             df,
         )
-    # Check the shape of the sector dataframe
-    print(sector_data_sets["dlog_hb_prod"])
-    print(sector_data_sets["dlog_hb_attr"])
+    # # Check the shape of the sector dataframe
+    # print(sector_data_sets["dlog_nhb_prod"])
+    # print(sector_data_sets["dlog_nhb_attr"])
 
     LOG.info("Inserting name of sector to the data")
     # Define dataset mappings dynamically by looping through pop and emp keys
@@ -661,8 +753,8 @@ def run(config: inputs.DLitConfig):
     for geo, data_dict in geographies:
         for source in sources:
             for category in categories:
-                for data_type in te:
-                    key = f"{source}_{category}_{data_type}"
+                for te in tes:
+                    key = f"{source}_{category}_{te}"
                     data_dict[key]["source"] = source
                     # Find the index of the base_year_column
                     base_year_index = data_dict[key].columns.get_loc(base_year_column)
@@ -727,7 +819,7 @@ def run(config: inputs.DLitConfig):
     # Export datasets for visualization
     export_for_viz = config.tripend.export_for_viz
     if export_for_viz:
-        LOG.info("Export datasets for LAD and Aggregated LAD")
+        LOG.info("Exporting datasets for LAD and Aggregated LAD")
         # Define the list of locations to filter
         # sector_list = ["Bury", "Manchester", "Oldham", "Rochdale",
         #             "Salford", "Stockport", "Tameside", "Trafford"]
@@ -745,8 +837,8 @@ def run(config: inputs.DLitConfig):
         for geography, _ in geographies:  # Ignore geo_data
             for subkey in subkeys:
                 for category in categories:
-                    for data_type in te:
-                        id = f"{category}_{data_type}"
+                    for te in tes:
+                        id = f"{category}_{te}"
                         # Define Excel file name
                         file_name = f"{geography}_{subkey}_{id}.xlsx"
                         file_path = f"{output_path}/{file_name}"
@@ -794,27 +886,37 @@ def run(config: inputs.DLitConfig):
 
     LOG.info(f"Constraining dlog data with ntem data")
     for category in categories:
-        for data_type in te:
-            id = f"{category}_{data_type}"
+        for te in tes:
+            id = f"{category}_{te}"
 
             LOG.info(f"Working out the background growth at sector level for {id}")
 
             sector_target_tot = growth_calculator.target_yeartot(
-                results[f"{sector}_dlog_{id}"]["YearTotal"],
-                results[f"{sector}_ntem_{id}"]["YearTotal"],
+                results[f"{sector}_dlog_{id}"][
+                    "YearTotal"
+                ],  # base year total from dlog
+                results[f"{sector}_ntem_{id}"][
+                    "YearTotal"
+                ],  # fugure year target derived from ntem growth
                 base_year_column,
                 future_year_columns,
             )
             zone_target_tot = growth_calculator.target_yeartot(
-                results[f"zone_dlog_{id}"]["YearTotal"],
-                results[f"zone_ntem_{id}"]["YearTotal"],
+                results[f"zone_dlog_{id}"]["YearTotal"],  # base year total from dlog
+                results[f"zone_ntem_{id}"][
+                    "YearTotal"
+                ],  # fugure year target derived from ntem growth
                 base_year_column,
                 future_year_columns,
             )
 
             sector_target_growth = growth_calculator.target_growth(
-                results[f"{sector}_dlog_{id}"]["YearTotal"],
-                results[f"{sector}_ntem_{id}"]["YearTotal"],
+                results[f"{sector}_dlog_{id}"][
+                    "YearTotal"
+                ],  # base year total from dlog
+                results[f"{sector}_ntem_{id}"][
+                    "YearTotal"
+                ],  # fugure year growth from ntem
                 base_year_column,
                 future_year_columns,
             )
@@ -902,7 +1004,7 @@ def run(config: inputs.DLitConfig):
             # print(sector_bg_growth)
 
             LOG.info(
-                f"Calculating weight to distribute background growth for each ZONE for {id}"
+                f"Calculating weight to distribute background growth for each zone for {id}"
             )
 
             # calculate gap of growth between target (trend-based forecast) and estimated (from dlog) for each zone
@@ -926,7 +1028,7 @@ def run(config: inputs.DLitConfig):
                     zone_gap_growth[col],  # Keep original value otherwise
                 )
 
-            # calculate weight to be used to distribute sector level background growth
+            # Calculate weight to be used to distribute sector level background growth
             zone_weight = calc.calculate_zone_weights(
                 zone_gap_growth,
                 future_year_columns,
@@ -959,7 +1061,7 @@ def run(config: inputs.DLitConfig):
             zone_adjusted_growth = zone_adjusted_growth.merge(
                 zone_base_year, on=zone_index_columns, how="left"
             )
-            agg_zone_adj_growth = zone_adjusted_growth.groupby(f"{sector}nm")[
+            agg_zone_adj_growth = zone_adjusted_growth.groupby(sector_index_columns)[
                 future_year_columns
             ].sum()
             agg_zone_adj_growth = agg_zone_adj_growth.reset_index()
@@ -968,15 +1070,65 @@ def run(config: inputs.DLitConfig):
             zone_forecast = growth_calculator.yearly_totals_from_base(
                 zone_adjusted_growth, base_year_column, future_year_columns
             )
-
             agg_zone_forecast = zone_forecast.groupby(sector_index_columns)[
                 future_year_columns
             ].sum()
             agg_zone_forecast = agg_zone_forecast.reset_index()
 
+            # Filter your dataframes before comparison for car mode only "m" == 3
+            filtered_sector_target = sector_target_tot[sector_target_tot["m"] == 3]
+            filtered_sector_output = agg_zone_forecast[agg_zone_forecast["m"] == 3]
+            # Check sector level output against target values
+            comparator = ForecastComparator(
+                df1=filtered_sector_target,
+                df2=filtered_sector_output,
+                key_columns=sector_index_columns,
+                year_columns=future_year_columns,
+                df1_label="target",
+                df2_label="output",
+                use_tolerance=True,
+                tol=1e-6,
+            )
+
+            comparator.run_comparison()
+
+            # Calculate final adjustment factor between forecast (adjusted future year total) and estimated total to scale te growth related to large sites
+            zone_adjustment_factor = calc.calculate_ratio(
+                cap_ratio=1,  # no scaling
+                target_data=zone_forecast,  # final future year total combined ntem and dlog
+                estimated_data=results[f"zone_dlog_{id}"][
+                    "YearTotal"
+                ],  # original estimated future year total from dlog
+                build_out_columns=future_year_columns,
+                sector_index_columns=zone_index_columns,
+            )
+            # Check for any negative values in the specified future year columns
+            negative_values_df = zone_adjustment_factor[
+                zone_adjustment_factor[future_year_columns].lt(0).any(axis=1)
+            ]
+
+            if not negative_values_df.empty:
+                print("Negative values found in dataframe 'zone_adjustment_factor':")
+                print(negative_values_df)
+            else:
+                print("No negative values found in 'zone_adjustment_factor'.")
+
+            # Apply the adjustment factor to te large site growth
+            zone_ls_te_grth = calc.calculate_product(
+                dlog_zone_te_ls_grth[f"fy_ls_grth_{category}"][
+                    f"{te}"
+                ],  # large site trip production growth
+                zone_adjustment_factor,  # adjustment factor
+                future_year_columns,
+                zone_index_columns_initial,
+            )
+
             LOG.info("Exporting key output data")
+            inter_output_path = key_te_folder / f"output_intermediate"
+            inter_output_path.mkdir(exist_ok=True)
             # Files to be exported
             sector_list = ["Bury", "Manchester"]
+            mode_list = [3]
 
             # Combine data and file names into a single dictionary
             data_files_and_names = {
@@ -1025,14 +1177,6 @@ def run(config: inputs.DLitConfig):
                     "data": agg_zone_adj_growth,
                     "file": f"agg_zone_adjusted_growth_{id}.csv",
                 },
-                "zone_forecast": {
-                    "data": zone_forecast,
-                    "file": f"zone_forecast_{id}.csv",
-                },
-                "agg_zone_forecast": {
-                    "data": agg_zone_forecast,
-                    "file": f"agg_zone_forecast_{id}.csv",
-                },
                 "sector_target_tot": {
                     "data": sector_target_tot,
                     "file": f"{sector}_target_tot_{id}.csv",
@@ -1044,16 +1188,49 @@ def run(config: inputs.DLitConfig):
             }
 
             # Check if sector_list is provided (not empty)
-            if sector_list:
+            if mode_list:
                 # Filter dataframes based on sector_list
                 for key, value in data_files_and_names.items():
-                    filtered_data = value["data"][
-                        value["data"][f"{sector}nm"].isin(sector_list)
-                    ]
-                    utilities.write_to_csv(key_te_folder / value["file"], filtered_data)
+                    filtered_data = value["data"][value["data"]["m"].isin(mode_list)]
+                    utilities.write_to_csv(
+                        inter_output_path / value["file"], filtered_data
+                    )
             else:
                 # Export without filtering if sector_list is empty
                 for key, value in data_files_and_names.items():
+                    utilities.write_to_csv(
+                        inter_output_path / value["file"], value["data"]
+                    )
+
+            # Combine data and file names into a single dictionary
+            key_outputs_and_names = {
+                "zone_fy_tot": {
+                    "data": zone_forecast,
+                    "file": f"Normits_tripend_fy_{id}.csv",
+                },
+                "agg_zone_future_year_tot": {
+                    "data": agg_zone_forecast,
+                    "file": f"Normits_agg_tripend_fy_{id}.csv",
+                },
+                "zone_adjustment_factor": {
+                    "data": zone_adjustment_factor,
+                    "file": f"zone_ajfactor_{id}.csv",
+                },
+                "zone_fy_ls_grth": {
+                    "data": zone_ls_te_grth,
+                    "file": f"Normits_largesite_tripend_fy_{id}.csv",
+                },
+            }
+
+            # Check if sector_list is provided (not empty)
+            if mode_list:
+                # Filter dataframes based on sector_list
+                for key, value in key_outputs_and_names.items():
+                    filtered_data = value["data"][value["data"]["m"].isin(mode_list)]
+                    utilities.write_to_csv(key_te_folder / value["file"], filtered_data)
+            else:
+                # Export without filtering if sector_list is empty
+                for key, value in key_outputs_and_names.items():
                     utilities.write_to_csv(key_te_folder / value["file"], value["data"])
 
     LOG.info("Data processing completed")
