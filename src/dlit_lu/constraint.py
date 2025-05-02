@@ -477,13 +477,13 @@ class GrowthCalculator:
         # Calculate growth rates using _calculate_growth
         growth_result = self.calculate_growth(
             data_source, base_year_column, build_out_columns, growth_type="rate"
-        )
+        ).fillna(0)
+
         # Merge growth rates with base year data
         target_growth = target_growth.merge(growth_result, on=index_columns, how="left")
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
             target_growth[year] = target_growth[base_year] * target_growth[year]
-
         # # Reset index so output matches original data format
         # target_growth = target_growth.reset_index()
 
@@ -537,7 +537,7 @@ class GrowthCalculator:
             base_year_column,
             build_out_columns,
             growth_type="ratio",
-        )
+        ).fillna(1)
         # Merge growth rates with base year data
         target_growth = target_growth.merge(growth_result, on=index_columns, how="left")
         # Multiply base year values by (1 + growth rate) to get future values
@@ -679,8 +679,12 @@ class ConstraintCalculation:
             agg_zone_data, on=sector_index_columns, how="left"
         )
 
+        # Compute weights with safeguard against division by zero
         for col in build_out_columns:
-            zone_weight[col] = zone_weight[col] / zone_weight[f"{col}_agg"]
+            agg_col = f"{col}_agg"
+            zone_weight[col] = zone_weight.apply(
+                lambda row: 1 if row[agg_col] == 0 else row[col] / row[agg_col], axis=1
+            )
 
         return zone_weight[zone_index_columns + build_out_columns]
 
@@ -1045,13 +1049,13 @@ def run(config: inputs.DLitConfig):
             ),
             "GrowthRatio": growth_calculator.calculate_growth(
                 processed_data, base_year_column, build_out_columns, growth_type="ratio"
-            ),
+            ).fillna(1),
             "GrowthRate": growth_calculator.calculate_growth(
                 processed_data, base_year_column, build_out_columns, growth_type="rate"
-            ),
+            ).fillna(0),
             "AnnualGrowthRate": growth_calculator.calculate_annual_growth_rate(
                 processed_data, year_columns
-            ),
+            ).fillna(0),
         }
         # processed_datasets.append(processed_data)
 

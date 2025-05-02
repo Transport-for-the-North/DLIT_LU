@@ -459,7 +459,7 @@ def run(config: inputs.DLitConfig):
     # Load datasets
     by_datasets = {
         "by_hb": pd.read_csv(config.tripend.by_fr_hb),
-        "by_hb_to": pd.read_csv(config.tripend.by_to_hb),
+        # "by_hb_to": pd.read_csv(config.tripend.by_to_hb),
         "by_nhb": pd.read_csv(config.tripend.by_nhb),
     }
 
@@ -509,9 +509,9 @@ def run(config: inputs.DLitConfig):
     utilities.write_to_csv(
         key_te_folder / "by_hb_attraction.csv", by_zone_te["by_hb"]["attr"]
     )
-    # Check the shape of the by_zone_te
-    print(by_zone_te["by_nhb"]["prod"].shape)
-    print(by_zone_te["by_nhb"]["attr"].shape)
+    # # Check the shape of the by_zone_te
+    # print(by_zone_te["by_nhb"]["prod"].shape)
+    # print(by_zone_te["by_nhb"]["attr"].shape)
 
     # # Rename key "by_hb_fr" to "by_hb"
     # if "by_hb_fr" in by_zone_te:
@@ -594,9 +594,25 @@ def run(config: inputs.DLitConfig):
     utilities.write_to_csv(
         key_te_folder / "dlog_hb_attraction.csv", dlog_zone_te["fy_hb"]["attr"]
     )
-    # Check the shape of the by_zone_te
-    print(dlog_zone_te["fy_nhb"]["prod"].shape)
-    print(dlog_zone_te["fy_nhb"]["attr"].shape)
+    # # Check the shape of the by_zone_te
+    # print(dlog_zone_te["fy_nhb"]["prod"].shape)
+    # print(dlog_zone_te["fy_nhb"]["attr"].shape)
+
+    # # print zone specific output
+    # prod_zone = "5217001"
+    # zone_specific_prod = dlog_zone_te["fy_hb"]["prod"].loc[
+    #     dlog_zone_te["fy_hb"]["prod"]["normits_v3.3_id"] == prod_zone
+    # ]
+    # attr_zone = "3191006"
+    # zone_specific_attr = dlog_zone_te["fy_hb"]["attr"].loc[
+    #     dlog_zone_te["fy_hb"]["attr"]["normits_v3.3_id"] == attr_zone
+    # ]
+    # utilities.write_to_csv(
+    #     key_te_folder / f"fy_hb_prod_zone_{prod_zone}.csv", zone_specific_prod
+    # )
+    # utilities.write_to_csv(
+    #     key_te_folder / f"fy_hb_attr_zone_{attr_zone}.csv", zone_specific_attr
+    # )
 
     # Process each dataset
     dlog_zone_te_ls_grth = {}
@@ -646,11 +662,11 @@ def run(config: inputs.DLitConfig):
         key_te_folder / "dlog_te_ls_grth_summary.csv", summary_dlog_ls_grth_df
     )
     utilities.write_to_csv(
-        key_te_folder / "dlog_hb_production_ls_grth.csv",
+        key_te_folder / "dlog_nhb_production_ls_grth.csv",
         dlog_zone_te_ls_grth["fy_ls_grth_nhb"]["prod"],
     )
     utilities.write_to_csv(
-        key_te_folder / "dlog_hb_attraction_ls_grth.csv",
+        key_te_folder / "dlog_nhb_attraction_ls_grth.csv",
         dlog_zone_te_ls_grth["fy_ls_grth_nhb"]["attr"],
     )
 
@@ -678,12 +694,11 @@ def run(config: inputs.DLitConfig):
         ],
     }
 
+    LOG.info("Combining Dlog fy data (or fy growth) with base year data")
     # Lists of categories and data types
     categories = ["hb"]  # ["hb", "nhb"],["hb"], ["nhb"]
     tes = ["prod", "attr"]
     sources = ["dlog", "ntem"]
-
-    LOG.info("Combining Dlog fy data (or fy growth) with base year data")
     # Initialize an empty dictionary to hold the processed data
     dlog_zone_te_processed = {}
 
@@ -804,16 +819,16 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
                 growth_type="ratio",
-            ),
+            ).fillna(1),
             "GrowthRate": growth_calculator.calculate_growth(
                 processed_data,
                 base_year_column,
                 future_year_columns,
                 growth_type="rate",
-            ),
+            ).fillna(0),
             "AnnualGrowthRate": growth_calculator.calculate_annual_growth_rate(
                 processed_data, future_year_columns
-            ),
+            ).fillna(0),
         }
 
     # Export datasets for visualization
@@ -823,7 +838,7 @@ def run(config: inputs.DLitConfig):
         # Define the list of locations to filter
         # sector_list = ["Bury", "Manchester", "Oldham", "Rochdale",
         #             "Salford", "Stockport", "Tameside", "Trafford"]
-        sector_list = ["Bury", "Manchester"]
+        sector_list = ["Tamworth", "Cheshire West and Chester"]
         # List of subkeys in the required order
         subkeys = [
             "YearTotal",
@@ -920,7 +935,7 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
             )
-            print(sector_target_growth)
+            # print(sector_target_growth)
             sector_estimated_growth = results[f"{sector}_dlog_{id}"]["AbsoluteGrowth"]
 
             sector_index_column_count = sector_target_growth.columns.get_loc(
@@ -929,7 +944,7 @@ def run(config: inputs.DLitConfig):
             sector_index_columns = list(
                 sector_target_growth.columns[:sector_index_column_count]
             )
-            print(sector_index_columns)
+            # print(sector_index_columns)
 
             sector_ratio = calc.calculate_ratio(
                 cap_ratio,
@@ -945,7 +960,7 @@ def run(config: inputs.DLitConfig):
                     1,  # set gap to zero to avoid additional background growth when estimated growth is not zero and the gap is negative (estimated exceeds target)
                     sector_ratio[col],  # Keep original value otherwise
                 )
-            print("sector_ratio:", sector_ratio)
+            # print("sector_ratio:", sector_ratio)
             # Dlog estimated growth at lower geographical level
             zone_estimated_growth = results[f"zone_dlog_{id}"]["AbsoluteGrowth"]
 
@@ -956,7 +971,7 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
             )
-            print(zone_target_growth)
+            # print(zone_target_growth)
             # Create a list of columns for index
             zone_index_column_count = zone_target_growth.columns.get_loc(
                 base_year_column
@@ -964,7 +979,7 @@ def run(config: inputs.DLitConfig):
             zone_index_columns = list(
                 zone_target_growth.columns[:zone_index_column_count]
             )
-            print(zone_index_columns)
+            # print(zone_index_columns)
             zone_base_year = zone_target_growth[zone_index_columns + [base_year_column]]
             # Adjust zone_etmt growth using scaler to make sure the sector level total estimated growth won't exceed 95% of target growth
             zone_etmt_growth = zone_estimated_growth[
@@ -1127,7 +1142,7 @@ def run(config: inputs.DLitConfig):
             inter_output_path = key_te_folder / f"output_intermediate"
             inter_output_path.mkdir(exist_ok=True)
             # Files to be exported
-            sector_list = ["Bury", "Manchester"]
+            sector_list = ["Tamworth", "Cheshire West and Chester"]
             mode_list = [3]
 
             # Combine data and file names into a single dictionary
@@ -1151,6 +1166,14 @@ def run(config: inputs.DLitConfig):
                 "zone_target_growth": {
                     "data": zone_target_growth,
                     "file": f"zone_target_growth_{id}.csv",
+                },
+                "zone_gap_growth": {
+                    "data": zone_gap_growth,
+                    "file": f"zone_gap_growth_{id}.csv",
+                },
+                "zone_weight": {
+                    "data": zone_weight,
+                    "file": f"zone_weight_{id}.csv",
                 },
                 "zone_bg_growth": {
                     "data": zone_bg_growth,
