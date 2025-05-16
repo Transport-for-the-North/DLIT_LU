@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 # Local imports
-from dlit_lu import constraint, inputs, dev_pattern, utilities
+from dlit_lu import constraint, inputs, utilities
 from caf.base.data_structures import DVector
 import caf.base as cb
 
@@ -35,7 +35,7 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
             config.tripend.sector
         )  # Modify if needed for trip-end-specific sector
         self.sector_info_map = inputs.SECTOR_INFO_MAP
-        self.base_year_column = config.dev_pattern.base_year
+        self.base_year_column = config.large_sites.base_year
         self.future_year_columns = [str(year) for year in config.tripend.future_years]
         # Validate sector
         if self.sector not in self.sector_info_map:
@@ -45,13 +45,15 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
         self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
 
         # Initialize the BaseZoneHandler for geo_boundary and other zone info
-        self.base_zone_handler = dev_pattern.BaseZoneHandler(config)
+        self.base_zone_handler = large_sites.BaseZoneHandler(
+            config, geo_boundary_override=inputs.GeoBoundary.NORMITS
+        )
         # Access zone information based on geo_boundary
         self.zone_info = self.base_zone_handler.zone_info
         # Example: If you want to update other sector-specific information
         self.sector_info["lookup_path"] = self.zone_info[
             "zone_to_lad_path"
-        ]  # config.dev_pattern.summary_data.normits_to_lad_file
+        ]  # config.large_sites.summary_data.normits_to_lad_file
         self.sector_info["zone_id"] = self.zone_info[
             "group_by_column"
         ]  # "normits_v3.3_id"
@@ -75,8 +77,8 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
         if model_zone == inputs.GeoBoundary.NORMITS.value:
             # No translation file needed for normits
             return None
-        # elif model_zone == inputs.GeoBoundary.LSOA.value:
-        #    return pd.read_csv(self.config.tripend.normits_to_lsoa)
+        elif model_zone == inputs.GeoBoundary.LSOA.value:
+            return pd.read_csv(self.config.large_sites.lsoa_to_normits)
         # elif model_zone == inputs.GeoBoundary.MSOA.value:
         #    return pd.read_csv(self.config.tripend.normits_to_msoa)
         # elif model_zone == inputs.GeoBoundary.NOHAM.value:
@@ -432,15 +434,18 @@ def run(config: inputs.DLitConfig):
 
     LOG.info("Initializing Tripend Module")
     config.output_folder.mkdir(exist_ok=True)
-    base_year = int(config.dev_pattern.base_year)
+    base_year = int(config.large_sites.base_year)
     base_year_column = str(base_year)
-    future_years = config.tripend.future_years
+    future_years = config.split.future_years
     future_year_columns = [str(year) for year in future_years]
     future_year_column = str(2024)
     cap_ratio = config.constraint.cap_ratio
-    key_te_folder = config.output_folder / "07_tripend"
+    key_te_folder = config.output_folder / "M7_tripend"
     key_te_folder.mkdir(exist_ok=True)
-    model_zone = config.dev_pattern.geo_boundary.value
+    model_zone = config.large_sites.geo_boundary.value
+
+    lookup_lad_region_file = config.constraint.lad_to_region_file
+    lookup_lad_region = pd.read_csv(lookup_lad_region_file)
 
     LOG.info("Instantiating TEConstraintProcessor")
     te_cp = TEConstraintProcessor(config)
@@ -594,25 +599,6 @@ def run(config: inputs.DLitConfig):
     utilities.write_to_csv(
         key_te_folder / "dlog_hb_attraction.csv", dlog_zone_te["fy_hb"]["attr"]
     )
-    # # Check the shape of the by_zone_te
-    # print(dlog_zone_te["fy_nhb"]["prod"].shape)
-    # print(dlog_zone_te["fy_nhb"]["attr"].shape)
-
-    # # print zone specific output
-    # prod_zone = "5217001"
-    # zone_specific_prod = dlog_zone_te["fy_hb"]["prod"].loc[
-    #     dlog_zone_te["fy_hb"]["prod"]["normits_v3.3_id"] == prod_zone
-    # ]
-    # attr_zone = "3191006"
-    # zone_specific_attr = dlog_zone_te["fy_hb"]["attr"].loc[
-    #     dlog_zone_te["fy_hb"]["attr"]["normits_v3.3_id"] == attr_zone
-    # ]
-    # utilities.write_to_csv(
-    #     key_te_folder / f"fy_hb_prod_zone_{prod_zone}.csv", zone_specific_prod
-    # )
-    # utilities.write_to_csv(
-    #     key_te_folder / f"fy_hb_attr_zone_{attr_zone}.csv", zone_specific_attr
-    # )
 
     # Process each dataset
     dlog_zone_te_ls_grth = {}
@@ -707,7 +693,6 @@ def run(config: inputs.DLitConfig):
             # Merge zone data for each category and data type
             merged_data = te_cp.merge_zone_data(
                 by_zone_te[f"by_{category}"][te],
-                # dlog_zone_te_grth[f"fy_grth_{category}"][te],
                 dlog_zone_te[f"fy_{category}"][te],
                 # dlog_zone_te[f"dlog_{category}_{te}"],
                 zone_index_columns_initial,
@@ -742,12 +727,6 @@ def run(config: inputs.DLitConfig):
                     zone_data_sets[key] = dlog_zone_te_processed[key]
                 else:
                     zone_data_sets[key] = ntem_zone_te[key]
-
-    # Check the shape of the by_zone_te
-    # print(zone_data_sets["dlog_nhb_prod"])
-    # print(zone_data_sets["dlog_nhb_attr"])
-    # print(zone_data_sets["ntem_nhb_prod"])
-    # print(zone_data_sets["ntem_nhb_attr"])
 
     sector_data_sets = {}
     for key, df in zone_data_sets.items():
@@ -1137,6 +1116,16 @@ def run(config: inputs.DLitConfig):
                 future_year_columns,
                 zone_index_columns_initial,
             )
+            LOG.info("Adding regions into final output dataframe")
+            zone_forecast = zone_forecast.merge(
+                lookup_lad_region[[sector_id, "ntem_region_id"]],
+                on=sector_id,
+                how="left",
+            )
+            region_forecast = zone_forecast.groupby(["ntem_region_id", "p", "m"])[
+                [base_year_column] + future_year_columns
+            ].sum()
+            region_forecast = region_forecast.reset_index()
 
             LOG.info("Exporting key output data")
             inter_output_path = key_te_folder / f"output_intermediate"
@@ -1234,6 +1223,10 @@ def run(config: inputs.DLitConfig):
                 "agg_zone_future_year_tot": {
                     "data": agg_zone_forecast,
                     "file": f"Normits_agg_tripend_fy_{id}.csv",
+                },
+                "region_forecast": {
+                    "data": region_forecast,
+                    "file": f"Normits_region_tripend_fy_{id}.csv",
                 },
                 "zone_adjustment_factor": {
                     "data": zone_adjustment_factor,

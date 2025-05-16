@@ -26,7 +26,9 @@ from dlit_lu import (
     utilities,
     land_use,
     parser,
-    dev_pattern,
+    large_sites,
+    split,
+    # dev_pattern,
     tripend,
 )
 
@@ -67,11 +69,14 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
     if config.run_land_use and infilled_data is not None:
         land_use.run(infilled_data, config)
 
-    assess_data = parser.parse_dev_pattern_input(config)
-    if config.run_dev_pattern and assess_data is not None:
-        dev_pattern.run(assess_data, config)
-    # else:
-    #     te_inputs = parser.parse_tripend_input(config)
+    assess_data = parser.parse_large_sites_input(config)
+    if config.run_large_sites and assess_data is not None:
+        fy_zone_data = large_sites.run(assess_data, config)
+    else:
+        fy_zone_data = parser.parse_fy_zone_input(config)
+
+    if config.run_split and fy_zone_data is not None:
+        split.run(fy_zone_data, config)
 
     if config.run_constraint:
         constraint.run(config)

@@ -8,22 +8,32 @@ The infilling module loads, analyses and performs data fixes on the D-Log data s
 It outputs analysis results as an Excel workbook with summary maps.
 
 ## Land Use 
-The land use module converts DLog into MSOA base build-out profiles disaggregated by SIC
-code for employment and, census dwelling type and TfN traveller type for residential. 
+The land use module converts development data—including land area (hectares), 
+floorspace, and dwelling units—into land use units (population, households and jobs) 
+at the site level. 
 
-## Dev Pattern
+## Large Sites
 The Dev pattern module defines and categorizes large-scale developments that have the 
 potential to influence existing travel patterns, ensuring they are appropriately 
 integrated into demand forecasting.
+
+## Split
+The split module Disaggregates population, household, and employment data from the D-Log 
+for each future year, capturing both total values and growth attributable to large sites.
 
 ## Constraint 
 The constrain module merges future-year growth from the Development Log (D-Log)
 with EDGE growth for rail and NTEM growth for other modes, 
 constraining combined LAD or LAD-level growth appropriately.
 
+## Tem (currently in caf.tem)
+The Tem module utilises caf.tem to convert the development-related population, 
+household and employment data into trip ends for use in forecasting demand matrices.
+
 ## Trip End
-The Trip End module converts the development-related population and employment
- data into trip ends for use in forecasting demand matrices.
+The Trip End module further integrates D-Log-based future year growth with NTEM trip end forecasts 
+for car travel, applying NTEM constraints at the Local Authority District (LAD) level to maintain 
+alignment with NTEM growth trajectories.
 
 
 # Environment
@@ -68,6 +78,10 @@ These parameters are all mandatory with no default values.
 | :---------------------- | :---------------------: | :------------------------------------------------------ |
 | run_infill              | Boolean (True or False) | Whether to run the infill module                        |
 | run_land_use            | Boolean (True or False) | Whether to run the land use module                      |
+| run_large_sites         | Boolean (True or False) | Whether to run the land use module                      |
+| run_split               | Boolean (True or False) | Whether to run the land use module                      |
+| run_constraint          | Boolean (True or False) | Whether to run the land use module                      |
+| run_tripend             | Boolean (True or False) | Whether to run the land use module                      |
 | dlog_input_file         |        File Path        | Path to the D-Log Excel Worksheet                       |
 | lookups_sheet_name      |          Text           | Name of the lookup sheet in the D-Log Excel Worksheet   |
 | output_folder           |     Directory Path      | Folder to save outputs to                               |
@@ -107,7 +121,7 @@ These parameters are all mandatory with no default values.
 | demolition_dampener            | Real 0 - 1.0 (default 1.0) | Factor to apply to GFA when calculating demolitions of existing land use values, 0 indicates no implied demolitions.                                   |
 
 
-## Dev Pattern
+## Large Sites
 
 | Parameter                      |            Type            | Description                                                                                                                                                |
 | :----------------------------- | :------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------     |
@@ -157,6 +171,43 @@ Optional parameters for aggregating zonal data to LAD .
 | lad_shapefile               |     File Path      | Path to LAD shapefile.                                                   |
 | shapefile_id_column         |        Text        | Name of ID column in shapefile.                                          |
 | geometry_simplify_tolerance | Integer (Optional) | Optional tolerance parameter to simplify the shapefile to.               |
+
+## Split
+
+| Parameter                      |            Type            | Description                                                                                                                                                |
+| :----------------------------- | :------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------     |
+| base_year                      |    Text                    | Base Year                                                                                  |
+| geo_boundary                   |    Text                    | Model zone , among the options of lsoa, normits, noham, norms, msoa                        |
+| assessment_input               |    File Path (optional)    | Path to inputs exported from previous infilling module                                     |
+| emp_site_data                  |    File Path (optional)    | Path to inputs exported from previous land use module,site level total jobs from D-log     |
+| res_site_data                  |    File Path (optional)    | Path to inputs exported from previous land use module,site level total dwellings from D-log| 
+| lsoa_data_path                 |    File Path (optional)    | Path to CSV containing TfN’s base year total population,household and jobs                 | 
+| pop_tt_site_data               |    File Path (optional)    | Path to inputs exported from previous land use module,site level population by tt          |
+| emp_sic_soc_site_data          |    File Path (optional)    | Path to inputs exported from previous land use module,site level jobs by SIC, SOC          |
+| normits_shapefile_path         |         File Path          | Path to normits zone shape file                                                            |
+| noham_shapefile_path           |         File Path          | Path to normits zone shape file                                                            |
+| norms_shapefile_path           |         File Path          | Path to normits zone shape file                                                            |
+| msoa_shapefile_path            |         File Path          | Path to normits zone shape file                                                            |
+| lsoa_hh_centroids              |         File Path          | Path to hh weighted lsoa centroids                                                         |
+| lsoa_emp_centroids             |         File Path          | Path to emp weighted lsoa centroids                                                        |
+| lsoa_pop_centroids             |         File Path          | Path to pop weighted lsoa centroids                                                        |
+| normits_hh_centroids           |         File Path          | Path to hh weighted normits centroids                                                      |
+| normits_emp_centroids          |         File Path          | Path to emp weighted normits centroids                                                     |
+| normits_pop_centroids          |         File Path          | Path to pop weighted normits centroids                                                     |
+| noham_hh_centroids             |         File Path          | Path to hh weighted noham centroids                                                        |
+| noham_emp_centroids            |         File Path          | Path to emp weighted noham centroids                                                       |
+| noham_pop_centroids            |         File Path          | Path to pop weighted noham centroids                                                       |
+| norms_hh_centroids             |         File Path          | Path to hh weighted norms centroids                                                        |
+| norms_emp_centroids            |         File Path          | Path to emp weighted norms centroids                                                       |
+| norms_pop_centroids            |         File Path          | Path to pop weighted norms centroids                                                       |
+| msoa_hh_centroids              |         File Path          | Path to hh weighted msoa centroids                                                         |
+| msoa_emp_centroids             |         File Path          | Path to emp weighted msoa centroids                                                        |
+| msoa_pop_centroids             |         File Path          | Path to pop weighted msoa centroids                                                        |
+| lsoa_to_normits                |         File Path          | Path to translation file bewteen lsoa and normits                                          |
+| lsoa_to_noham                  |         File Path          | Path to translation file bewteen lsoa and noham                                            |
+| lsoa_to_norms                  |         File Path          | Path to translation file bewteen lsoa and norms                                            |
+| lsoa_to_msoa                   |         File Path          | Path to translation file bewteen lsoa and msoa                                             |
+
 
 ## Constraint
 

@@ -892,7 +892,7 @@ def run(config: inputs.DLitConfig):
 
     config.output_folder.mkdir(exist_ok=True)
 
-    key_constraint_path = config.output_folder / f"06_constraint"
+    key_constraint_path = config.output_folder / f"M5_constraint"
     key_constraint_path.mkdir(exist_ok=True)
 
     LOG.info("Instantiating the Classes")
@@ -1309,45 +1309,6 @@ def run(config: inputs.DLitConfig):
         agg_zone_forecast = zone_forecast.groupby("REGIONNM")[build_out_columns].sum()
         agg_zone_forecast = agg_zone_forecast.reset_index()
 
-        # # Further adjust the aggregated forecast year to meet sector level DDG total
-        # sector_ddg_ratio = calc.calculate_ratio(
-        #     cap_ratio = 1,
-        #     target_data = results[f"{sector}_ddg_{id}"]["YearTotal"],
-        #     estimated_data = agg_zone_forecast,
-        #     build_out_columns = build_out_columns,
-        #     sector_index_columns=["REGIONNM"],
-        # )
-        # # Get zone scaler from sector gratio
-        # zone_ddg_ratio = zone_etmt_growth[zone_index_columns].copy()
-        # zone_ddg_ratio = zone_ddg_ratio.merge(sector_ddg_ratio, on="REGIONNM")
-        # zone_ddg_ratio = zone_ddg_ratio[zone_index_columns + build_out_columns]
-        # zone_ddg_forecast = calc.calculate_product(
-        #     zone_forecast,
-        #     zone_ddg_ratio,
-        #     build_out_columns,
-        #     zone_index_columns,
-        # )
-        # agg_zone_ddg_forecast = zone_ddg_forecast.groupby("REGIONNM")[build_out_columns].sum()
-        # agg_zone_ddg_forecast = agg_zone_ddg_forecast.reset_index()
-
-        # # Check the aggregated output data against ddg data at sector level
-        # sector_deviation = calc.calculate_gap(
-        #     results[f"{sector}_ddg_{id}"]["YearTotal"],
-        #     agg_zone_ddg_forecast,
-        #     build_out_columns,
-        #     sector_index_columns=["REGIONNM"],
-        # )
-        # deviation_total = sector_deviation[build_out_columns].sum().sum()
-        # print(deviation_total)
-        # if deviation_total > 0.01:
-        #     LOG.warning(
-        #         f"Warning: The aggregated forecast data for {sector} has a deviation of {deviation_total} from the DDG data."
-        #     )
-        # else:
-        #     LOG.info(
-        #         f"The aggregated forecast data for {sector} has been successfully constrained to the DDG data with a deviation total being {deviation_total}."
-        #     )
-
         LOG.info(
             f"Exporting the intermediate outputs for {sector} and {id} for checking purpose for ddg_related constraining process"
         )
@@ -1625,45 +1586,6 @@ def run(config: inputs.DLitConfig):
         # Agg zone forecast to sector level
         agg_zone_forecast = zone_forecast.groupby("REGIONNM")[build_out_columns].sum()
         agg_zone_forecast = agg_zone_forecast.reset_index()
-
-        # # Further adjust the aggregated forecast year to meet sector level DDG total
-        # sector_ddg_ratio = calc.calculate_ratio(
-        #     cap_ratio = 1,
-        #     target_data = results[f"{sector}_ddg_{id}"]["YearTotal"],
-        #     estimated_data = agg_zone_forecast,
-        #     build_out_columns = build_out_columns,
-        #     sector_index_columns=["REGIONNM"],
-        # )
-        # # Get zone scaler from sector gratio
-        # zone_ddg_ratio = zone_etmt_growth[zone_index_columns].copy()
-        # zone_ddg_ratio = zone_ddg_ratio.merge(sector_ddg_ratio, on="REGIONNM")
-        # zone_ddg_ratio = zone_ddg_ratio[zone_index_columns + build_out_columns]
-        # zone_ddg_forecast = calc.calculate_product(
-        #     zone_forecast,
-        #     zone_ddg_ratio,
-        #     build_out_columns,
-        #     zone_index_columns,
-        # )
-        # agg_zone_ddg_forecast = zone_ddg_forecast.groupby("REGIONNM")[build_out_columns].sum()
-        # agg_zone_ddg_forecast = agg_zone_ddg_forecast.reset_index()
-
-        # # Check the aggregated output data against ddg data at sector level
-        # sector_deviation = calc.calculate_gap(
-        #     results[f"{sector}_ddg_{id}"]["YearTotal"],
-        #     agg_zone_ddg_forecast,
-        #     build_out_columns,
-        #     sector_index_columns=["REGIONNM"],
-        # )
-        # deviation_total = sector_deviation[build_out_columns].sum().sum()
-        # print(deviation_total)
-        # if deviation_total > 0.01:
-        #     LOG.warning(
-        #         f"Warning: The aggregated forecast data for {sector} has a deviation of {deviation_total} from the DDG data."
-        #     )
-        # else:
-        #     LOG.info(
-        #         f"The aggregated forecast data for {sector} has been successfully constrained to the DDG data with a deviation total being {deviation_total}."
-        #     )
 
         LOG.info(
             f"Exporting the intermediate outputs for {sector} and {id} for checking purpose for ntem_related constraining process"

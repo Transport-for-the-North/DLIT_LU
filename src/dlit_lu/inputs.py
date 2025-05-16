@@ -173,7 +173,7 @@ class LandUseConfig:
 
 
 @dataclasses.dataclass
-class DevPatnConfig:
+class LargeSitesConfig:
     """Manages reading / writing the tool's config file.
 
     Attributes
@@ -234,20 +234,8 @@ class DevPatnConfig:
         Path to the translation file from LSOA to Norms.
     lsoa_to_msoa : pydantic.FilePath
         Path to the translation file from LSOA to MSOA.
-    tfn_tt : pydantic.FilePath
-        Path to Transport for the North (TfN) travel time data.
-    normits_hh_car : pydantic.FilePath
-        Path to Normits household data segmented by car ownership.
-    normits_pop_car : pydantic.FilePath
-        Path to Normits population data segmented by car ownership.
-    normits_pop_age : pydantic.FilePath
-        Path to Normits population data segmented by age group.
-    lad_hh_car : pydantic.FilePath
-        Path to LAD (Local Authority District) household data segmented by car ownership.
-    lad_pop_car : pydantic.FilePath
-        Path to LAD population data segmented by car ownership.
-    lad_pop_age : pydantic.FilePath
-        Path to LAD population data segmented by age group.
+    lsoa2021_name : pydantic.FilePath
+        Path to the LSOA 2021 name file.
     lsoa_data_path : Optional[pathlib.Path], default=None
         Path to the zonal totals file containing population, dwelling, and employment data.
     assessment_input : Optional[pathlib.Path], default=None
@@ -256,12 +244,7 @@ class DevPatnConfig:
         Path to employment site data.
     res_site_data : Optional[pathlib.Path], default=None
         Path to residential site data.
-    hh_type_site_data : Optional[pathlib.Path], default=None
-        Path to household data segmented by household type.
-    pop_tt_site_data : Optional[pathlib.Path], default=None
-        Path to population data segmented by travel type.
-    emp_sic_soc_site_data : Optional[pathlib.Path], default=None
-        Path to job data segmented by SIC (Standard Industrial Classification) and SOC (Standard Occupational Classification).
+
     summary_data : SummaryInputs | None, optional
         Lookup file and shapefile for creating output summaries at different zone levels.
     """
@@ -294,23 +277,65 @@ class DevPatnConfig:
     lsoa_to_noham: pydantic.FilePath
     lsoa_to_norms: pydantic.FilePath
     lsoa_to_msoa: pydantic.FilePath
+    assessment_input: Optional[pathlib.Path] = None
+    emp_site_data: Optional[pathlib.Path] = None
+    res_site_data: Optional[pathlib.Path] = None
+    pop_site_data: Optional[pathlib.Path] = None
+    emp_sic_site_data: Optional[pathlib.Path] = None
+
+    summary_data: SummaryInputs | None = None
+
+
+@dataclasses.dataclass
+class SplitConfig:
+    """Manages reading / writing the tool's config file.
+
+    Attributes
+    ----------
+    tfn_tt : pydantic.FilePath
+        Path to Transport for the North (TfN) travel time data.
+    lsoa_hh_car : pydantic.FilePath
+        Path to ntem household profile segmented by household car availability at lsoa level.
+    lsoa_pop_car : pydantic.FilePath
+        Path to ntem population profile segmented by household car ownership at lsoa level.
+    lsoa_pop_age : pydantic.FilePath
+        Path to ntem population profile segmented by age bands at lsoa level.
+    normits_hh_car : pydantic.FilePath
+        Path to ntem household profile segmented by household car availability at normits zone level.
+    normits_pop_car : pydantic.FilePath
+        Path to ntem population profile segmented by household car ownership at normits zone level.
+    normits_pop_age : pydantic.FilePath
+        Path to ntem population profile segmented by age bands at normits zone level.
+    lad_hh_car : pydantic.FilePath
+        Path to ntem household profile segmented by household car availability at LAD level.
+    lad_pop_car : pydantic.FilePath
+        Path to ntem population profile segmented by household car ownership at LAD level.
+    lad_pop_age : pydantic.FilePath
+        Path to ntem population profile segmented by age bands at LAD level.
+    lsoa_data_path : Optional[pathlib.Path], default=None
+        Path to the zonal totals file containing population, dwelling, and employment data.
+
+    """
+
+    future_years: list[int]
     tfn_tt: pydantic.FilePath
+    lsoa_hh_car: pydantic.FilePath
+    lsoa_pop_car: pydantic.FilePath
+    lsoa_pop_age: pydantic.FilePath
     normits_hh_car: pydantic.FilePath
     normits_pop_car: pydantic.FilePath
     normits_pop_age: pydantic.FilePath
     lad_hh_car: pydantic.FilePath
     lad_pop_car: pydantic.FilePath
     lad_pop_age: pydantic.FilePath
-    lsoa_data_path: Optional[pathlib.Path] = None
-    assessment_input: Optional[pathlib.Path] = None
-    emp_site_data: Optional[pathlib.Path] = None
-    res_site_data: Optional[pathlib.Path] = None
-    pop_site_data: Optional[pathlib.Path] = None
-    emp_sic_site_data: Optional[pathlib.Path] = None
-    hh_type_site_data: Optional[pathlib.Path] = None
-    pop_tt_site_data: Optional[pathlib.Path] = None
-    emp_sic_soc_site_data: Optional[pathlib.Path] = None
-    summary_data: SummaryInputs | None = None
+    zone_fy_tot_hh: Optional[pathlib.Path] = None
+    zone_fy_tot_pop: Optional[pathlib.Path] = None
+    zone_fy_tot_emp: Optional[pathlib.Path] = None
+    zone_fy_tot_emp_sic: Optional[pathlib.Path] = None
+    zone_fy_lsgrth_hh: Optional[pathlib.Path] = None
+    zone_fy_lsgrth_pop: Optional[pathlib.Path] = None
+    zone_fy_lsgrth_emp: Optional[pathlib.Path] = None
+    zone_fy_lsgrth_emp_sic: Optional[pathlib.Path] = None
 
 
 @dataclasses.dataclass
@@ -415,7 +440,7 @@ class TripendsConfig:
     """
 
     sector: Sector
-    future_years: list[int]
+
     # pop2023: pydantic.FilePath
     by_fr_hb: pydantic.FilePath
     by_to_hb: pydantic.FilePath
@@ -449,7 +474,9 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     run_infill: bool
     run_land_use: bool
-    run_dev_pattern: bool
+    # run_dev_pattern: bool
+    run_large_sites: bool
+    run_split: bool
     run_constraint: bool
     run_tripend: bool
 
@@ -461,7 +488,9 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     infill: Optional[InfillConfig] = None
     land_use: Optional[LandUseConfig] = None
-    dev_pattern: Optional[DevPatnConfig] = None
+    # dev_pattern: Optional[DevPatnConfig] = None
+    large_sites: Optional[LargeSitesConfig] = None
+    split: Optional[SplitConfig] = None
     constraint: Optional[ConstraintConfig] = None
     tripend: Optional[TripendsConfig] = None
 
@@ -493,23 +522,79 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
         return value
 
-    @pydantic.validator("dev_pattern")
-    def dev_pattern_input_check(  # pylint: disable=no-self-argument
-        cls, value: DevPatnConfig | None, values: dict[str, Any]
-    ) -> DevPatnConfig:
+    # @pydantic.validator("dev_pattern")
+    # def dev_pattern_input_check(  # pylint: disable=no-self-argument
+    #     cls, value: DevPatnConfig | None, values: dict[str, Any]
+    # ) -> DevPatnConfig:
+    #     """Check dev pattern is given if running module."""
+    #     if not values["run_dev_pattern"]:
+    #         # Don't need to check if we aren't running dev_pattern module
+    #         return value
+
+    #     if value is None:
+    #         raise ValueError("dev_pattern is required if run_dev_pattern is true")
+
+    #     if not values.get("run_land_use") and not all(
+    #         [value.lsoa_by_data_path, value.emp_site_data, value.res_site_data]
+    #     ):
+    #         raise ValueError(
+    #             "lsoa_data_path, emp_site_data, and res_site_data are required if not running land use module"
+    #         )
+
+    #     return value
+
+    @pydantic.validator("large_sites")
+    def large_sites_input_check(  # pylint: disable=no-self-argument
+        cls, value: LargeSitesConfig | None, values: dict[str, Any]
+    ) -> LargeSitesConfig:
         """Check dev pattern is given if running module."""
-        if not values["run_dev_pattern"]:
+        if not values["run_large_sites"]:
             # Don't need to check if we aren't running dev_pattern module
             return value
 
         if value is None:
-            raise ValueError("dev_pattern is required if run_dev_pattern is true")
+            raise ValueError("large_sites is required if run_large_sites is true")
 
         if not values.get("run_land_use") and not all(
-            [value.lsoa_data_path, value.emp_site_data, value.res_site_data]
+            [
+                value.emp_site_data,
+                value.res_site_data,
+                value.pop_site_data,
+                value.emp_sic_site_data,
+            ]
         ):
             raise ValueError(
-                "lsoa_data_path, emp_site_data, and res_site_data are required if not running infill module"
+                "lsoa_data_path, emp_site_data, res_site_data, pop_site_data, emp_sic_site_data are required if not running land use module"
+            )
+
+        return value
+
+    @pydantic.validator("split")
+    def split_input_check(  # pylint: disable=no-self-argument
+        cls, value: SplitConfig | None, values: dict[str, Any]
+    ) -> SplitConfig:
+        """Check dev pattern is given if running module."""
+        if not values["run_split"]:
+            # Don't need to check if we aren't running dev_pattern module
+            return value
+
+        if value is None:
+            raise ValueError("split is required if run_split is true")
+
+        if not values.get("run_large_sites") and not all(
+            [
+                value.zone_fy_tot_hh,
+                value.zone_fy_tot_pop,
+                value.zone_fy_tot_emp,
+                value.zone_fy_tot_emp_sic,
+                value.zone_fy_lsgrth_hh,
+                value.zone_fy_lsgrth_pop,
+                value.zone_fy_lsgrth_emp,
+                value.zone_fy_lsgrth_emp_sic,
+            ]
+        ):
+            raise ValueError(
+                "future year zonal total and large site growth are required if not running large sites module"
             )
 
         return value
@@ -564,14 +649,15 @@ class DLitConfig(caf.toolkit.BaseConfig):
             [
                 instance.run_infill,
                 instance.run_land_use,
-                instance.run_dev_pattern,
+                instance.run_large_sites,
+                instance.run_split,
                 instance.run_constraint,
                 instance.run_tripend,
             ]
         ):
             raise ValueError(
-                "At least one of run_infill, run_land_use, "
-                "run_dev_pattern, run_constraint, or run_tripend must be set to True"
+                "At least one of run_infill, run_land_use, run_large_sites "
+                "run_split, run_constraint, or run_tripend must be set to True"
             )
 
         return instance

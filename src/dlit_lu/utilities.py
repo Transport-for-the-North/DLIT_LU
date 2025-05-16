@@ -1,5 +1,5 @@
-"""General functions and classes used by tool. 
-"""
+"""General functions and classes used by tool."""
+
 # standard imports
 import logging
 import pathlib
