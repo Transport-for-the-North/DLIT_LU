@@ -314,10 +314,10 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
 
     utilities.write_to_csv(
         lu_output_path / emp_sites_tot_file, emp_sites_jobs_tot
-    )  # inputs needed by module dev_pattern
+    )  # inputs needed by module large_sites
     utilities.write_to_csv(
         lu_output_path / emp_sites_jobs_sic_file, emp_sites_jobs_sic
-    )  # inputs needed by module dev_pattern
+    )  # inputs needed by module large_sites
 
     LOG.info("Disaggregating dwellings into population by dwelling type")
     res_lsoa_sites_pop = disagg_dwelling(

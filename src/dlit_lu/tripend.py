@@ -1,15 +1,111 @@
 import pandas as pd
 import numpy as np
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 # Local imports
 from dlit_lu import constraint, inputs, utilities
-from caf.base.data_structures import DVector
+from dlit_lu import large_sites as ls
+
+#
+# from caf.base.data_structures import DVector
 import caf.base as cb
 
+
 LOG = logging.getLogger(__name__)
+
+
+import os
+import pandas as pd
+
+
+class TEMOutputProcessor(ls.BaseZoneHandler):
+    def __init__(
+        self,
+        config: inputs.DLitConfig,
+        geo_boundary_override: Optional[inputs.GeoBoundary],
+        base_dir: Path,
+    ):
+        """
+        Initializes the TEMOutputProcessor with configuration settings and paths.
+        Args:
+            config (inputs.DLitConfig): The configuration object containing paths and settings.
+            geo_boundary_override (Optional[inputs.GeoBoundary]): Optional override for geo boundary.
+            base_dir (str): Base directory for the output files.
+        """
+        # Call the parent class's __init__ to inherit all other methods and attributes
+        super().__init__(config, geo_boundary_override=geo_boundary_override)
+        self.base_dir = base_dir
+        self.subfolders = {
+            "hb_productions": "hb_normits_tem_segmented_{}_dvec.h5",
+            "hb_attractions": "hb_normits_tem_segmented_{}_dvec.h5",
+            "nhb_productions": "nhb_normits_tem_segmented_{}_dvec.h5",
+            "nhb_attractions": "nhb_normits_tem_segmented_{}_dvec.h5",
+        }
+        self.zone_dvec_id = self.zone_info["zone_gdf_id_col"]
+        self.zone_id = self.zone_info["group_by_column"]
+
+    def process_output(self, subfolder: str, years: list[str]) -> pd.DataFrame | None:
+        if subfolder not in self.subfolders:
+            raise ValueError(
+                f"Unknown subfolder '{subfolder}'. Must be one of {list(self.subfolders.keys())}"
+            )
+
+        folder_path = self.base_dir / subfolder
+        file_template = self.subfolders[subfolder]
+        processed_dataframes = []
+
+        for year in years:
+            filename = file_template.format(year)
+            file_path = os.path.join(folder_path, filename)
+            zone_dvec_id = self.zone_dvec_id
+            zone_id = self.zone_id
+            if not os.path.exists(file_path):
+                print(f"File not found: {file_path}")
+                continue
+
+            # df = pd.read_hdf(file_path, key="data")
+            dvec = cb.DVector.load(file_path)
+            zone = cb.ZoningSystem.get_zoning("normits")
+            zone_dvec = dvec.aggregate_comp_zones(zone)
+            df = zone_dvec.data
+            df = df.reset_index()
+            # print(df)
+
+            # Universal transformation for all subfolders
+            df = df[~df["tp"].isin([5, 6])]
+            df = df[df["m"] != 7]
+            df["m"] = df["m"].replace(4, 3)
+            df = df.drop(columns=["hh_type", "tp"])
+
+            df = df.groupby(["p", "m"]).sum().reset_index()
+
+            id_vars = ["p", "m"]
+            value_vars = [col for col in df.columns if col not in id_vars]
+            df = df.melt(
+                id_vars=id_vars,
+                value_vars=value_vars,
+                var_name=zone_dvec_id,
+                value_name="value",
+            )
+            df["value"] = df["value"] / 5
+            df["year"] = year
+
+            processed_dataframes.append(df)
+
+        if not processed_dataframes:
+            print(f"No valid files processed for subfolder '{subfolder}'.")
+            return None
+
+        combined_df = pd.concat(processed_dataframes, axis=0)
+        combined_df = combined_df.pivot_table(
+            index=[zone_dvec_id, "p", "m"], columns="year", values="value"
+        ).reset_index()
+        combined_df.columns.name = None
+        combined_df = combined_df.rename(columns={zone_dvec_id: zone_id})
+
+        return combined_df
 
 
 class TEConstraintProcessor(constraint.ConstraintProcessor):
@@ -36,7 +132,7 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
         )  # Modify if needed for trip-end-specific sector
         self.sector_info_map = inputs.SECTOR_INFO_MAP
         self.base_year_column = config.large_sites.base_year
-        self.future_year_columns = [str(year) for year in config.tripend.future_years]
+        self.future_year_columns = [str(year) for year in config.split.future_years]
         # Validate sector
         if self.sector not in self.sector_info_map:
             raise ValueError(f"Unsupported sector: {self.sector}")
@@ -45,7 +141,7 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
         self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
 
         # Initialize the BaseZoneHandler for geo_boundary and other zone info
-        self.base_zone_handler = large_sites.BaseZoneHandler(
+        self.base_zone_handler = ls.BaseZoneHandler(
             config, geo_boundary_override=inputs.GeoBoundary.NORMITS
         )
         # Access zone information based on geo_boundary
@@ -284,63 +380,63 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
         return data_with_name
 
 
-class ByTeTransformation:
-    def __init__(self, df: pd.DataFrame, base_year_column: str):
-        """
-        Initialize the class with the given DataFrame and base year.
+# class ByTeTransformation:
+#     def __init__(self, df: pd.DataFrame, base_year_column: str):
+#         """
+#         Initialize the class with the given DataFrame and base year.
 
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Input DataFrame with mode and period columns.
-        base_year : int
-            The base year to rename "prod" and "attr".
-        """
-        self.df = df.copy()
+#         Parameters
+#         ----------
+#         df : pd.DataFrame
+#             Input DataFrame with mode and period columns.
+#         base_year : int
+#             The base year to rename "prod" and "attr".
+#         """
+#         self.df = df.copy()
 
-        # Exclude unwanted categories for mode and period
-        self.df = self.df[~self.df["mode"].isin([7])]  # Exclude mode category 7 for Air
-        self.df = self.df[
-            self.df["period"].isin([1, 2, 3, 4])
-        ]  # Keep only period categories 1, 2, 3, and 4
-        self.df["mode"] = self.df["mode"].replace(
-            {4: 3}
-        )  # Merge 4 into 3 for mode to combine car driver and car passenger
-        self.base_year_column = base_year_column
+#         # Exclude unwanted categories for mode and period
+#         self.df = self.df[~self.df["mode"].isin([7])]  # Exclude mode category 7 for Air
+#         self.df = self.df[
+#             self.df["period"].isin([1, 2, 3, 4])
+#         ]  # Keep only period categories 1, 2, 3, and 4
+#         self.df["mode"] = self.df["mode"].replace(
+#             {4: 3}
+#         )  # Merge 4 into 3 for mode to combine car driver and car passenger
+#         self.base_year_column = base_year_column
 
-    def groupby_sum(self, val: str):
-        """
-        Group the DataFrame by "normits_v3.3_id", "purpose", "mode", and "period",
-        summing the specified value column.
+#     def groupby_sum(self, val: str):
+#         """
+#         Group the DataFrame by "normits_v3.3_id", "purpose", "mode", and "period",
+#         summing the specified value column.
 
-        Parameters
-        ----------
-        val : str
-            The column to be summed, either "prod" or "attr".
+#         Parameters
+#         ----------
+#         val : str
+#             The column to be summed, either "prod" or "attr".
 
-        Returns
-        -------
-        pd.DataFrame
-            Grouped DataFrame with summed values.
-        """
-        if val not in self.df.columns:
-            raise ValueError(f"Column '{val}' not found in DataFrame")
+#         Returns
+#         -------
+#         pd.DataFrame
+#             Grouped DataFrame with summed values.
+#         """
+#         if val not in self.df.columns:
+#             raise ValueError(f"Column '{val}' not found in DataFrame")
 
-        grouped_df = self.df.groupby(
-            ["normits_v3.3_id", "purpose", "mode"], as_index=False
-        )[val].sum()
-        # Divide the summed value by 5 to get average week day totals
-        grouped_df[val] = grouped_df[val] / 5
-        # Rename columns
-        grouped_df = grouped_df.rename(
-            columns={
-                "purpose": "p",
-                "mode": "m",
-                val: self.base_year_column,  # Rename "prod" or "attr" to base year
-            }
-        )
+#         grouped_df = self.df.groupby(
+#             ["normits_v3.3_id", "purpose", "mode"], as_index=False
+#         )[val].sum()
+#         # Divide the summed value by 5 to get average week day totals
+#         grouped_df[val] = grouped_df[val] / 5
+#         # Rename columns
+#         grouped_df = grouped_df.rename(
+#             columns={
+#                 "purpose": "p",
+#                 "mode": "m",
+#                 val: self.base_year_column,  # Rename "prod" or "attr" to base year
+#             }
+#         )
 
-        return grouped_df
+#         return grouped_df
 
 
 class ForecastComparator:
@@ -426,6 +522,23 @@ class ForecastComparator:
         self.report()
 
 
+def summarize_year_sums(dfs_dict, year_columns):
+    # dfs_dict: dict of DataFrames keyed by category keys
+    # year_columns: list of columns (years) to sum across
+
+    summed = pd.DataFrame()
+    for key, df in dfs_dict.items():
+        # Sum only the specified year columns
+        year_sums = df[year_columns].sum()
+        summed[key] = year_sums
+
+    # Add a total column summing across all categories per year
+    summed["total"] = summed.sum(axis=1)
+    # Reset index to turn year index into a column, and put it first
+    summed = summed.reset_index().rename(columns={"index": "year"})
+    return summed
+
+
 def run(config: inputs.DLitConfig):
     """Main function to run the Tripends processing."""
 
@@ -438,7 +551,7 @@ def run(config: inputs.DLitConfig):
     base_year_column = str(base_year)
     future_years = config.split.future_years
     future_year_columns = [str(year) for year in future_years]
-    future_year_column = str(2024)
+    # future_year_column = str(2024)
     cap_ratio = config.constraint.cap_ratio
     key_te_folder = config.output_folder / "M7_tripend"
     key_te_folder.mkdir(exist_ok=True)
@@ -446,7 +559,17 @@ def run(config: inputs.DLitConfig):
 
     lookup_lad_region_file = config.constraint.lad_to_region_file
     lookup_lad_region = pd.read_csv(lookup_lad_region_file)
-
+    LOG.info("Defining key lists")
+    # Lists of categories and data types
+    categories = ["hb"]  # ["hb", "nhb"],["hb"], ["nhb"]
+    tes = ["prod", "attr"]  # trip end to be either production or attraction
+    sources = ["dlog", "ntem"]  # dlog or ntem data
+    sector_list = [
+        "Eilean Siar",
+        "Moray",
+        "Aberdeen City",
+    ]  # ["Bury", "Manchester", "Oldham", "Rochdale", "Salford", "Stockport", "Tameside", "Trafford"]
+    mode_list = [3]  # list of mode to be filtered
     LOG.info("Instantiating TEConstraintProcessor")
     te_cp = TEConstraintProcessor(config)
     zone_translation = te_cp.load_zone_translation(model_zone)
@@ -460,211 +583,54 @@ def run(config: inputs.DLitConfig):
     )
     growth_calculator = constraint.GrowthCalculator()
     calc = constraint.ConstraintCalculation()
-    LOG.info("Loading and transforming base year trip end data")
+    LOG.info("Loading and transforming trip end dvec h5 data")
     # Load datasets
-    by_datasets = {
-        "by_hb": pd.read_csv(config.tripend.by_fr_hb),
-        # "by_hb_to": pd.read_csv(config.tripend.by_to_hb),
-        "by_nhb": pd.read_csv(config.tripend.by_nhb),
+    # Instantiate TEMOutputProcessor
+    tem_tot = TEMOutputProcessor(
+        config, inputs.GeoBoundary.NORMITS, config.tripend.dlog_te_tot_path
+    )
+    tem_lsgrth = TEMOutputProcessor(
+        config, inputs.GeoBoundary.NORMITS, config.tripend.dlog_te_lsgrth_path
+    )
+    # Map short keys to subfolder names
+    category_map = {
+        "dlog_hb_prod": "hb_productions",
+        "dlog_hb_attr": "hb_attractions",
+        "dlog_nhb_prod": "nhb_productions",
+        "dlog_nhb_attr": "nhb_attractions",
     }
 
-    # Process each dataset
-    by_zone_te = {}
-    summary_by_zone_te = []  # Initialize summary table outside the loop
-    for name, df in by_datasets.items():
-        total_prod_before = df[
-            "prod"
-        ].sum()  # Divide by 5 to get average week day totals
-        total_attr_before = df[
-            "attr"
-        ].sum()  # Divide by 5 to get average week day totals
-        transformer = ByTeTransformation(df, base_year_column)
-
-        # Store transformed DataFrame
-        by_zone_te[name] = {
-            "total_prod_before": total_prod_before,
-            "total_attr_before": total_attr_before,
-            "prod": transformer.groupby_sum("prod"),
-            "attr": transformer.groupby_sum("attr"),
-        }
-
-    # Summary table to check total before and after transformation
-    for name in by_zone_te.keys():
-        # Get total sum from aggregated "prod" and "attr"
-        total_prod = by_zone_te[name]["prod"][base_year_column].sum()
-        total_attr = by_zone_te[name]["attr"][base_year_column].sum()
-
-        # Store summary data
-        summary_by_zone_te.append(
-            {
-                "dataset": name,
-                "total_prod_beforetrans": by_zone_te[name]["total_prod_before"],
-                "total_attr_beforetrans": by_zone_te[name]["total_attr_before"],
-                "total_prod": total_prod,
-                "total_attr": total_attr,
-            }
+    dlog_te_tot_dfs = {
+        key: tem_tot.process_output(
+            sub_folder, [base_year_column] + future_year_columns
         )
-
-    # Convert summary data to DataFrame
-    summary_by_df = pd.DataFrame(summary_by_zone_te)
-    utilities.write_to_csv(key_te_folder / "by_te_summary.csv", summary_by_df)
-    utilities.write_to_csv(
-        key_te_folder / "by_hb_production.csv", by_zone_te["by_hb"]["prod"]
-    )
-    utilities.write_to_csv(
-        key_te_folder / "by_hb_attraction.csv", by_zone_te["by_hb"]["attr"]
-    )
-    # # Check the shape of the by_zone_te
-    # print(by_zone_te["by_nhb"]["prod"].shape)
-    # print(by_zone_te["by_nhb"]["attr"].shape)
-
-    # # Rename key "by_hb_fr" to "by_hb"
-    # if "by_hb_fr" in by_zone_te:
-    #     by_zone_te["by_hb"] = by_zone_te.pop("by_hb_fr")
-
-    # Get the index columns for the zone data
-    zone_index_column_count = by_zone_te["by_hb"]["prod"].columns.get_loc(
-        base_year_column
-    )
-
-    zone_index_columns_initial = list(
-        by_zone_te["by_hb"]["prod"].columns[:zone_index_column_count]
-    )
-
-    LOG.info("Generating or Loading Dlog trip end data")
-
-    # Load data into a dictionary
-
-    # Load datasets
-    dlog_datasets = {
-        "fy_hb": pd.read_csv(config.tripend.fy_fr_hb),
-        # "fy_hb_to": pd.read_csv(config.tripend.fy_to_hb),
-        "fy_nhb": pd.read_csv(config.tripend.fy_nhb),
+        for key, sub_folder in category_map.items()
     }
+    summary_totals = summarize_year_sums(
+        dlog_te_tot_dfs, [base_year_column] + future_year_columns
+    )
 
-    # dlog_grth_datasets = {
-    #     "fy_grth_hb": pd.read_csv(config.tripend.fy_grth_fr_hb),
-    #     "fy_grth_hb_to": pd.read_csv(config.tripend.fy_grth_to_hb),
-    #     "fy_grth_nhb": pd.read_csv(config.tripend.fy_grth_nhb),
-    # }
-
-    dlog_ls_grth_datasets = {
-        "fy_ls_grth_hb": pd.read_csv(config.tripend.fy_ls_grth_fr_hb),
-        # "fy_ls_grth_hb_to": pd.read_csv(config.tripend.fy_ls_grth_to_hb),
-        "fy_ls_grth_nhb": pd.read_csv(config.tripend.fy_ls_grth_nhb),
+    dlog_te_lsgrth_dfs = {
+        key: tem_lsgrth.process_output(sub_folder, future_year_columns)
+        for key, sub_folder in category_map.items()
     }
-    # Process each dataset
-    dlog_zone_te = {}
-    summary_dlog_zone_te = []  # Initialize summary table outside the loop
-    for name, df in dlog_datasets.items():
-        total_prod_before = df[
-            "prod"
-        ].sum()  # Divide by 5 to get average week day totals
-        total_attr_before = df[
-            "attr"
-        ].sum()  # Divide by 5 to get average week day totals
-        transformer = ByTeTransformation(df, future_year_column)
+    summary_ls_growth = summarize_year_sums(dlog_te_lsgrth_dfs, future_year_columns)
 
-        # Store transformed DataFrame
-        dlog_zone_te[name] = {
-            "total_prod_before": total_prod_before,
-            "total_attr_before": total_attr_before,
-            "prod": transformer.groupby_sum("prod"),
-            "attr": transformer.groupby_sum("attr"),
-        }
+    print("Summary of totals:\n", summary_totals)
+    print("\nSummary of growths:\n", summary_ls_growth)
 
-    # Summary table to check total before and after transformation
-    for name in dlog_zone_te.keys():
-        # Get total sum from aggregated "prod" and "attr"
-        total_prod = dlog_zone_te[name]["prod"][future_year_column].sum()
-        total_attr = dlog_zone_te[name]["attr"][future_year_column].sum()
+    # Export individual total DataFrames
+    for key, df in dlog_te_tot_dfs.items():
+        file_path = os.path.join(key_te_folder, f"{key}_total.csv")
+        utilities.write_to_csv(file_path, df)
+        print(f"Saved {file_path}")
+    for key, df in dlog_te_lsgrth_dfs.items():
+        file_path = os.path.join(key_te_folder, f"{key}_lsgrowth.csv")
+        utilities.write_to_csv(file_path, df)
+    # Export key dataFrames to CSV files
+    utilities.write_to_csv(key_te_folder / "summary_totals.csv", summary_totals)
+    utilities.write_to_csv(key_te_folder / "summary_growth.csv", summary_ls_growth)
 
-        # Store summary data
-        summary_dlog_zone_te.append(
-            {
-                "dataset": name,
-                "total_prod_beforetrans": dlog_zone_te[name]["total_prod_before"],
-                "total_attr_beforetrans": dlog_zone_te[name]["total_attr_before"],
-                "total_prod": total_prod,
-                "total_attr": total_attr,
-            }
-        )
-
-    # Convert summary data to DataFrame
-    summary_dlog_df = pd.DataFrame(summary_dlog_zone_te)
-    utilities.write_to_csv(key_te_folder / "dlog_te_summary.csv", summary_dlog_df)
-    utilities.write_to_csv(
-        key_te_folder / "dlog_hb_production.csv", dlog_zone_te["fy_hb"]["prod"]
-    )
-    utilities.write_to_csv(
-        key_te_folder / "dlog_hb_attraction.csv", dlog_zone_te["fy_hb"]["attr"]
-    )
-
-    # Process each dataset
-    dlog_zone_te_ls_grth = {}
-    summary_dlog_zone_te_ls_grth = []  # Initialize summary table outside the loop
-    for name, df in dlog_ls_grth_datasets.items():
-        total_prod_before = df[
-            "prod"
-        ].sum()  # Divide by 5 to get average week day totals
-        total_attr_before = df[
-            "attr"
-        ].sum()  # Divide by 5 to get average week day totals
-        transformer = ByTeTransformation(df, future_year_column)
-
-        transformer = ByTeTransformation(df, future_year_column)
-
-        # Store transformed DataFrame
-        dlog_zone_te_ls_grth[name] = {
-            "total_prod_before": total_prod_before,
-            "total_attr_before": total_attr_before,
-            "prod": transformer.groupby_sum("prod"),
-            "attr": transformer.groupby_sum("attr"),
-        }
-    # Summary table to check total before and after transformation
-    for name in dlog_zone_te_ls_grth.keys():
-        # Get total sum from aggregated "prod" and "attr"
-        total_prod = dlog_zone_te_ls_grth[name]["prod"][future_year_column].sum()
-        total_attr = dlog_zone_te_ls_grth[name]["attr"][future_year_column].sum()
-
-        # Store summary data
-        summary_dlog_zone_te_ls_grth.append(
-            {
-                "dataset": name,
-                "total_prod_beforetrans": dlog_zone_te_ls_grth[name][
-                    "total_prod_before"
-                ],
-                "total_attr_beforetrans": dlog_zone_te_ls_grth[name][
-                    "total_attr_before"
-                ],
-                "total_prod": total_prod,
-                "total_attr": total_attr,
-            }
-        )
-
-    # Convert summary data to DataFrame
-    summary_dlog_ls_grth_df = pd.DataFrame(summary_dlog_zone_te_ls_grth)
-    utilities.write_to_csv(
-        key_te_folder / "dlog_te_ls_grth_summary.csv", summary_dlog_ls_grth_df
-    )
-    utilities.write_to_csv(
-        key_te_folder / "dlog_nhb_production_ls_grth.csv",
-        dlog_zone_te_ls_grth["fy_ls_grth_nhb"]["prod"],
-    )
-    utilities.write_to_csv(
-        key_te_folder / "dlog_nhb_attraction_ls_grth.csv",
-        dlog_zone_te_ls_grth["fy_ls_grth_nhb"]["attr"],
-    )
-
-    # dlog_zone_te = {
-    #     key: df.rename(columns={"zone": "normits_v3.3_id"})
-    #     for key, df in {
-    #         "dlog_hb_prod": pd.read_csv(config.tripend.dlog_hb_prod),
-    #         "dlog_hb_attr": pd.read_csv(config.tripend.dlog_hb_attr),
-    #         "dlog_nhb_prod": pd.read_csv(config.tripend.dlog_nhb_prod),
-    #         "dlog_nhb_attr": pd.read_csv(config.tripend.dlog_nhb_attr),
-    #     }.items()
-    # }
     ntem_zone_te = {
         "ntem_hb_prod": pd.read_csv(config.tripend.ntem_zone_hb_prod)[
             [zone_id, "p", "m", base_year_column] + future_year_columns
@@ -680,42 +646,8 @@ def run(config: inputs.DLitConfig):
         ],
     }
 
-    LOG.info("Combining Dlog fy data (or fy growth) with base year data")
-    # Lists of categories and data types
-    categories = ["hb"]  # ["hb", "nhb"],["hb"], ["nhb"]
-    tes = ["prod", "attr"]
-    sources = ["dlog", "ntem"]
-    # Initialize an empty dictionary to hold the processed data
-    dlog_zone_te_processed = {}
-
-    for category in categories:
-        for te in tes:
-            # Merge zone data for each category and data type
-            merged_data = te_cp.merge_zone_data(
-                by_zone_te[f"by_{category}"][te],
-                dlog_zone_te[f"fy_{category}"][te],
-                # dlog_zone_te[f"dlog_{category}_{te}"],
-                zone_index_columns_initial,
-            )
-            # Fill NaN values with 0 in merged_data before further processing
-            merged_data = merged_data.fillna(0)
-
-            # # Apply yearly totals for the merged data
-            # processed_te = growth_calculator.yearly_totals_from_base(
-            #     merged_data,
-            #     base_year_column,
-            #     future_year_columns,
-            # )
-
-            # # Fill NaN values with 0 in processed_te after yearly totals
-            # processed_te = processed_te.fillna(0)
-
-            # # Store the processed data in the dictionary
-            # dlog_zone_te_processed[f"dlog_{category}_{te}"] = processed_te
-            # Store the processed data in the dictionary
-            dlog_zone_te_processed[f"dlog_{category}_{te}"] = merged_data
-
     LOG.info("Aggregating zonal data to sector level")
+
     zone_data_sets = {}
     for source in sources:
         for category in categories:
@@ -724,7 +656,7 @@ def run(config: inputs.DLitConfig):
 
                 if source == "dlog":
                     # Access dictionary variable, not a formatted string
-                    zone_data_sets[key] = dlog_zone_te_processed[key]
+                    zone_data_sets[key] = dlog_te_tot_dfs[key]
                 else:
                     zone_data_sets[key] = ntem_zone_te[key]
 
@@ -817,7 +749,7 @@ def run(config: inputs.DLitConfig):
         # Define the list of locations to filter
         # sector_list = ["Bury", "Manchester", "Oldham", "Rochdale",
         #             "Salford", "Stockport", "Tameside", "Trafford"]
-        sector_list = ["Tamworth", "Cheshire West and Chester"]
+
         # List of subkeys in the required order
         subkeys = [
             "YearTotal",
@@ -878,7 +810,8 @@ def run(config: inputs.DLitConfig):
                             except Exception as e:
                                 LOG.error(f"Failed to write {file_path}: {e}")
 
-    LOG.info(f"Constraining dlog data with ntem data")
+    LOG.info(f"Constraining dlog data with ntem growth")
+    te_output = {}
     for category in categories:
         for te in tes:
             id = f"{category}_{te}"
@@ -931,6 +864,7 @@ def run(config: inputs.DLitConfig):
                 sector_estimated_growth,
                 future_year_columns,
                 sector_index_columns,
+                1e-5,
             )
             # Apply conditional transformation
             for col in future_year_columns:
@@ -1017,11 +951,14 @@ def run(config: inputs.DLitConfig):
             # Apply conditional transformation
             for col in future_year_columns:
                 zone_gap_growth[col] = np.where(
-                    (zone_gap_growth[col] < 0) & (zone_gap_growth[f"{col}_etmt"] != 0),
-                    0,  # set gap to zero to avoid additional background growth when estimated growth is not zero and the gap is negative (estimated exceeds target)
+                    (zone_gap_growth[col] < 0)
+                    & (~np.isclose(zone_gap_growth[f"{col}_etmt"], 0, atol=1e-5)),
+                    0,  # Set gap to zero when estimated growth isn't (almost) zero and gap is negative
                     zone_gap_growth[col],  # Keep original value otherwise
                 )
-
+            # zone_gap_growth["zone_count"] = zone_gap_growth.groupby(
+            #     zone_index_columns[1:]
+            # )[zone_id].transform("count")
             # Calculate weight to be used to distribute sector level background growth
             zone_weight = calc.calculate_zone_weights(
                 zone_gap_growth,
@@ -1095,6 +1032,7 @@ def run(config: inputs.DLitConfig):
                 ],  # original estimated future year total from dlog
                 build_out_columns=future_year_columns,
                 sector_index_columns=zone_index_columns,
+                tolerance=1e-5,
             )
             # Check for any negative values in the specified future year columns
             negative_values_df = zone_adjustment_factor[
@@ -1108,14 +1046,16 @@ def run(config: inputs.DLitConfig):
                 print("No negative values found in 'zone_adjustment_factor'.")
 
             # Apply the adjustment factor to te large site growth
+            zone_index_columns_initial = [zone_id, "p", "m"]
             zone_ls_te_grth = calc.calculate_product(
-                dlog_zone_te_ls_grth[f"fy_ls_grth_{category}"][
-                    f"{te}"
-                ],  # large site trip production growth
+                dlog_te_lsgrth_dfs[f"dlog_{id}"],  # large site trip production growth
                 zone_adjustment_factor,  # adjustment factor
                 future_year_columns,
                 zone_index_columns_initial,
             )
+            zone_ls_te_grth[future_year_columns] = zone_ls_te_grth[
+                future_year_columns
+            ].where(zone_ls_te_grth[future_year_columns].abs() >= 1e-5, 0)
             LOG.info("Adding regions into final output dataframe")
             zone_forecast = zone_forecast.merge(
                 lookup_lad_region[[sector_id, "ntem_region_id"]],
@@ -1127,12 +1067,13 @@ def run(config: inputs.DLitConfig):
             ].sum()
             region_forecast = region_forecast.reset_index()
 
+            te_output[id] = zone_forecast
+
             LOG.info("Exporting key output data")
             inter_output_path = key_te_folder / f"output_intermediate"
             inter_output_path.mkdir(exist_ok=True)
             # Files to be exported
-            sector_list = ["Tamworth", "Cheshire West and Chester"]
-            mode_list = [3]
+            # sector_list = ["Eilean Siar", "Moray", "Aberdeen City"]
 
             # Combine data and file names into a single dictionary
             data_files_and_names = {
@@ -1230,7 +1171,7 @@ def run(config: inputs.DLitConfig):
                 },
                 "zone_adjustment_factor": {
                     "data": zone_adjustment_factor,
-                    "file": f"zone_ajfactor_{id}.csv",
+                    "file": f"Normits_zone_ajfactor_{id}.csv",
                 },
                 "zone_fy_ls_grth": {
                     "data": zone_ls_te_grth,
@@ -1248,5 +1189,34 @@ def run(config: inputs.DLitConfig):
                 # Export without filtering if sector_list is empty
                 for key, value in key_outputs_and_names.items():
                     utilities.write_to_csv(key_te_folder / value["file"], value["data"])
+    LOG.info("Finally scale attraction according to the production total")
+    # Scale attraction according to the production total
+    for cat in categories:
+        prod_df = te_output[f"{cat}_prod"]
+        attr_df = te_output[f"{cat}_attr"]
+
+        # Group by (p, m) and sum across future years
+        prod_totals = prod_df.groupby(["p", "m"])[future_year_columns].sum()
+        attr_totals = attr_df.groupby(["p", "m"])[future_year_columns].sum()
+
+        # Compute scaling factor
+        scaling_factor = (
+            prod_totals.divide(attr_totals).replace([np.inf, -np.inf], np.nan).fillna(1)
+        )
+
+        # Apply scaling
+        attr_scaled = attr_df.copy()
+        for year in future_year_columns:
+            attr_scaled[year] = attr_scaled.apply(
+                lambda row: row[year] * scaling_factor.loc[(row["p"], row["m"]), year],
+                axis=1,
+            )
+
+        # Filter for m == 3
+        filtered_scaled = attr_scaled[attr_scaled["m"].isin(mode_list)]
+
+        # Write to CSV
+        output_path = key_te_folder / f"Normits_tripend_fy_{cat}_attr_scaled.csv"
+        utilities.write_to_csv(output_path, filtered_scaled)
 
     LOG.info("Data processing completed")

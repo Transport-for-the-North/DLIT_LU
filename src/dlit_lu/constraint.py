@@ -34,7 +34,7 @@ class ConstraintProcessor:
     #         inputs.Sector.REGION: {
     #             "lookup_path": self.config.constraint.lad_to_region_file,
     #             "zone_id": "lad2013_id",
-    #             "base_year_column": self.config.dev_pattern.base_year,
+    #             "base_year_column": self.config.large_sites.base_year,
     #             "sector_id": "ntem_region_id",
     #             "zone_to_sector_prop_col": "lad2013_to_ntem_region",
     #             "sector_name": self.config.constraint.region_name,
@@ -52,7 +52,7 @@ class ConstraintProcessor:
         self.config: inputs.DLitConfig = config
         self.sector: inputs.Sector = config.constraint.sector
         self.sector_info_map = inputs.SECTOR_INFO_MAP
-        self.base_year_column = config.dev_pattern.base_year
+        self.base_year_column = config.large_sites.base_year
 
         # Validate sector
         if self.sector not in self.sector_info_map:
@@ -484,8 +484,8 @@ class GrowthCalculator:
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
             target_growth[year] = target_growth[base_year] * target_growth[year]
-        # # Reset index so output matches original data format
-        # target_growth = target_growth.reset_index()
+
+        target_growth[build_out_columns] = target_growth[build_out_columns].fillna(0)
 
         return target_growth[index_columns + [base_year] + build_out_columns]
 
@@ -543,9 +543,7 @@ class GrowthCalculator:
         # Multiply base year values by (1 + growth rate) to get future values
         for year in build_out_columns:
             target_growth[year] = target_growth[base_year] * target_growth[year]
-
-        # # Reset index so output matches original data format
-        # target = target.reset_index()
+        target_growth[build_out_columns] = target_growth[build_out_columns].fillna(0)
 
         return target_growth[index_columns + [base_year] + build_out_columns]
 
@@ -660,33 +658,43 @@ class ConstraintCalculation:
         build_out_columns : list
             List of column names representing growth-related data.
 
-        zone_index_comlumns: list
+        zone_index_columns: list
             List of columns used for indexing and merging zone-level data (e.g., ['ZONE_ID']).
+            In trip end constrain process, columns that uniquely identify each zone (e.g., ['normits_v3.3_id', 'lad2013_id', 'ladnm', 'p', 'm']).
 
-        sector_index_comlumns: list
+        sector_index_columns: list
             List of columns representing the sector or region (e.g., 'REGIONNM') and segementation p and m in the DataFrame.
+            In trip end constrain process, columns defining groupings (e.g., ['ladnm', 'p', 'm']).
 
         Returns:
         -------
         pd.DataFrame
             DataFrame containing the computed zone weights, with values aggregated by region.
         """
-
+        # Step 1: Aggregate totals by sector group
         agg_zone_data = zone_data.groupby(sector_index_columns)[build_out_columns].sum()
         agg_zone_data.columns = [f"{col}_agg" for col in build_out_columns]
-
+        # Step 2: Merge back to zone_data
         zone_weight = zone_data.merge(
             agg_zone_data, on=sector_index_columns, how="left"
         )
 
-        # Compute weights with safeguard against division by zero
+        # Step 3: Compute weights
         for col in build_out_columns:
             agg_col = f"{col}_agg"
-            zone_weight[col] = zone_weight.apply(
-                lambda row: 1 if row[agg_col] == 0 else row[col] / row[agg_col], axis=1
+            weight_col = f"{col}_weight"
+            zone_weight[weight_col] = np.where(
+                zone_weight[agg_col] == 0,
+                1 / zone_weight.groupby(sector_index_columns)[col].transform("count"),
+                zone_weight[col] / zone_weight[agg_col],
             )
-
-        return zone_weight[zone_index_columns + build_out_columns]
+        # Step 4: Select and rename columns
+        weight_cols = [f"{col}_weight" for col in build_out_columns]
+        zone_weight = zone_weight[zone_index_columns + weight_cols]
+        zone_weight.rename(
+            columns={f"{col}_weight": col for col in build_out_columns}, inplace=True
+        )
+        return zone_weight
 
     @staticmethod
     def calculate_ratio(
@@ -695,6 +703,7 @@ class ConstraintCalculation:
         estimated_data: pd.DataFrame,
         build_out_columns: list,
         sector_index_columns: list,
+        tolerance: float,
     ) -> pd.DataFrame:
         """
         Computes the ratio of target growth values to estimated growth values for each sector,
@@ -717,11 +726,14 @@ class ConstraintCalculation:
         sector_index_columns : list
             List of columns used for indexing and merging sector-level data.
 
+        tolerance : float, optional (default=1e-10)
+            Threshold below which estimated values are considered zero to avoid division errors.
+
         Returns:
         --------
         pd.DataFrame
             DataFrame containing the computed ratios of target to estimated growth
-            for each sector, scaled by `cap_ratio`. If the estimated value is zero,
+            for each sector, scaled by `cap_ratio`. If the estimated value is (close to) zero,
             the corresponding ratio is set to `1` to avoid division errors.
         """
         # Rename columns for clarity in merging
@@ -739,11 +751,9 @@ class ConstraintCalculation:
 
         # Compute ratio while handling division by zero safely
         for col in build_out_columns:
-            merged_data[col] = (
-                merged_data[f"{col}_tgt"]
-                * cap_ratio
-                / merged_data[f"{col}_etmt"].replace(0, np.nan)
-            ).fillna(1)
+            denom = merged_data[f"{col}_etmt"].copy()
+            denom[np.isclose(denom, 0, atol=tolerance)] = np.nan
+            merged_data[col] = (merged_data[f"{col}_tgt"] * cap_ratio / denom).fillna(1)
 
         return merged_data[sector_index_columns + build_out_columns]
 
@@ -916,9 +926,9 @@ def run(config: inputs.DLitConfig):
 
     # Process data
     year_columns = [col for col in lad_data["dlog_pop"].columns if col.isdigit()]
-    base_year_column = config.dev_pattern.base_year
+    base_year_column = config.large_sites.base_year
     base_year_int = int(base_year_column)
-    end_year_column = config.dev_pattern.end_year
+    end_year_column = config.large_sites.end_year
     end_year_int = int(end_year_column)
     build_out_columns = [
         str(year) for year in range(base_year_int + 1, end_year_int + 1)
@@ -1162,6 +1172,7 @@ def run(config: inputs.DLitConfig):
             sector_estimated_growth,
             build_out_columns,
             sector_index_columns,
+            1e-5,
         )
         # Apply conditional transformation
         for col in build_out_columns:
@@ -1440,6 +1451,7 @@ def run(config: inputs.DLitConfig):
             sector_estimated_growth,
             build_out_columns,
             sector_index_columns,
+            1e-5,
         )
         # Apply conditional transformation
         for col in build_out_columns:
@@ -1518,7 +1530,9 @@ def run(config: inputs.DLitConfig):
                 0,  # set gap to zero to avoid additional background growth when estimated growth is not zero and the gap is negative (estimated exceeds target)
                 zone_gap_growth[col],  # Keep original value otherwise
             )
-
+        # zone_gap_growth["zone_count"] = zone_gap_growth.groupby(
+        #     zone_index_columns[1:]
+        # )[zone_id].transform("count")
         # calculate weight to be used to distribute sector level background growth
         zone_weight = calc.calculate_zone_weights(
             zone_gap_growth,

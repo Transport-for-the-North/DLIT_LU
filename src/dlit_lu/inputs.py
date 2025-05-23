@@ -403,14 +403,6 @@ class TripendsConfig:
     ----------
     sector : Sector
         The sector for which trip-end data is being defined.
-    future_years : list[int]
-        List of future years for which trip-end data is required.
-    by_fr_hb : pydantic.FilePath
-        Path to the file containing "by" trip ends from households (HB).
-    by_to_hb : pydantic.FilePath
-        Path to the file containing "to" trip ends from households (HB).
-    by_nhb : pydantic.FilePath
-        Path to the file containing "by" trip ends from non-households (NHB).
     ntem_zone_hb_prod : pydantic.FilePath
         Path to the NTEM zone-level production data for households (HB).
     ntem_zone_hb_attr : pydantic.FilePath
@@ -419,54 +411,22 @@ class TripendsConfig:
         Path to the NTEM zone-level production data for non-households (NHB).
     ntem_zone_nhb_attr : pydantic.FilePath
         Path to the NTEM zone-level attraction data for non-households (NHB).
-    ntem_lad_hb_prod : pydantic.FilePath
-        Path to the NTEM LAD-level production data for households (HB).
-    ntem_lad_hb_attr : pydantic.FilePath
-        Path to the NTEM LAD-level attraction data for households (HB).
-    ntem_lad_nhb_prod : pydantic.FilePath
-        Path to the NTEM LAD-level production data for non-households (NHB).
-    ntem_lad_nhb_attr : pydantic.FilePath
-        Path to the NTEM LAD-level attraction data for non-households (NHB).
     export_for_viz : bool
         Flag indicating whether to export trip-end data for visualization.
-    dlog_hb_prod : Optional[pathlib.Path], default=None
-        Path to the DLOG household production data, if available.
-    dlog_hb_attr : Optional[pathlib.Path], default=None
-        Path to the DLOG household attraction data, if available.
-    dlog_nhb_prod : Optional[pathlib.Path], default=None
-        Path to the DLOG non-household production data, if available.
-    dlog_nhb_attr : Optional[pathlib.Path], default=None
-        Path to the DLOG non-household attraction data, if available.
+    dlog_te_tot_path : Optional[pathlib.Path], default=None
+        Path to the DLOG trip end totals.
+    dlog_te_lsgrth_path : Optional[pathlib.Path], default=None
+        Path to the DLOG trip end related to large sites.
     """
 
     sector: Sector
-
-    # pop2023: pydantic.FilePath
-    by_fr_hb: pydantic.FilePath
-    by_to_hb: pydantic.FilePath
-    by_nhb: pydantic.FilePath
     ntem_zone_hb_prod: pydantic.FilePath
     ntem_zone_hb_attr: pydantic.FilePath
     ntem_zone_nhb_prod: pydantic.FilePath
     ntem_zone_nhb_attr: pydantic.FilePath
-    ntem_lad_hb_prod: pydantic.FilePath
-    ntem_lad_hb_attr: pydantic.FilePath
-    ntem_lad_nhb_prod: pydantic.FilePath
-    ntem_lad_nhb_attr: pydantic.FilePath
     export_for_viz: bool
-    fy_fr_hb: Optional[pathlib.Path] = None
-    fy_to_hb: Optional[pathlib.Path] = None
-    fy_nhb: Optional[pathlib.Path] = None
-    fy_grth_fr_hb: Optional[pathlib.Path] = None
-    fy_grth_to_hb: Optional[pathlib.Path] = None
-    fy_grth_nhb: Optional[pathlib.Path] = None
-    fy_ls_grth_fr_hb: Optional[pathlib.Path] = None
-    fy_ls_grth_to_hb: Optional[pathlib.Path] = None
-    fy_ls_grth_nhb: Optional[pathlib.Path] = None
-    # dlog_hb_prod: Optional[pathlib.Path] = None
-    # dlog_hb_attr: Optional[pathlib.Path] = None
-    # dlog_nhb_prod: Optional[pathlib.Path] = None
-    # dlog_nhb_attr: Optional[pathlib.Path] = None
+    dlog_te_tot_path: Optional[pathlib.Path] = None
+    dlog_te_lsgrth_path: Optional[pathlib.Path] = None
 
 
 class DLitConfig(caf.toolkit.BaseConfig):
@@ -474,10 +434,10 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     run_infill: bool
     run_land_use: bool
-    # run_dev_pattern: bool
     run_large_sites: bool
     run_split: bool
     run_constraint: bool
+    run_tem: bool
     run_tripend: bool
 
     output_folder: pathlib.Path
@@ -488,7 +448,6 @@ class DLitConfig(caf.toolkit.BaseConfig):
 
     infill: Optional[InfillConfig] = None
     land_use: Optional[LandUseConfig] = None
-    # dev_pattern: Optional[DevPatnConfig] = None
     large_sites: Optional[LargeSitesConfig] = None
     split: Optional[SplitConfig] = None
     constraint: Optional[ConstraintConfig] = None
@@ -549,7 +508,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     ) -> LargeSitesConfig:
         """Check dev pattern is given if running module."""
         if not values["run_large_sites"]:
-            # Don't need to check if we aren't running dev_pattern module
+            # Don't need to check if we aren't running large_sites module
             return value
 
         if value is None:
@@ -575,7 +534,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
     ) -> SplitConfig:
         """Check dev pattern is given if running module."""
         if not values["run_split"]:
-            # Don't need to check if we aren't running dev_pattern module
+            # Don't need to check if we aren't running split module
             return value
 
         if value is None:
@@ -611,11 +570,11 @@ class DLitConfig(caf.toolkit.BaseConfig):
         if value is None:
             raise ValueError("constraint is required if run_constraint is true")
 
-        if not values.get("run_dev_pattern") and not all(
+        if not values.get("run_large_sites") and not all(
             [value.dlog_hh, value.dlog_emp, value.dlog_pop]
         ):
             raise ValueError(
-                "dlog_household, dlog_employment, and dlog_population at LAD level are required if not running dev_pattern module"
+                "dlog_household, dlog_employment, and dlog_population at LAD level are required if not running large_sites module"
             )
 
         return value
@@ -632,8 +591,8 @@ class DLitConfig(caf.toolkit.BaseConfig):
         if value is None:
             raise ValueError("tripend is required if run_tripend is true")
 
-        if not values.get("run_constraint") and not all(
-            [value.fy_fr_hb, value.fy_nhb]
+        if not values.get("run_tem") and not all(
+            [value.dlog_te_tot_path, value.dlog_te_lsgrth_path]
             # [value.dlog_hb_prod, value.dlog_hb_attr]
         ):
             raise ValueError(

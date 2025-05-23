@@ -10,7 +10,6 @@ from typing import Iterator, Tuple, Optional, Dict, Any, List, Union
 import dask.dataframe as dd
 import pandas as pd
 import numpy as np
-import polars as pl
 
 # from sklearn.preprocessing import MinMaxScaler
 # from scipy.spatial import cKDTree
@@ -235,33 +234,75 @@ class Ratios(ls.BaseZoneHandler):
 
         return ratios.reset_index()
 
+    # def zone_soc_over_sic_ratios(
+    #     self, df: pd.DataFrame, job_type_columns: List[str]
+    # ) -> pd.DataFrame:
+    #     """
+    #     Calculates the SOC ratio within each (zone_id, sic_2d) based on jobs, using MultiIndex.
+
+    #     Parameters
+    #     ----------
+    #     df : pd.DataFrame
+    #         Input DataFrame with columns: 'zone_id', 'sic_2d', 'soc', 'jobs'
+
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         DataFrame with MultiIndex (zone_id, sic_2d, soc) and 'jobs' and 'soc_ratio' columns.
+    #     """
+    #     zone_id = self.zone_info["group_by_column"]
+    #     group_by = [zone_id] + job_type_columns
+    #     # Set MultiIndex
+    #     zonal_ratios = df.groupby(group_by)["jobs"].sum().to_frame()
+    #     # Calculate SOC ratios
+    #     zonal_ratios["ratios"] = zonal_ratios["jobs"] / zonal_ratios.groupby(
+    #         level=[0, 1]
+    #     )["jobs"].transform("sum")
+
+    #     # Step 3: Fill NaNs caused by division by zero with 0
+    #     zonal_ratios["ratios"] = zonal_ratios["ratios"].fillna(0)
+
+    #     return zonal_ratios.reset_index()
+
     def zone_soc_over_sic_ratios(
-        self, df: pd.DataFrame, job_type_columns: List[str]
+        self,
+        df: pd.DataFrame,
+        job_type_columns: List[str],
+        input_col: str = "jobs",
+        output_col: str = "soc_ratio",
     ) -> pd.DataFrame:
         """
-        Calculates the SOC ratio within each (zone_id, sic_2d) based on jobs, using MultiIndex.
+        Calculates the SOC ratio within each (zone_id, sic_2d) group based on job counts.
 
         Parameters
         ----------
         df : pd.DataFrame
-            Input DataFrame with columns: 'zone_id', 'sic_2d', 'soc', 'jobs'
+            Input DataFrame with job counts in the column specified by jobs_col.
+        job_type_columns : List[str]
+            Columns defining job classification (e.g., ['sic_2d', 'soc']).
+        input_col : str
+            Column name in df to be used for further calculation
+        output_col : str
+            Name for the output column containing the computed SOC ratios.
 
         Returns
         -------
         pd.DataFrame
-            DataFrame with MultiIndex (zone_id, sic_2d, soc) and 'jobs' and 'soc_ratio' columns.
+            DataFrame with MultiIndex (zone_id, sic_2d, soc) and the job count and ratio columns.
         """
         zone_id = self.zone_info["group_by_column"]
         group_by = [zone_id] + job_type_columns
-        # Set MultiIndex
-        zonal_ratios = df.groupby(group_by)["jobs"].sum().to_frame()
-        # Calculate SOC ratios
-        zonal_ratios["ratios"] = zonal_ratios["jobs"] / zonal_ratios.groupby(
-            level=[0, 1]
-        )["jobs"].transform("sum")
 
-        # Step 3: Fill NaNs caused by division by zero with 0
-        zonal_ratios["ratios"] = zonal_ratios["ratios"].fillna(0)
+        # Group and sum job counts
+        zonal_ratios = df.groupby(group_by)[input_col].sum().to_frame()
+
+        # Calculate the SOC ratio within each (zone_id, sic_2d)
+        zonal_ratios[output_col] = zonal_ratios[input_col] / zonal_ratios.groupby(
+            level=[0, 1]
+        )[input_col].transform("sum")
+
+        # Replace NaNs from division by zero
+        zonal_ratios[output_col] = zonal_ratios[output_col].fillna(0)
 
         return zonal_ratios.reset_index()
 
@@ -476,67 +517,6 @@ class Ratios(ls.BaseZoneHandler):
 
         # Reset index for output
         return grouped.fillna(0).reset_index()
-
-    def zone_ratios_by_type_fy_pl(
-        self,
-        data: pd.DataFrame,
-        dimension_columns: List[str],
-        build_out_columns: List[str],
-        level: Union[int, List[int]] = 0,
-    ) -> pd.DataFrame:
-        """
-        Memory-efficient Polars version of zone_ratios_by_type_fy using long format.
-
-        Parameters
-        ----------
-        data : pd.DataFrame
-            Household data by zone and household type, with household counts in year columns.
-        dimension_columns : List[str]
-            Columns that define household segmentations (e.g. size, age, income).
-        build_out_columns : List[str]
-            List of year-based columns (e.g., ['2024', '2025', ...]) with household counts.
-        level : int or List[int], default=0
-            The index level(s) to group by when calculating zone-level totals for ratio computation.
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame with household type proportions per year.
-        """
-        # Convert pandas DataFrame to polars DataFrame
-        pl_df = pl.from_pandas(data)
-
-        zone_id = self.zone_info["group_by_column"]
-        id_cols = [zone_id] + dimension_columns
-
-        # Step 1: Melt to long format: one row per zone, hh type, and year
-        df_long = pl_df.melt(
-            id_vars=id_cols,
-            value_vars=build_out_columns,
-            variable_name="year",
-            value_name="value",
-        )
-
-        # Step 2: Compute total households per zone and year (based on `level`)
-        group_levels = (
-            [id_cols[level]] if isinstance(level, int) else [id_cols[i] for i in level]
-        )
-        totals = df_long.group_by(group_levels + ["year"]).agg(
-            pl.sum("value").alias("total")
-        )
-
-        # Step 3: Join totals back and compute proportion
-        df_long = df_long.join(
-            totals, on=group_levels + ["year"], how="left"
-        ).with_columns(
-            (pl.col("value") / pl.col("total")).fill_nan(0).fill_null(0).alias("ratios")
-        )
-
-        # Step 4: Select output columns
-        result = df_long.select(id_cols + ["year", "ratios"])
-
-        # Convert back to pandas DataFrame
-        return result.to_pandas()
 
     @staticmethod
     def expand_gb_ratios_by_zone(
@@ -1114,77 +1094,6 @@ class Ratios(ls.BaseZoneHandler):
 
     #     return result
 
-    def expand_by_dimension_pl(
-        self,
-        zone_data: pd.DataFrame,
-        zone_ratio: pd.DataFrame,
-        build_out_columns: list[str],
-        dimension_columns: list[str],
-    ) -> pd.DataFrame:
-        """
-        Polars version of expand_by_dimension to compute household counts by dimension per year.
-        Calculate the number of households by given dimension categories per zone and year.
-
-        Parameters
-        ----------
-        zone_data : pd.DataFrame
-            DataFrame with total projected households per zone and year.
-            Expected columns: [zone_id] + build_out_columns.
-
-        zone_ratio : pd.DataFrame
-            DataFrame with ratios per zone and dimension (e.g., car availability) for each year.
-            Expected columns: [zone_id, *dimension_columns] + build_out_columns.
-
-        build_out_columns : list[str]
-            List of column names representing future years (e.g. ['2024', '2025', ..., '2066']).
-
-        dimension_columns : Optional[list[str]], default=None
-            List of columns representing the dimensions (e.g., car availability, income group).
-            If None, defaults to using a single dimension column like 'car_availability'.
-
-        Returns
-        -------
-        pd.DataFrame
-            A wide-format DataFrame with [zone_id, dimension_categories] and one column per year,
-
-        """
-        zone_id = self.zone_info["group_by_column"]
-
-        # Convert to Polars DataFrames
-        pl_zone_data = pl.from_pandas(zone_data)
-        pl_zone_ratio = pl.from_pandas(zone_ratio)
-
-        # Determine ID columns
-        id_list = [zone_id, "sic_2d"] if "sic_2d" in zone_data.columns else [zone_id]
-
-        # Melt zone_data into long format
-        zone_data_long = pl_zone_data.melt(
-            id_vars=id_list,
-            value_vars=build_out_columns,
-            variable_name="year",
-            value_name="vals",
-        )
-
-        # Join with ratio data (already long format)
-        merged = zone_data_long.join(pl_zone_ratio, on=id_list + ["year"], how="left")
-
-        # Calculate values by dimension
-        merged = merged.with_columns(
-            (pl.col("vals").cast(pl.Float64) * pl.col("ratios").cast(pl.Float64)).alias(
-                "val_by_dimension"
-            )
-        )
-
-        # Pivot back to wide format
-        pivot = merged.pivot(
-            values="val_by_dimension",
-            index=id_list + dimension_columns,
-            columns="year",
-            aggregate_function="first",
-        )
-        # Convert back to pandas
-        return pivot.to_pandas()
-
     def scaling_factors(
         self,
         target_df: pd.DataFrame,
@@ -1307,67 +1216,6 @@ class Ratios(ls.BaseZoneHandler):
         result_ddf = merged_ddf[final_cols]
 
         return result_ddf.compute()
-
-    def scaling_factors_pl(
-        self,
-        target_df: pd.DataFrame,
-        estimated_df: pd.DataFrame,
-        build_out_columns: list[str],
-        dimension_columns: list[str],
-    ) -> pd.DataFrame:
-        """
-        Calculate scaling factors using long format to minimize memory usage using polars.
-        Parameters
-        ----------
-        target_df : pd.DataFrame
-            DataFrame containing the target values (e.g., from expand_by_dimension).
-        estimated_df : pd.DataFrame
-            DataFrame containing the estimated values (e.g., from zone_vals_by_type_fy).
-        build_out_columns : list[str]
-            List of column names representing years (e.g., ['2024', '2025', ..., '2066']).
-        dimension_columns : list[str]
-            List of dimension columns to include in the merge (e.g., ['car_availability']).
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame with zone_id, dimension columns, and scaling factors per year.
-        """
-        zone_id = self.zone_info["group_by_column"]
-
-        # Convert to Polars
-        pl_target = pl.from_pandas(target_df)
-        pl_estimated = pl.from_pandas(estimated_df)
-
-        id_cols = [zone_id] + dimension_columns
-
-        # Melt both to long format
-        target_long = pl_target.melt(
-            id_vars=id_cols,
-            value_vars=build_out_columns,
-            variable_name="year",
-            value_name="target_val",
-        )
-
-        estimated_long = pl_estimated.melt(
-            id_vars=id_cols,
-            value_vars=build_out_columns,
-            variable_name="year",
-            value_name="estimated_val",
-        )
-
-        # Merge and calculate scaling factor
-        merged = target_long.join(
-            estimated_long, on=id_cols + ["year"], how="outer"
-        ).with_columns(
-            (pl.col("target_val") / pl.col("estimated_val"))
-            .fill_nan(1)
-            .fill_null(1)
-            .alias("scaler")
-        )
-
-        # Keep necessary columns only
-        return merged.select(id_cols + ["year", "scaler"]).to_pandas()
 
     def apply_scaling_factor(
         self,
@@ -1585,54 +1433,6 @@ class Ratios(ls.BaseZoneHandler):
         merged["value"] = merged["value"] * merged["value_scaler"]
         return merged.drop(columns=["value_scaler"])
 
-    def apply_scaling_factor_pl(
-        self,
-        segmented_df: pd.DataFrame,
-        scaler_df: pd.DataFrame,
-        build_out_columns: list[str],
-        dimension_columns: list[str],
-    ) -> pd.DataFrame:
-        """
-        Applies scaling factor from long format and returns result in wide format.
-        """
-        zone_id = self.zone_info["group_by_column"]
-
-        pl_segmented = pl.from_pandas(segmented_df)
-        pl_scaler = pl.from_pandas(scaler_df)
-
-        id_cols = [zone_id] + dimension_columns
-
-        # Melt segmented data to long format
-        segmented_long = pl_segmented.melt(
-            id_vars=id_cols,
-            value_vars=build_out_columns,
-            variable_name="year",
-            value_name="value",
-        )
-        segmented_long = segmented_long.with_columns(
-            pl.col("car_availability").cast(pl.Int64)
-        )
-        pl_scaler = pl_scaler.with_columns(pl.col("car_availability").cast(pl.Int64))
-        # Join with long-format scaler
-        merged = segmented_long.join(
-            pl_scaler, on=id_cols + ["year"], how="left"
-        ).with_columns(
-            (pl.col("value") * pl.col("scaler"))
-            .fill_nan(0)
-            .fill_null(0)
-            .alias("scaled_val")
-        )
-
-        # Pivot back to wide format
-        wide = merged.pivot(
-            values="scaled_val",
-            index=id_cols,
-            columns="year",
-            aggregate_function="first",
-        )
-
-        return wide.to_pandas()
-
     # def export_singleyear_file(
     #     self,
     #     df: Union[pd.DataFrame, dd.DataFrame],
@@ -1750,9 +1550,13 @@ class Ratios(ls.BaseZoneHandler):
         zone_id = self.zone_info["group_by_column"]
         year_df_dict = {}
 
+        # # Persist Dask DataFrame if applicable
+        # if isinstance(df, dd.DataFrame):
+        #     df = df.persist()
+
         for year in year_cols:
             columns_to_extract = [zone_id] + (dimension_cols or []) + [year]
-            df_year = df[columns_to_extract].rename(columns={year: "value"})
+            df_year = df.loc[:, columns_to_extract].rename(columns={year: "value"})
 
             # Convert Dask to Pandas if needed
             if isinstance(df_year, dd.DataFrame):
@@ -2016,10 +1820,15 @@ class PrepTripends:
             naming_order=self.data_config[data_type]["segments"],
         )
 
+    def export_csv(self, data: pd.DataFrame, output_path: Path):
+        """export csv file."""
+        utilities.write_to_csv(output_path, data)
+
     def perform_segmentation_and_zoning(
         self, data: pd.DataFrame, data_type: str, output_path: Path
     ):
         """Perform segmentation and zoning, then save the result."""
+        # utilities.write_to_csv(output_path, data)
 
         seg = cb.Segmentation(self.prepare_segmentation_input(data_type))
         zoning = cb.ZoningSystem.get_zoning("lsoa_2021")
@@ -2076,14 +1885,12 @@ class PrepTripends:
                     if data_type_base == "pop" and lookup is not None:
                         df = self.merge_and_rename(df, lookup)
 
-                    # if self.zone_id in df.columns:
-                    #     df[self.zone_id] = df[self.zone_id].astype("str")
-
-                    # # Pivot data
-                    # if f"{year}" not in df.columns:
-                    #     print(f"⚠️ Warning: Year column {year} not found in {full_key}")
-                    #     continue
-
+                    # Export csv file
+                    self.export_csv(
+                        df,
+                        output_folders[data_type_base]
+                        / f"{data_type_base}{suffix}_{year}.csv.bz2",
+                    )
                     pivoted = df.pivot_table(
                         index=config[
                             "index_cols" if data_type_base != "pop" else "segments"
@@ -2266,13 +2073,11 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         )
 
     # Calculate ratios across dimensions for base year household, population and jobs
-
     # Calculating zonal ratio by each household type
     by_zone_hh_type_ratio = cal_ratios.zone_hh_type_ratios(
         by_zone_hh_type_data,
         hh_type_columns,
     )
-    # print("by_zone_hh_type_ratio", by_zone_hh_type_ratio)
     # Calculating zonal ratio by household car availability
     by_zone_hh_car_ratio = (
         cal_ratios.zone_hh_type_ratios(
@@ -2287,7 +2092,6 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         by_zone_pop_tt_data,
         pop_type_columns,
     )
-
     # Calculating zonal ratio by population's household car ownership
     by_zone_pop_car_ratio = (
         cal_ratios.zone_traveller_type_ratios(
@@ -2309,21 +2113,30 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     by_zone_job_soc_over_sic_ratio = cal_ratios.zone_soc_over_sic_ratios(
         by_zone_job_sic_soc_data,
         job_type_columns,
+        "jobs",
+        "soc_ratios",
     )
-
     by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.merge(
         by_gb_job_soc_ratio,
         on="soc",
         how="left",
     )
     # infill nan with default ratio
-    by_zone_job_soc_over_sic_ratio["ratios"] = by_zone_job_soc_over_sic_ratio[
-        "ratios"
+    by_zone_job_soc_over_sic_ratio["soc_ratios"] = by_zone_job_soc_over_sic_ratio[
+        "soc_ratios"
     ].fillna(by_zone_job_soc_over_sic_ratio["default_ratio"])
     by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.drop(
         columns=["default_ratio"]
     )
-
+    print("sum of soc_ratios", by_zone_job_soc_over_sic_ratio["soc_ratios"].sum())
+    # further adjust ratios to make sure the sum is 1
+    by_zone_job_soc_over_sic_ratio_aj = cal_ratios.zone_soc_over_sic_ratios(
+        by_zone_job_soc_over_sic_ratio,
+        job_type_columns,
+        "soc_ratios",
+        "ratios",
+    )
+    print("sum of ratios", by_zone_job_soc_over_sic_ratio_aj["ratios"].sum())
     # Define filenames and corresponding DataFrames
     by_zone_ratios = [
         (f"by_zone_hh_car_ratio_{model_zone}.csv", by_zone_hh_car_ratio),
@@ -2400,7 +2213,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         zone_job_sic_fy,
         build_out_columns,
         job_type_columns,
-        by_zone_job_soc_over_sic_ratio,
+        by_zone_job_soc_over_sic_ratio_aj,
     )
 
     LOG.info(
@@ -2418,7 +2231,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         build_out_columns,
     )
 
-    # Calculate scalling factor to adjust estimated car profile
+    # Calculate scalling factor to adjust estimated car profile for all future years
     # for household and population
     zone_hh_car_scaler = cal_ratios.scaling_factors_dask(
         zone_hh_car_target,
@@ -2435,69 +2248,105 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         10,
     )
 
-    # Apply scaling factor to segmented zonal household and population future year data
+    # Apply scaling factor to segmented zonal household and population future year data for selected future years
     zone_hh_segmented_scaled = cal_ratios.apply_scaling_factor_dask(
         zone_hh_segmented,
         zone_hh_car_scaler,
-        build_out_columns,
+        future_year_columns,
         ["car_availability"],
         10,
     )
     zone_pop_segmented_scaled = cal_ratios.apply_scaling_factor_dask(
         zone_pop_segmented,
         zone_pop_car_scaler,
-        build_out_columns,
+        future_year_columns,
         ["car_ownership"],
         20,
     )
     zone_pop_segmented_scaled = zone_pop_segmented_scaled[
-        [zone_id, "tt"] + build_out_columns
+        [zone_id, "tt"] + future_year_columns
     ]
 
-    print("zone_hh_segmented_scaled", zone_hh_segmented_scaled.head(10))
-    print("zone_pop_segmented_scaled", zone_pop_segmented_scaled.head(10))
+    # Creating dict to contain yearly dataframes for further calculation on hh and pop data
+    yearly_output_folder = key_output_path / f"yearly_zonal_data"
+    yearly_output_folder.mkdir(exist_ok=True)
+
+    fy_zone_hh_seged_dict = cal_ratios.create_singleyear_df(
+        df=zone_hh_segmented_scaled,
+        dimension_cols=hh_type_columns,
+        year_cols=future_year_columns,
+        output_dir=yearly_output_folder,
+        file_name="fy_zone_hh_segmented",
+        export_csv=False,
+    )
+    fy_zone_pop_seged_dict = cal_ratios.create_singleyear_df(
+        df=zone_pop_segmented_scaled,
+        dimension_cols=["tt"],
+        year_cols=future_year_columns,
+        output_dir=yearly_output_folder,
+        file_name="fy_zone_pop_segmented",
+        export_csv=False,
+    )
 
     LOG.info(
         "Calculating zonal ratios for segmented zonal data for household, population and jobs for future years"
     )
-    # Work out the ratios (profile) of dimensions based on scaled zonal data for household and population, and the segmetned jobs for future year
-    fy_zone_hh_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
-        zone_hh_segmented_scaled,
-        hh_type_columns,
-        build_out_columns,
-        10,
-    )
-    print("fy_zone_hh_type_ratio", fy_zone_hh_type_ratio.head(10))
+    fy_zone_hh_type_ratio_dict = {}
+    fy_zone_traveller_type_ratio_dict = {}
 
-    fy_zone_traveller_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
-        zone_pop_segmented_scaled,
-        ["tt"],
-        build_out_columns,
-        30,
-    )
+    for year in future_year_columns:
+        # Create a dictionary for each year
+        fy_zone_hh_type_ratio_dict[year] = cal_ratios.zone_ratios_by_type_single_year(
+            fy_zone_hh_seged_dict[year],
+            hh_type_columns,
+            0,
+        )
+
+        fy_zone_traveller_type_ratio_dict[year] = (
+            cal_ratios.zone_ratios_by_type_single_year(
+                fy_zone_pop_seged_dict[year],
+                ["tt"],
+                0,
+            )
+        )
+    # # Work out the ratios (profile) of dimensions based on scaled zonal data for household and population, and the segmetned jobs for future year
+    # fy_zone_hh_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
+    #     zone_hh_segmented_scaled,
+    #     hh_type_columns,
+    #     future_year_columns,
+    #     10,
+    # )
+    # # print("fy_zone_hh_type_ratio", fy_zone_hh_type_ratio.head(10))
+
+    # fy_zone_traveller_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
+    #     zone_pop_segmented_scaled,
+    #     ["tt"],
+    #     future_year_columns,
+    #     30,
+    # )
 
     LOG.info(
-        "Exporting yearly csv files for household and pop before expanding zonal data derived from large sites to full dimensions"
+        "Slicing yearly dataframe (optionally exporting compressed csv file) for household and pop before expanding zonal data derived from large sites to full dimensions"
     )
-    yearly_output_folder = key_output_path / f"yearly_zonal_data"
 
     # Creating dict to contain yearly dataframes for further calculation on hh and pop data
-    fy_zone_hh_type_ratio_dict = cal_ratios.create_singleyear_df(
-        fy_zone_hh_type_ratio,
-        hh_type_columns,
-        future_year_columns,
-        yearly_output_folder,
-        "fy_zone_hh_type_ratio",
-        False,
-    )
-    fy_zone_traveller_type_ratio_dict = cal_ratios.create_singleyear_df(
-        fy_zone_traveller_type_ratio,
-        ["tt"],
-        future_year_columns,
-        yearly_output_folder,
-        "fy_zone_traveller_type_ratio",
-        False,
-    )
+    # fy_zone_hh_type_ratio_dict = cal_ratios.create_singleyear_df(
+    #     fy_zone_hh_type_ratio,
+    #     hh_type_columns,
+    #     future_year_columns,
+    #     yearly_output_folder,
+    #     "fy_zone_hh_type_ratio",
+    #     False,
+    # )
+    # fy_zone_traveller_type_ratio_dict = cal_ratios.create_singleyear_df(
+    #     fy_zone_traveller_type_ratio,
+    #     ["tt"],
+    #     future_year_columns,
+    #     yearly_output_folder,
+    #     "fy_zone_traveller_type_ratio",
+    #     False,
+    # )
+
     fy_zone_lsgrth_hh_dict = cal_ratios.create_singleyear_df(
         df=input_data.fy_zone_lsgrth_hh,
         dimension_cols=None,
@@ -2546,28 +2395,28 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         input_data.fy_zone_lsgrth_emp_sic,
         build_out_columns,
         job_type_columns,
-        by_zone_job_soc_over_sic_ratio,
+        by_zone_job_soc_over_sic_ratio_aj,
     )
 
     LOG.info(
         "Creating dictionaries of segmented future year zonal data for all key outputs"
     )
-    fy_zone_hh_seged_dict = cal_ratios.create_singleyear_df(
-        df=zone_hh_segmented_scaled,
-        dimension_cols=hh_type_columns,
-        year_cols=future_year_columns,
-        output_dir=yearly_output_folder,
-        file_name="fy_zone_hh_segmented",
-        export_csv=False,
-    )
-    fy_zone_pop_seged_dict = cal_ratios.create_singleyear_df(
-        df=zone_pop_segmented_scaled,
-        dimension_cols=["tt"],
-        year_cols=future_year_columns,
-        output_dir=yearly_output_folder,
-        file_name="fy_zone_pop_segmented",
-        export_csv=False,
-    )
+    # fy_zone_hh_seged_dict = cal_ratios.create_singleyear_df(
+    #     df=zone_hh_segmented_scaled,
+    #     dimension_cols=hh_type_columns,
+    #     year_cols=future_year_columns,
+    #     output_dir=yearly_output_folder,
+    #     file_name="fy_zone_hh_segmented",
+    #     export_csv=False,
+    # )
+    # fy_zone_pop_seged_dict = cal_ratios.create_singleyear_df(
+    #     df=zone_pop_segmented_scaled,
+    #     dimension_cols=["tt"],
+    #     year_cols=future_year_columns,
+    #     output_dir=yearly_output_folder,
+    #     file_name="fy_zone_pop_segmented",
+    #     export_csv=False,
+    # )
     fy_zone_job_seged_dict = cal_ratios.create_singleyear_df(
         df=zone_job_sic_segmented,
         dimension_cols=job_type_columns,
@@ -2586,38 +2435,77 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         export_csv=False,
     )
 
-    # LOG.info(
-    #     "Checking totals across future years before and after disaggregating zonal data into dimensions"
-    # )
-    # # Instantiate with your build-out year columns
-    # comparator = TotalsComparison(build_out_columns)
+    LOG.info(
+        "Checking totals across future years before and after disaggregating zonal data into dimensions"
+    )
+    # Instantiate with your build-out year columns
 
-    # zone_hh_segmented_scaled = zone_hh_segmented_scaled.compute()
-    # zone_pop_segmented_scaled = zone_pop_segmented_scaled.compute()
+    comparator = TotalsComparison(build_out_columns)
 
-    # # Add comparisons
-    # comparator.add_comparison(
-    #     "Household", input_data.fy_zone_tot_hh, zone_hh_segmented_scaled
-    # )
-    # comparator.add_comparison(
-    #     "Population", input_data.fy_zone_tot_pop, zone_pop_segmented_scaled
-    # )
-    # comparator.add_comparison(
-    #     "Jobs", input_data.fy_zone_tot_emp_sic, zone_job_sic_segmented
-    # )
+    # Add comparisons
 
-    # comparator.add_comparison(
-    #     "Jobs_ls_grth",
-    #     input_data.fy_zone_lsgrth_emp_sic,
-    #     zone_job_sic_largesites_fy_seg,
-    # )
+    comparator.add_comparison(
+        "Jobs", input_data.fy_zone_tot_emp_sic, zone_job_sic_segmented
+    )
 
-    # # Get summary
-    # summary_df = comparator.get_summary()
+    comparator.add_comparison(
+        "Jobs_ls_grth",
+        input_data.fy_zone_lsgrth_emp_sic,
+        zone_job_sic_largesites_fy_seg,
+    )
 
-    # # Export if needed
-    # summary_file = f"fy_totals_comparison_{model_zone}.csv"
-    # utilities.write_to_csv(key_output_path / summary_file, summary_df)
+    # Get summary
+    summary_df = comparator.get_summary()
+
+    # Export if needed
+    summary_file = f"fy_totals_comparison_{model_zone}.csv"
+    utilities.write_to_csv(key_output_path / summary_file, summary_df)
+
+    LOG.info("Checking detailed zonal results")
+    zone_list = ["E01033684", "E01033688", "E01034135", "E01034136", "E01005318"]
+
+    for year in future_year_columns:
+        filtered_zone_hh = fy_zone_hh_seged_dict[year].merge(
+            fy_zone_lsgrth_hh_seged_dict[year],
+            on=[zone_id] + hh_type_columns,
+            how="left",
+            suffixes=("_tot", "_lsgrth"),
+        )
+        filtered_zone_hh = filtered_zone_hh[filtered_zone_hh[zone_id].isin(zone_list)]
+
+        filtered_zone_pop = fy_zone_pop_seged_dict[year].merge(
+            fy_zone_lsgrth_pop_seged_dict[year],
+            on=[zone_id] + ["tt"],
+            how="left",
+            suffixes=("_tot", "_lsgrth"),
+        )
+        filtered_zone_pop = filtered_zone_pop[
+            filtered_zone_pop[zone_id].isin(zone_list)
+        ]
+
+        filtered_zone_job = fy_zone_job_seged_dict[year].merge(
+            fy_zone_lsgrth_job_seged_dict[year],
+            on=[zone_id] + job_type_columns,
+            how="left",
+            suffixes=("_tot", "_lsgrth"),
+        )
+        filtered_zone_job = filtered_zone_job[
+            filtered_zone_job[zone_id].isin(zone_list)
+        ]
+
+        # Save to CSV
+        utilities.write_to_csv(
+            key_output_path / f"fy_zone_hh_seged_tot_lsgrth_{year}.csv.bz2",
+            filtered_zone_hh,
+        )
+        utilities.write_to_csv(
+            key_output_path / f"fy_zone_pop_seged_tot_lsgrth_{year}.csv.bz2",
+            filtered_zone_pop,
+        )
+        utilities.write_to_csv(
+            key_output_path / f"fy_zone_job_seged_tot_lsgrth_{year}.csv.bz2",
+            filtered_zone_job,
+        )
 
     LOG.info("Exporting segmented zonal results on future year totals")
 
@@ -2625,14 +2513,6 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     zonal_outputs = []  # Always define it, even if empty
     if write_large_files:
         zonal_outputs = [
-            (
-                f"{model_zone}_zonal_fy_hh_by_type.csv.bz2",
-                zone_hh_segmented_scaled.compute(),
-            ),
-            (
-                f"{model_zone}_zonal_fy_pop_by_tt.csv.bz2",
-                zone_pop_segmented_scaled.compute(),
-            ),
             (f"{model_zone}_zonal_fy_job_by_sic_soc.csv.bz2", zone_job_sic_segmented),
         ]
 

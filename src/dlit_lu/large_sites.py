@@ -1703,15 +1703,16 @@ def process_site_data(
 
 def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     """
-
-    Process to select large developmetn sites
+    Identifies and categorizes large residential and employment development sites
+    based on probabilistic build-out data, base year land use statistics, and
+    weighted index scores.
 
     Parameters
     ----------
     input_data : global_classes.AssessData
-        data to further categorise site data, whether they are estimated or not
+        Contains base year and forecast land use data for assessment.
     config : inputs.DLitConfig
-        config file
+        Configuration settings, including file paths, thresholds, and zone definitions.
     """
     if config.large_sites is None:
         raise ValueError("cannot run large_sites without any large_sites parameters")
@@ -1773,13 +1774,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     res_sites = pd.read_csv(config.large_sites.res_site_data)
     pop_sites = pd.read_csv(config.large_sites.pop_site_data)
     job_sic_sites = pd.read_csv(config.large_sites.emp_sic_site_data)
-    # tfn_tt = pd.read_csv(config.large_sites.tfn_tt)
 
-    # Get base year data
     LOG.info("Loading base year data")
-    # # Get base year zonal total pop, hh and jobs without dimensions
-    # by_data_tot = pd.read_csv(config.large_sites.lsoa_by_data_path)
-    # Get base year zonal total pop, hh and jobs with full dimensions
     lsoa_hh_column_names = [
         "accom_h",
         "ns_sec",
@@ -1789,27 +1785,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "lsoa2021_id",
         "household",
     ]
-    # hh_type_columns = [
-    #     "accom_h",
-    #     "ns_sec",
-    #     "adults",
-    #     "car_availability",  # no car, 1 car, 2+ cars
-    #     "children",
-    # ]
+
     lsoa_pop_by_tt_column_names = [
         "lsoa2021_id",
         "tt",
         "population",
     ]
-    # pop_type_columns = [
-    #     "tt",
-    #     "gender",
-    #     "aws",
-    #     "soc",
-    #     "ns",
-    #     "hh_type",
-    #     "car_ownership",  # without and with car
-    # ]
 
     lsoa_jobs_column_names = [
         "sic_2d",
@@ -1817,10 +1798,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         "lsoa2021_id",
         "jobs",
     ]
-    # job_type_columns = [
-    #     "sic_2d",
-    #     "soc",
-    # ]
 
     by_lsoa_hh_type = pd.read_csv(
         config.land_use.lsoa_hh_types_path,
@@ -1835,16 +1812,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         header=0,
         index_col=None,
     )
-    # by_lsoa_pop_tt = by_lsoa_pop_tt.merge(tfn_tt, on="tt", how="left")[
-    #     ["lsoa2021_id", "population"] + pop_type_columns[:-1]
-    # ]
-
-    # # Define the mapping
-    # without_car = [1, 3, 6]
-    # by_lsoa_pop_tt["car_ownership"] = by_lsoa_pop_tt["hh_type"].apply(
-    #     lambda x: 1 if x in without_car else 2
-    # )
-    # by_lsoa_pop_tt = by_lsoa_pop_tt[["lsoa2021_id"] + pop_type_columns + ["population"]]
 
     by_lsoa_jobs_sic_soc = pd.read_csv(
         config.land_use.lsoa_jobs_path,
@@ -1856,8 +1823,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     LOG.info("Instantiating the key classes")
     zt = ZoneTranslator(config)
     zp = ZoneProcessor(config)
-    # # transformer = DfTransformer()
-    # cal_ratios = Ratios(config)
+    site_zone_processer = SiteZoneProcessor(config)
     zone_info = zp.zone_info_map.get(zp.geo_boundary, {})
     if not zone_info:
         LOG.error(f"No zone information found for zone {zp.geo_boundary}")
@@ -1888,10 +1854,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         by_lsoa_pop_tt,
         by_lsoa_jobs_sic_soc,
     ).reset_index()
-    # get totals before zone translation
-    by_tot_hhs_prev = by_data_tot["household"].sum()
-    by_tot_pops_prev = by_data_tot["population"].sum()
-    by_tot_jobs_prev = by_data_tot["jobs"].sum()
 
     # Prepare the base data depending on zone type
     by_translated_data = {}
@@ -1935,16 +1897,60 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     # Concatenate the DataFrames along the columns
     combined_by = pd.concat([by_hh, by_pop, by_job], axis=1)
-    by_columns_stats = [
-        "household",
-        "population",
-        "jobs",
-        "ho_den",
-        "po_den",
-        "jo_den",
-    ]
+    # by_columns_stats = [
+    #     "household",
+    #     "population",
+    #     "jobs",
+    #     "ho_den",
+    #     "po_den",
+    #     "jo_den",
+    # ]
     # Optionally, remove duplicate columns if they exist
     combined_by = combined_by.loc[:, ~combined_by.columns.duplicated()]
+
+    if model_zone_enum == inputs.GeoBoundary.LSOA:
+        pass
+    else:
+        LOG.info(
+            "Checking base year totals before and after converting LSOA to the pre-defined model zone"
+        )
+
+        # get totals before zone translation
+        by_tot_hhs_prev = by_data_tot["household"].sum()
+        by_tot_pops_prev = by_data_tot["population"].sum()
+        by_tot_jobs_prev = by_data_tot["jobs"].sum()
+
+        # get totals after zone translation and other calculations
+        by_tot_hhs_post = by_processed_data["household"]["household"].sum()
+        by_tot_pops_post = by_processed_data["population"]["population"].sum()
+        by_tot_jobs_post = by_processed_data["jobs"]["jobs"].sum()
+
+        # Check totals before and after zone translation
+        print(
+            f"Sum of Input Totals-- Total Household: {by_tot_hhs_prev}, Total Population: {by_tot_pops_prev}, Total Jobs: {by_tot_jobs_prev}"
+        )
+        print(
+            f"Sum of Totals after translating LSOA to pre-defined zone-- Total Household: {by_tot_hhs_post}, Total Population: {by_tot_pops_post}, Total Jobs: {by_tot_jobs_post}"
+        )
+
+        totals_dict = {
+            "Category": ["Household", "Population", "Jobs"],
+            "Before Translation": [by_tot_hhs_prev, by_tot_pops_prev, by_tot_jobs_prev],
+            "After Translation": [by_tot_hhs_post, by_tot_pops_post, by_tot_jobs_post],
+        }
+        totals_df = pd.DataFrame(totals_dict)
+        # Format the numbers with commas as thousand separators
+        totals_df["Before Translation"] = totals_df["Before Translation"].apply(
+            lambda x: "{:,}".format(x)
+        )
+        totals_df["After Translation"] = totals_df["After Translation"].apply(
+            lambda x: "{:,}".format(x)
+        )
+        # Specify the output file path
+        totals_df_file = f"totals_before_after_{model_zone}_translation.csv"
+
+        # Save the DataFrame to a CSV file
+        utilities.write_to_csv(key_output_path / totals_df_file, totals_df)
 
     # # print(combined_by)
 
@@ -1980,48 +1986,13 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             aggregate_by_zone=True,
         )
 
-    LOG.info(
-        "Checking base year totals before and after converting LSOA to the pre-defined model zone"
-    )
-    # get totals after zone translation and other calculations
-    by_tot_hhs_post = by_processed_data["household"]["household"].sum()
-    by_tot_pops_post = by_processed_data["population"]["population"].sum()
-    by_tot_jobs_post = by_processed_data["jobs"]["jobs"].sum()
+    # LOG.info("Processing base year stats")
 
-    # Check totals before and after zone translation
-    print(
-        f"Sum of Input Totals-- Total Household: {by_tot_hhs_prev}, Total Population: {by_tot_pops_prev}, Total Jobs: {by_tot_jobs_prev}"
-    )
-    print(
-        f"Sum of Totals after translating LSOA to pre-defined zone-- Total Household: {by_tot_hhs_post}, Total Population: {by_tot_pops_post}, Total Jobs: {by_tot_jobs_post}"
-    )
-
-    totals_dict = {
-        "Category": ["Household", "Population", "Jobs"],
-        "Before Translation": [by_tot_hhs_prev, by_tot_pops_prev, by_tot_jobs_prev],
-        "After Translation": [by_tot_hhs_post, by_tot_pops_post, by_tot_jobs_post],
-    }
-    totals_df = pd.DataFrame(totals_dict)
-    # Format the numbers with commas as thousand separators
-    totals_df["Before Translation"] = totals_df["Before Translation"].apply(
-        lambda x: "{:,}".format(x)
-    )
-    totals_df["After Translation"] = totals_df["After Translation"].apply(
-        lambda x: "{:,}".format(x)
-    )
-    # Specify the output file path
-    totals_df_file = f"totals_before_after_{model_zone}_translation.csv"
-
-    # Save the DataFrame to a CSV file
-    utilities.write_to_csv(key_output_path / totals_df_file, totals_df)
-
-    LOG.info("Processing base year stats")
-
-    by_data_stats = stats.basic_statistics(combined_by, by_columns_stats)
-    by_data_file = f"by_{model_zone}_data.csv"
-    by_data_stats_file = f"by_{model_zone}_data_stats.csv"
-    utilities.write_to_csv(key_output_path / by_data_file, combined_by)
-    utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
+    # by_data_stats = stats.basic_statistics(combined_by, by_columns_stats)
+    # by_data_file = f"by_{model_zone}_data.csv"
+    # by_data_stats_file = f"by_{model_zone}_data_stats.csv"
+    # utilities.write_to_csv(key_output_path / by_data_file, combined_by)
+    # utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Processing site data for year 2024 upwards")
     res_zone_sites = process_site_data(
@@ -2032,7 +2003,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_columns,
         build_out_columns,
         probability_dict,
-        SiteZoneProcessor(config),
+        site_zone_processer,
         use_prob_for_size=False,
     ).fillna(0)
     # print("res_zone_sites column headers", res_zone_sites.columns)
@@ -2045,21 +2016,13 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         key_columns,
         build_out_columns,
         probability_dict,
-        SiteZoneProcessor(config),
+        site_zone_processer,
         use_prob_for_size=False,
     ).fillna(0)
     # print("emp_zone_sites column headers", emp_zone_sites.columns)
 
     LOG.info("Starting process to categorise large sites")
-    # Columns to explore for both residential and employment sites
-    # columns_to_explore = [
-    #     "sum_proposed",
-    #     "ho_den",
-    #     "po_den",
-    #     "jo_den",
-    #     "n_e_ratio",
-    #     "ctrd_shift_ratio",
-    # ]
+
     zscore_suffix = "zscore"  #'zscore', 'robust_zscore', 'modified_zscore'
     absize_col = "sum_proposed"
     index_col = "weighted_index"
@@ -2190,7 +2153,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         job_sic_sites["prob_val"], axis=0
     )
 
-    site_zone_processer = SiteZoneProcessor(config)
     hh_sites_zone = site_zone_processer.zone_site_geospatial_lookup(
         res_sites, site_geometry_col="geometry"
     )
@@ -2388,6 +2350,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             merge_translation_data=True,
             aggregate_by_zone=True,
         )
+
+        normits_zone_pop_ls["sum"] = normits_zone_pop_ls[build_out_columns].sum(axis=1)
+        normits_zone_job_ls["sum"] = normits_zone_job_ls[build_out_columns].sum(axis=1)
 
         utilities.write_to_csv(
             key_output_path / "normits_zone_pop_largesites_fy.csv", normits_zone_pop_ls
