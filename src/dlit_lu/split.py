@@ -486,7 +486,9 @@ class Ratios(ls.BaseZoneHandler):
         self,
         data: pd.DataFrame,
         dimension_columns: List[str],
-        level: Union[int, List[int]] = 0,
+        output_dir: Path = None,
+        file_name: str = None,
+        export_csv: bool = False,
     ) -> pd.DataFrame:
         """
         Calculates the proportion of each household type per zone and year, using MultiIndex.
@@ -499,7 +501,12 @@ class Ratios(ls.BaseZoneHandler):
             Columns that define household segmentations (e.g. size, age, income).
         level : int or List[int], default=0
             The index level(s) to group by when calculating zone-level totals for ratio computation.
-
+        output_dir : Path, optional
+            Directory to save the CSV file.
+        file_name : str, optional
+            Name of the CSV file to export.
+        export_csv : bool, default=False
+            Whether to export the result to CSV.
         Returns
         -------
         pd.DataFrame
@@ -511,12 +518,15 @@ class Ratios(ls.BaseZoneHandler):
 
         grouped = data.groupby(index_cols, as_index=False)["value"].sum()
         # Calculate total per group defined by `level`
-        totals = grouped.groupby(level=level)["value"].transform("sum")
+        totals = grouped.groupby(zone_id)["value"].transform("sum")
         # Compute ratios
         grouped["value"] = grouped["value"] / totals
+        grouped = grouped.fillna(0).reset_index(drop=True)
+        if export_csv:
+            output_file = output_dir / f"{file_name}.csv.bz2"
+            utilities.write_to_csv(output_file, grouped)
 
-        # Reset index for output
-        return grouped.fillna(0).reset_index()
+        return grouped
 
     @staticmethod
     def expand_gb_ratios_by_zone(
@@ -1886,11 +1896,12 @@ class PrepTripends:
                         df = self.merge_and_rename(df, lookup)
 
                     # Export csv file
-                    self.export_csv(
-                        df,
-                        output_folders[data_type_base]
-                        / f"{data_type_base}{suffix}_{year}.csv.bz2",
-                    )
+                    # self.export_csv(
+                    #     df,
+                    #     output_folders[data_type_base]
+                    #     / f"{data_type_base}{suffix}_{year}.csv.bz2",
+                    # )
+
                     pivoted = df.pivot_table(
                         index=config[
                             "index_cols" if data_type_base != "pop" else "segments"
@@ -2010,6 +2021,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
 
     LOG.info("Loading key parameter and paths")
     model_zone = config.large_sites.geo_boundary.value
+    model_zone_enum = inputs.GeoBoundary(model_zone.lower())
     base_year = config.large_sites.base_year
     base_year_int = int(base_year)
     end_year = config.large_sites.end_year
@@ -2040,7 +2052,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     )
     # Process base year data for household, population and jobs with required dimensions
     # Translate LSOA to pre-defined model zone
-    if model_zone == inputs.GeoBoundary.LSOA:
+    if model_zone_enum == inputs.GeoBoundary.LSOA:
         # No translation needed; use LSOA data directly
         by_zone_hh_type_data = by_lsoa_hh_type
         by_zone_pop_tt_data = by_lsoa_pop_tt
@@ -2174,6 +2186,27 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     zone_hh_fy = input_data.fy_zone_tot_hh
     zone_pop_fy = input_data.fy_zone_tot_pop
     zone_job_sic_fy = input_data.fy_zone_tot_emp_sic
+    negatives_df_before = zone_job_sic_fy[
+        zone_job_sic_fy[build_out_columns].lt(0).any(axis=1)
+    ]
+    if not negatives_df_before.empty:
+        LOG.info(
+            "Negative values found in zone_job_sic_fy before clipping: %s",
+            negatives_df_before.shape[0],
+        )
+
+    zone_job_sic_fy[build_out_columns] = zone_job_sic_fy[build_out_columns].clip(
+        lower=0
+    )
+    negatives_df_after = zone_job_sic_fy[
+        zone_job_sic_fy[build_out_columns].lt(0).any(axis=1)
+    ]
+    if not negatives_df_after.empty:
+        LOG.info(
+            "Negative values found in zone_job_sic_fy after clipping: %s",
+            negatives_df_after.shape[0],
+        )
+
     zone_hh_car_ratio_fy = zone_hh_car_ratio[
         [zone_id, "car_availability"] + build_out_columns
     ]
@@ -2297,18 +2330,32 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     for year in future_year_columns:
         # Create a dictionary for each year
         fy_zone_hh_type_ratio_dict[year] = cal_ratios.zone_ratios_by_type_single_year(
-            fy_zone_hh_seged_dict[year],
-            hh_type_columns,
-            0,
+            data=fy_zone_hh_seged_dict[year],
+            dimension_columns=hh_type_columns,
+            output_dir=yearly_output_folder,
+            file_name=f"fy_zone_hh_type_ratio_{year}",
+            export_csv=False,
         )
+        # Check that the sum of ratios equals the number of unique zones
+        hh_ratio_sum = fy_zone_hh_type_ratio_dict[year]["value"].sum()
+        hh_zone_count = fy_zone_hh_seged_dict[year][zone_id].nunique()
+
+        LOG.info(f"Sum of ratios: {hh_ratio_sum}, Number of zones: {hh_zone_count}")
 
         fy_zone_traveller_type_ratio_dict[year] = (
             cal_ratios.zone_ratios_by_type_single_year(
-                fy_zone_pop_seged_dict[year],
-                ["tt"],
-                0,
+                data=fy_zone_pop_seged_dict[year],
+                dimension_columns=["tt"],
+                output_dir=yearly_output_folder,
+                file_name=f"fy_zone_traveller_type_ratio_{year}",
+                export_csv=False,
             )
         )
+        # Check that the sum of ratios equals the number of unique zones
+        tt_ratio_sum = fy_zone_traveller_type_ratio_dict[year]["value"].sum()
+        tt_zone_count = fy_zone_pop_seged_dict[year][zone_id].nunique()
+        LOG.info(f"Sum of ratios: {tt_ratio_sum}, Number of zones: {tt_zone_count}")
+
     # # Work out the ratios (profile) of dimensions based on scaled zonal data for household and population, and the segmetned jobs for future year
     # fy_zone_hh_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
     #     zone_hh_segmented_scaled,
@@ -2462,49 +2509,78 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     utilities.write_to_csv(key_output_path / summary_file, summary_df)
 
     LOG.info("Checking detailed zonal results")
-    zone_list = ["E01033684", "E01033688", "E01034135", "E01034136", "E01005318"]
+    # zone_list = ["E01013306", "E01011232", "E01011233", "E01011235", "E01011237"]
 
     for year in future_year_columns:
-        filtered_zone_hh = fy_zone_hh_seged_dict[year].merge(
+        fy_zone_hh = fy_zone_hh_seged_dict[year].merge(
             fy_zone_lsgrth_hh_seged_dict[year],
             on=[zone_id] + hh_type_columns,
             how="left",
             suffixes=("_tot", "_lsgrth"),
         )
-        filtered_zone_hh = filtered_zone_hh[filtered_zone_hh[zone_id].isin(zone_list)]
 
-        filtered_zone_pop = fy_zone_pop_seged_dict[year].merge(
+        fy_zone_hh["diff"] = fy_zone_hh["value_tot"] - fy_zone_hh["value_lsgrth"]
+        neg_diff_hh = fy_zone_hh[fy_zone_hh["diff"] < 0]
+        if not neg_diff_hh.empty:
+            LOG.info(
+                f"Negative difference in household totals for year {year}: {neg_diff_hh.shape[0]} zones"
+            )
+        else:
+            LOG.info(f"No negative household difference identified for year {year}")
+
+        # filtered_zone_hh = fy_zone_hh[fy_zone_hh[zone_id].isin(zone_list)]
+
+        fy_zone_pop = fy_zone_pop_seged_dict[year].merge(
             fy_zone_lsgrth_pop_seged_dict[year],
             on=[zone_id] + ["tt"],
             how="left",
             suffixes=("_tot", "_lsgrth"),
         )
-        filtered_zone_pop = filtered_zone_pop[
-            filtered_zone_pop[zone_id].isin(zone_list)
-        ]
+        fy_zone_pop["diff"] = fy_zone_pop["value_tot"] - fy_zone_pop["value_lsgrth"]
+        neg_diff_pop = fy_zone_pop[fy_zone_pop["diff"] < 0]
+        if not neg_diff_pop.empty:
+            LOG.info(
+                f"Negative difference in population totals for year {year}: {neg_diff_pop.shape[0]} zones"
+            )
+        else:
+            LOG.info(f"No negative population difference identified for year {year}")
 
-        filtered_zone_job = fy_zone_job_seged_dict[year].merge(
+        # filtered_zone_pop = fy_zone_pop[
+        #     fy_zone_pop[zone_id].isin(zone_list)
+        # ]
+
+        fy_zone_job = fy_zone_job_seged_dict[year].merge(
             fy_zone_lsgrth_job_seged_dict[year],
             on=[zone_id] + job_type_columns,
             how="left",
             suffixes=("_tot", "_lsgrth"),
         )
-        filtered_zone_job = filtered_zone_job[
-            filtered_zone_job[zone_id].isin(zone_list)
-        ]
+        fy_zone_job["diff"] = fy_zone_job["value_tot"] - fy_zone_job["value_lsgrth"]
+        neg_diff_job = fy_zone_job[fy_zone_job["diff"] < 0]
+
+        if not neg_diff_job.empty:
+            LOG.info(
+                f"Negative difference in job totals for year {year}: {neg_diff_job.shape[0]} zones"
+            )
+        else:
+            LOG.info(f"No negative job difference identified for year {year}")
+
+        # filtered_zone_job = fy_zone_job[
+        #     fy_zone_job[zone_id].isin(zone_list)
+        # ]
 
         # Save to CSV
         utilities.write_to_csv(
-            key_output_path / f"fy_zone_hh_seged_tot_lsgrth_{year}.csv.bz2",
-            filtered_zone_hh,
+            key_output_path / f"neg_zone_hh_diff_{year}.csv",
+            neg_diff_hh,
         )
         utilities.write_to_csv(
-            key_output_path / f"fy_zone_pop_seged_tot_lsgrth_{year}.csv.bz2",
-            filtered_zone_pop,
+            key_output_path / f"neg_zone_pop_diff_{year}.csv",
+            neg_diff_pop,
         )
         utilities.write_to_csv(
-            key_output_path / f"fy_zone_job_seged_tot_lsgrth_{year}.csv.bz2",
-            filtered_zone_job,
+            key_output_path / f"neg_zone_job_diff_{year}.csv",
+            neg_diff_job,
         )
 
     LOG.info("Exporting segmented zonal results on future year totals")

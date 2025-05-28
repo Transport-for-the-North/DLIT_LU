@@ -1,9 +1,9 @@
 #Set Up Parameters
 run_infill: False # M1
 run_land_use: False # M2
-run_large_sites: False # M3
+run_large_sites: False  # M3
 run_split: True # M4
-run_constraint: False # M5
+run_constraint: True # M5
 run_tem: False # M6- currently in caf.tem
 run_tripend: False # M7
 
@@ -13,9 +13,9 @@ lookups_sheet_name: "Lookups"
 #--Read file paths
 dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v6.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\test21_v0.20
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\existing_luc_split_path.csv
 
 
 infill:
@@ -28,11 +28,11 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\user_input.xlsx
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\user_input.xlsx
   gfa_infill_method: regression_no_negatives # mean, median, glbaverage, regression, regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M1_03_post_fixes\post_fix_data.xlsx
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M1_03_post_fixes\post_fix_data.xlsx
 
   lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
   lsoa_hh_types_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output P13.3.csv
@@ -54,12 +54,12 @@ large_sites:
   geo_boundary: lsoa # lsoa, normits, noham, norms, mosa
   viz_distribution: False
   index_weights_path : inputs\variable_index_weights.csv
-  # lsoa_by_data_path: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\tot_by_data_out.csv
-  assessment_input: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M1_01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
-  emp_site_data: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M2_land_use_outputs\jobs_sites_uncertainty_build_out.csv
-  res_site_data: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M2_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
-  pop_site_data: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M2_land_use_outputs\population_sites_uncertainty_build_out.csv
-  emp_sic_site_data: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M2_land_use_outputs\jobs_sic_sites_uncertainty_build_out.csv
+  # lsoa_by_data_path: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\tot_by_data_out.csv
+  assessment_input: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M1_01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
+  emp_site_data: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M2_land_use_outputs\jobs_sites_uncertainty_build_out.csv
+  res_site_data: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M2_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
+  pop_site_data: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M2_land_use_outputs\population_sites_uncertainty_build_out.csv
+  emp_sic_site_data: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M2_land_use_outputs\jobs_sic_sites_uncertainty_build_out.csv
 
   # shape file paths
   normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
@@ -112,14 +112,14 @@ split:
     - 2052
     # - 2062  # list[int]
   # key input paths from large_sites
-  zone_fy_tot_hh: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_tot_hh.csv.bz2
-  zone_fy_tot_pop: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_tot_pop.csv.bz2
-  zone_fy_tot_emp: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_tot_emp.csv.bz2
-  zone_fy_tot_emp_sic: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_tot_emp_sic.csv.bz2
-  zone_fy_lsgrth_hh: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_lsgrth_hh.csv.bz2
-  zone_fy_lsgrth_pop: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_lsgrth_pop.csv.bz2
-  zone_fy_lsgrth_emp: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_lsgrth_emp.csv.bz2
-  zone_fy_lsgrth_emp_sic: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_key_outputs\fy_zone_lsgrth_emp_sic.csv.bz2
+  zone_fy_tot_hh: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_tot_hh.csv.bz2
+  zone_fy_tot_pop: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_tot_pop.csv.bz2
+  zone_fy_tot_emp: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_tot_emp.csv.bz2
+  zone_fy_tot_emp_sic: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_tot_emp_sic.csv.bz2
+  zone_fy_lsgrth_hh: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_lsgrth_hh.csv.bz2
+  zone_fy_lsgrth_pop: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_lsgrth_pop.csv.bz2
+  zone_fy_lsgrth_emp: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_lsgrth_emp.csv.bz2
+  zone_fy_lsgrth_emp_sic: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_key_outputs\fy_zone_lsgrth_emp_sic.csv.bz2
   # key input paths from NTEM car ownership and planning data
   lsoa_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lsoa_hh_car_proportions.csv.bz2
   lsoa_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lsoa_pop_car_proportions.csv.bz2
@@ -145,9 +145,9 @@ constraint:
   ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
   ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
   # Dlog related inputs from previous module large_sites
-  dlog_hh: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_aggregation\lad_household.csv
-  dlog_emp: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_aggregation\lad_job.csv
-  dlog_pop: I:\Data\D-Log\DLIT\Outputs\test20_v0.19_updated\M3_ls_aggregation\lad_population.csv
+  dlog_hh: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_aggregation\lad_household.csv
+  dlog_emp: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_aggregation\lad_job.csv
+  dlog_pop: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_aggregation\lad_population.csv
 
   # Ratio value to determing the proportion of Dlog growth. E,g, 0.75 means the 75% percent of target growth from constraint will from Dlog pattern
   cap_ratio: 0.95

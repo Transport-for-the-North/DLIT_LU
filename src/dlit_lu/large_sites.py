@@ -2238,6 +2238,11 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         model_zone_data=True,
     )
 
+    zone_hh_fy = zonal_household[[zone_id] + build_out_columns]
+    zone_pop_fy = zonal_population[[zone_id] + build_out_columns]
+    zone_job_fy = zonal_job[[zone_id] + build_out_columns]
+    zone_job_sic_fy = zonal_job_sic[[zone_id, "sic_2d"] + build_out_columns]
+
     # Call function for accumulated sum
     column_prefixes = ["", "_large", "_small"]
     hh_grth_zone_fy = site_zone_processer.accumulated_growth(
@@ -2332,6 +2337,43 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         and te_zone_enum == inputs.GeoBoundary.NORMITS
     ):
         LOG.info("Translating LSOA data to NORMITS zone and exporting CSVs...")
+        # zone_hh_fy = zonal_household[[zone_id] + build_out_columns]
+        # zone_pop_fy = zonal_population[[zone_id] + build_out_columns]
+        # zone_job_fy = zonal_job[[zone_id] + build_out_columns]
+
+        normits_zone_hh = translator.translate_data(
+            data=zone_hh_fy,
+            category="residential",
+            columns_to_process=build_out_columns,
+            dimension_columns=None,
+            merge_translation_data=True,
+            aggregate_by_zone=True,
+        )
+        normits_zone_pop = translator.translate_data(
+            data=zone_pop_fy,
+            category="residential",
+            columns_to_process=build_out_columns,
+            dimension_columns=None,
+            merge_translation_data=True,
+            aggregate_by_zone=True,
+        )
+        normits_zone_job = translator.translate_data(
+            data=zone_job_fy,
+            category="employment",
+            columns_to_process=build_out_columns,
+            dimension_columns=None,
+            merge_translation_data=True,
+            aggregate_by_zone=True,
+        )
+
+        normits_zone_hh_ls = translator.translate_data(
+            data=zone_hh_largesites_fy,
+            category="residential",
+            columns_to_process=build_out_columns,
+            dimension_columns=None,
+            merge_translation_data=True,
+            aggregate_by_zone=True,
+        )
 
         normits_zone_pop_ls = translator.translate_data(
             data=zone_pop_largesites_fy,
@@ -2350,27 +2392,28 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             merge_translation_data=True,
             aggregate_by_zone=True,
         )
-
+        normits_zone_hh_ls["sum"] = normits_zone_hh_ls[build_out_columns].sum(axis=1)
         normits_zone_pop_ls["sum"] = normits_zone_pop_ls[build_out_columns].sum(axis=1)
         normits_zone_job_ls["sum"] = normits_zone_job_ls[build_out_columns].sum(axis=1)
 
-        utilities.write_to_csv(
-            key_output_path / "normits_zone_pop_largesites_fy.csv", normits_zone_pop_ls
-        )
-        utilities.write_to_csv(
-            key_output_path / "normits_zone_job_largesites_fy.csv", normits_zone_job_ls
-        )
+        normits_datasets = {
+            "normits_zone_hh_fy": normits_zone_hh,
+            "normits_zone_pop_fy": normits_zone_pop,
+            "normits_zone_job_fy": normits_zone_job,
+            "normits_zone_hh_largesites_fy": normits_zone_hh_ls,
+            "normits_zone_pop_largesites_fy": normits_zone_pop_ls,
+            "normits_zone_job_largesites_fy": normits_zone_job_ls,
+        }
+        for name, df in normits_datasets.items():
+            # Write to CSV
+            utilities.write_to_csv(key_output_path / f"{name}.csv", df)
 
     else:
         LOG.info(
             "Zone translation from LSOA to NORMITS was not triggered (zone type mismatch)."
         )
 
-    zone_hh_fy = zonal_household[[zone_id] + build_out_columns]
-    zone_pop_fy = zonal_population[[zone_id] + build_out_columns]
-    zone_job_fy = zonal_job[[zone_id] + build_out_columns]
-    zone_job_sic_fy = zonal_job_sic[[zone_id, "sic_2d"] + build_out_columns]
-
+    LOG.info("Creating D-log zone data for household, population and jobs")
     zone_fy_data = global_classes.DlogZoneData(
         zone_hh_fy,
         zone_pop_fy,

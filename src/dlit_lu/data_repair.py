@@ -1,4 +1,5 @@
 """Automatically fixes and infills data where possible"""
+
 # standard imports
 from __future__ import annotations
 import dataclasses
@@ -119,7 +120,7 @@ def infill_landuse_codes(
 
 
 def infill_expected_landuse(
-    auxiliary_data: global_classes.AuxiliaryData
+    auxiliary_data: global_classes.AuxiliaryData,
 ) -> global_classes.DLogData:
     """Infill expected landuse columns using known land use columns.
 
@@ -136,13 +137,17 @@ def infill_expected_landuse(
 
     for k in _LAND_USE_COLUMNS:
         v = getattr(auxiliary_data, f"{k}_data").copy()
-        v.loc[v["expected_land_use"].str.len() == 0, "expected_land_use"] = v["proposed_land_use"]
+        v.loc[v["expected_land_use"].str.len() == 0, "expected_land_use"] = v[
+            "proposed_land_use"
+        ]
         filled_expecations[k] = v.copy()
-    return global_classes.DLogData.from_data_dict(filled_expecations, auxiliary_data.lookup)
+    return global_classes.DLogData.from_data_dict(
+        filled_expecations, auxiliary_data.lookup
+    )
 
 
 def fix_expected_split(
-    auxiliary_data: global_classes.AuxiliaryData
+    auxiliary_data: global_classes.AuxiliaryData,
 ) -> global_classes.DLogData:
     """Infill expected landuse columns using known land use columns.
 
@@ -159,17 +164,36 @@ def fix_expected_split(
     for k in _LAND_USE_COLUMNS:
         v = getattr(auxiliary_data, f"{k}_data").copy()
 
-        v["compatible_splits"] = v.apply(lambda x:
-            ((set(x["expected_split"].keys()) <= set(x["expected_land_use"])) | (x["expected_land_use"] == ["unknown"]))
-            & (len(x["expected_split"]) != 0), axis=1)
-        v["divisor"] = v['expected_land_use'].str.len().clip(lower=1)
-        v.loc[~v["compatible_splits"], "expected_split"] = v.apply(lambda x: {i: f"{1/x['divisor']}" for i in x["expected_land_use"]}, axis=1)
-        v["divisor"] = v['expected_split'].str.len().clip(lower=1)
-        v["expected_split"] = v.apply(lambda x: {i: float(f"{1/x['divisor']}") if j == "" else float(j.replace("%", "e-2")) for i, j in x["expected_split"].items()}, axis=1)
+        v["compatible_splits"] = v.apply(
+            lambda x: (
+                (set(x["expected_split"].keys()) <= set(x["expected_land_use"]))
+                | (x["expected_land_use"] == ["unknown"])
+            )
+            & (len(x["expected_split"]) != 0),
+            axis=1,
+        )
+        v["divisor"] = v["expected_land_use"].str.len().clip(lower=1)
+        v.loc[~v["compatible_splits"], "expected_split"] = v.apply(
+            lambda x: {i: f"{1/x['divisor']}" for i in x["expected_land_use"]}, axis=1
+        )
+        v["divisor"] = v["expected_split"].str.len().clip(lower=1)
+        v["expected_split"] = v.apply(
+            lambda x: {
+                i: (
+                    float(f"{1/x['divisor']}")
+                    if j == ""
+                    else float(j.replace("%", "e-2"))
+                )
+                for i, j in x["expected_split"].items()
+            },
+            axis=1,
+        )
         v["expected_land_use"] = v["expected_split"].apply(lambda x: list(x.keys()))
         v = v.drop(columns=["compatible_splits", "divisor"])
         split_expecations[k] = v.copy()
-    return global_classes.DLogData.from_data_dict(split_expecations, auxiliary_data.lookup)
+    return global_classes.DLogData.from_data_dict(
+        split_expecations, auxiliary_data.lookup
+    )
 
 
 def infill_data(
@@ -212,7 +236,7 @@ def infill_data(
     # required for regression area infill
     luc_infilled = infill_landuse_codes(data, auxiliary_data)
 
-    distribution_path = output_folder / "distribution_plots/before_infilling"
+    distribution_path = output_folder / "Aux_distribution_plots/before_infilling"
     distribution_path.mkdir(exist_ok=True, parents=True)
 
     infill_means = _mean_factors(
@@ -243,7 +267,7 @@ def infill_data(
         infilled_area = _regression_area_infill(
             luc_infilled,
             gfa_method == inputs.GFAInfillMethod.REGRESSION,
-            output_folder / "infilling_checks",
+            output_folder / "Aux_infilling_checks",
         )
     else:
         raise ValueError(f"invalid GFA infill method: {gfa_method}")
@@ -348,6 +372,7 @@ def _average_factors(
     infill_averages.save_yaml(averages_path)
     return infill_averages
 
+
 def _mean_factors(
     data: global_classes.DLogData,
     distribution_path: pathlib.Path,
@@ -402,6 +427,7 @@ def _mean_factors(
 
     infill_means.save_yaml(means_path)
     return infill_means
+
 
 def _median_factors(
     data: global_classes.DLogData,
@@ -481,7 +507,6 @@ def _average_area_infill(
         },
     )
 
-
     corrected_format["mixed"] = infill_units(
         {"mixed": corrected_format["mixed"]},
         {"mixed": ["dwellings", "units_(dwellings)"]},
@@ -511,6 +536,7 @@ def _average_area_infill(
     )
     return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
 
+
 def _mean_area_infill(
     data: global_classes.DLogData, infill_means: inputs.InfillingMeans
 ) -> global_classes.DLogData:
@@ -532,7 +558,6 @@ def _mean_area_infill(
             "mixed": infill_means.mean_mix_area,
         },
     )
-
 
     corrected_format["mixed"] = infill_units(
         {"mixed": corrected_format["mixed"]},
@@ -563,6 +588,7 @@ def _mean_area_infill(
     )
     return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
 
+
 def _median_area_infill(
     data: global_classes.DLogData, infill_medians: inputs.InfillingMedians
 ) -> global_classes.DLogData:
@@ -584,7 +610,6 @@ def _median_area_infill(
             "mixed": infill_medians.median_mix_area,
         },
     )
-
 
     corrected_format["mixed"] = infill_units(
         {"mixed": corrected_format["mixed"]},
@@ -819,7 +844,9 @@ def incorrect_luc_formatting(
     format_lookup.columns = ["land_use_code", "incorrect_format"]
 
     # Replace append with pd.concat
-    new_row = pd.DataFrame([["sg", "suigeneris"]], columns=["land_use_code", "incorrect_format"])
+    new_row = pd.DataFrame(
+        [["sg", "suigeneris"]], columns=["land_use_code", "incorrect_format"]
+    )
     format_lookup = pd.concat([format_lookup, new_row], ignore_index=True)
 
     # format_lookup = format_lookup.append(
@@ -879,8 +906,12 @@ def calc_average_years_webtag_certainty(
             filtered_value = value[value["missing_years"] == False]
             filtered_value = filtered_value[value["web_tag_certainty_id"] == id_]
 
-            all_start_years = pd.concat([all_start_years, filtered_value["start_year_id"]], ignore_index=True)
-            all_end_years = pd.concat([all_end_years, filtered_value["end_year_id"]], ignore_index=True)
+            all_start_years = pd.concat(
+                [all_start_years, filtered_value["start_year_id"]], ignore_index=True
+            )
+            all_end_years = pd.concat(
+                [all_end_years, filtered_value["end_year_id"]], ignore_index=True
+            )
         mode_start_year = all_start_years.mode().values[0]
         mode_end_year = all_end_years.mode().values[0]
 
@@ -981,9 +1012,9 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
 
         # infill
         to_be_infilled.loc[missing_tag_permissioned.index, :] = missing_tag_permissioned
-        to_be_infilled.loc[
-            missing_tag_not_permissioned.index, :
-        ] = missing_tag_not_permissioned
+        to_be_infilled.loc[missing_tag_not_permissioned.index, :] = (
+            missing_tag_not_permissioned
+        )
         to_be_infilled.loc[missing_tag_not_spec.index, :] = missing_tag_not_spec
 
         infilled_data[key] = to_be_infilled
@@ -1051,9 +1082,9 @@ def infill_one_missing_year(
 
             # set start to end if applying period will set value out of bounds
             mask_end = end_no_start_values["end_year_id"] <= period
-            end_no_start_values.loc[
-                mask_end, "start_year_id"
-            ] = end_no_start_values.loc[mask_end, "end_year_id"]
+            end_no_start_values.loc[mask_end, "start_year_id"] = (
+                end_no_start_values.loc[mask_end, "end_year_id"]
+            )
             # set start to end - period if result in bounds
             end_no_start_values.loc[~mask_end, "start_year_id"] = (
                 end_no_start_values.loc[~mask_end, "end_year_id"] - period
@@ -1271,6 +1302,7 @@ def calculate_mean(
             )
     return mean_values
 
+
 def calculate_median(
     data: global_classes.DLogData,
     columns: dict[str, list[str]],
@@ -1469,6 +1501,7 @@ def fix_undefined_invalid_luc(
                 fixed_codes[key].loc[not_fixed.index, column] = replacement
     return fixed_codes
 
+
 def unit_area_ratio_glb_average(
     data: dict[str, pd.DataFrame],
     unit_columns: dict[str, str],
@@ -1494,7 +1527,6 @@ def unit_area_ratio_glb_average(
         Calculate the ratio of total units to total are.
     """
 
-
     total_units = 0
     total_area = 0
 
@@ -1504,10 +1536,11 @@ def unit_area_ratio_glb_average(
 
         # Filter out NaN values and zero values
         data_subset = value.loc[
-            (~value[units_col].isna()) & 
-            (~value[area_col].isna()) & 
-            (value[units_col] != 0) & 
-            (value[area_col] != 0), :
+            (~value[units_col].isna())
+            & (~value[area_col].isna())
+            & (value[units_col] != 0)
+            & (value[area_col] != 0),
+            :,
         ]
 
         # Sum up the units and area
@@ -1519,6 +1552,7 @@ def unit_area_ratio_glb_average(
         return np.nan  # or return 0, depending on how you want to handle it
 
     return total_units / total_area  # Return the aggregated ratio
+
 
 def unit_area_ratio_mean(
     data: dict[str, pd.DataFrame],
@@ -1563,10 +1597,11 @@ def unit_area_ratio_mean(
                 out=np.full_like(data_subset[units_col], np.nan),
             ),
         )
-        
+
     all_ratios = all_ratios[np.isfinite(all_ratios)]
     distribution_plots(all_ratios, "Unit-Site Area Ratio Plot", plot_path)
     return all_ratios.mean()
+
 
 def unit_area_ratio_median(
     data: dict[str, pd.DataFrame],
@@ -1617,7 +1652,6 @@ def unit_area_ratio_median(
     return np.median(all_ratios)
 
 
-
 def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> None:
     """create a Kernel Distribution Estimation plot for data
 
@@ -1650,7 +1684,9 @@ def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> N
     plt.close()
 
 
-def distribution_plots_median(data: np.ndarray, title: str, save_as: pathlib.Path) -> None:
+def distribution_plots_median(
+    data: np.ndarray, title: str, save_as: pathlib.Path
+) -> None:
     """create a Kernel Distribution Estimation plot for data
 
     plots KDE line and mean for data
@@ -1680,6 +1716,7 @@ def distribution_plots_median(data: np.ndarray, title: str, save_as: pathlib.Pat
     ax.legend()
     fig.savefig(save_as)
     plt.close()
+
 
 def _infilling_comparison_plots(
     data: global_classes.DLogData,
@@ -1775,7 +1812,7 @@ def _infill_comparison_figure(
 
     fig.savefig(output_file)
     LOG.info("Written: %s", output_file)
-    
+
     # """Plot a KDE or Histogram comparing the `before` and `after` values."""
 
     # def tidy_name(name: str) -> str:
@@ -1807,25 +1844,25 @@ def _infill_comparison_figure(
     #         combined = combined[np.isfinite(combined)]
     #         hist_bins = np.histogram_bin_edges(combined, bins=50)
     #         patches = []  # Store patches to apply hatching later
-            
+
     #         for i, (nm, df) in enumerate(data.items()):
     #             # Ensure the color string is valid
     #             color = f"C{i % 10}"  # Modulo to ensure within valid range
     #             rgb_color = colors.to_rgb(color)  # Get RGB color
     #             rgba_color = colors.to_rgba(rgb_color, alpha=0.3)  # Convert to RGBA with transparency
-                
+
     #             # Plot histogram and get patch collection
     #             _, _, patches_tmp = ax.hist(
     #                 df[column],
     #                 bins=hist_bins,
     #                 histtype="bar",
     #                 edgecolor=rgba_color,
-    #                 facecolor=rgba_color,  
+    #                 facecolor=rgba_color,
     #                 density=True,
     #                 label=f"{nm.title()} Infilling",
     #             )
     #             patches.extend(patches_tmp)
-            
+
     #         # Apply hatching manually to patches
     #         for patch, nm in zip(patches, ["before"] * len(data["before"]) + ["after"] * len(data["after"])):
     #             patch.set_hatch(hatches[nm])
@@ -1996,12 +2033,17 @@ def infill_year_units(
 
     if len(not_specified) != 0 or len(years_defined) != 0:
         # raise ValueError("distrubtion contains not specified or defined years values")
-        ad_str = lookup.distribution_profile.loc[assumed_distribution, 'distribution_profile']
+        ad_str = lookup.distribution_profile.loc[
+            assumed_distribution, "distribution_profile"
+        ]
         LOG.warning(  # pylint: disable=logging-fstring-interpolation
-                    f"{len(not_specified) + len(years_defined)} undefined or invalid distributions"
-                    f" found in '{distribution_column}'\n"
-                    f"Assuming '{ad_str}' distribution.")
-        data.loc[data[distribution_column].isin([0, 1]), distribution_column] = assumed_distribution
+            f"{len(not_specified) + len(years_defined)} undefined or invalid distributions"
+            f" found in '{distribution_column}'\n"
+            f"Assuming '{ad_str}' distribution."
+        )
+        data.loc[data[distribution_column].isin([0, 1]), distribution_column] = (
+            assumed_distribution
+        )
 
     flat = data[data[distribution_column] == 2]
     flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], lookup.years)

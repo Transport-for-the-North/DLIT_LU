@@ -204,11 +204,20 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     ]["existing_land_use"]
 
     residential_build_out = construction_land_use_data["residential"]
+    employment_build_out = construction_land_use_data["employment"]
+    # residential_build_out = pd.concat(
+    #     [
+    #         construction_land_use_data["residential"],
+    #         demolition_land_use_data["residential"],
+    #     ],
+    #     ignore_index=True,
+    # )
+
     employment_build_out = pd.concat(
         [
             construction_land_use_data["employment"],
             demolition_land_use_data["employment"],
-            demolition_land_use_data["residential"],
+            # demolition_land_use_data["residential"],
         ],
         ignore_index=True,
     )
@@ -258,7 +267,7 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
     # Files needed by LUTI
     if LUTI:
         LOG.info("Creating LUTI zonal data")
-        luti_output_path = config.output_folder / "LUTI_outputs"
+        luti_output_path = config.output_folder / "Aux_LUTI_outputs"
         luti_output_path.mkdir(exist_ok=True)
         # Need LUTI zone system and shapefile here to convert site data into luti zonal data
         luti_zones = parser.parse_zone(config.land_use.luti_zone_shapefile_path)
@@ -330,7 +339,6 @@ def run(input_data: global_classes.DLogData, config: inputs.DLitConfig):
         build_out_columns + res_key_columns + ["lsoa2021_id", "accom_h"],
     ]
 
-    LOG.info("Disaggregating site level population further by traveller type")
     res_lsoa_sites_pop = res_lsoa_sites_pop.groupby(res_key_columns + ["lsoa2021_id"])[
         build_out_columns
     ].sum()
