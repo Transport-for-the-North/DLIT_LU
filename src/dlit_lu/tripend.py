@@ -260,7 +260,11 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
 
         lookup_df = pd.read_csv(lookup_path)
 
-        val_cols = [base_year_column] + future_year_columns
+        # Construct val_cols with base_year_column only if it's in the DataFrame
+        val_cols = future_year_columns.copy()
+        if base_year_column in data.columns:
+            val_cols = [base_year_column] + val_cols
+
         totals_before = {col: data[col].sum() for col in val_cols}
 
         merged_df = data.merge(
@@ -450,6 +454,7 @@ class ForecastComparator:
         df2_label="output",
         use_tolerance=False,
         tol=1e-6,
+        output_path=None,
     ):
         """
         Initialize the comparator with two dataframes and comparison settings.
@@ -473,6 +478,7 @@ class ForecastComparator:
         self.tol = tol
         self.merged = None
         self.differences = []
+        self.output_path = output_path if output_path else "output"
 
     def merge_data(self):
         self.merged = pd.merge(
@@ -506,19 +512,40 @@ class ForecastComparator:
                     (year, mismatch[[*self.key_columns, col1, col2]])
                 )
 
+    def export(self):
+        """
+        Export the differences to a CSV file.
+
+        :param output_path: Path to save the CSV file
+        """
+        if not self.differences:
+            print("No differences found.")
+            return
+
+        # Create a DataFrame to hold all differences
+        all_differences = pd.concat(
+            [df for _, df in self.differences], ignore_index=True
+        )
+        output_file = self.output_path + f"/sector_differences.csv"
+
+        utilities.write_to_csv(output_file, all_differences)
+
+        print(f"Differences exported to {self.output_path}")
+
     def report(self):
         if self.differences:
             for year, df in self.differences:
-                print(f"❌ Mismatch found in year '{year}':")
+                print(f"Mismatch found in year '{year}':")
                 print(df)
             print(
-                "⚠️ Discrepancies found between input dataframes, but the process will continue."
+                "Discrepancies found between input dataframes, but the process will continue."
             )
         else:
-            print("✅ All values match across future year columns.")
+            print("All values match across future year columns.")
 
     def run_comparison(self):
         self.compare()
+        self.export()
         self.report()
 
 
@@ -565,9 +592,9 @@ def run(config: inputs.DLitConfig):
     tes = ["prod", "attr"]  # trip end to be either production or attraction
     sources = ["dlog", "ntem"]  # dlog or ntem data
     sector_list = [
-        "Eilean Siar",
-        "Moray",
-        "Aberdeen City",
+        "Cheshire West and Chester",
+        "Barrow-in-Furness",
+        "Dumfries and Galloway",
     ]  # ["Bury", "Manchester", "Oldham", "Rochdale", "Salford", "Stockport", "Tameside", "Trafford"]
     mode_list = [3]  # list of mode to be filtered
     LOG.info("Instantiating TEConstraintProcessor")
@@ -577,6 +604,7 @@ def run(config: inputs.DLitConfig):
     zone_id = sector_info["zone_id"]
     sector_id = sector_info["sector_id"]
     sector = config.tripend.sector.value
+    zone_index_columns_initial = [zone_id, "p", "m"]
 
     LOG.info(
         "Instantiating GrowthCalculator and ConstraintCalculation from constraint module"
@@ -777,8 +805,8 @@ def run(config: inputs.DLitConfig):
                                 df = results[key].get(subkey)
                                 if df is not None and f"{sector}nm" in df.columns:
                                     # Check if sector_list is provided (non-empty)
-                                    if sector_list:
-                                        # Filter DataFrame to include only rows where sector name is in sector_list
+                                    if sector_list and geography == "zone":
+                                        # Filter DataFrame to include only rows where sector name is in sector_list when sector_list is provided AND geography is "zone"
                                         df_filtered = df[
                                             df[f"{sector}nm"].isin(sector_list)
                                         ]
@@ -812,6 +840,7 @@ def run(config: inputs.DLitConfig):
 
     LOG.info(f"Constraining dlog data with ntem growth")
     te_output = {}
+    te_ls_output = {}
     for category in categories:
         for te in tes:
             id = f"{category}_{te}"
@@ -867,12 +896,45 @@ def run(config: inputs.DLitConfig):
                 1e-5,
             )
             # Apply conditional transformation
+            # Merge the two dataframes on sector_index_columns
+            merged = sector_ratio.merge(
+                sector_target_growth,
+                on=sector_index_columns,
+                suffixes=("_ratio", "_target"),
+            )
+
+            # Apply conditional transformation for each future year column
             for col in future_year_columns:
-                sector_ratio[col] = np.where(
-                    (sector_ratio[col] > 1),
-                    1,  # set gap to zero to avoid additional background growth when estimated growth is not zero and the gap is negative (estimated exceeds target)
-                    sector_ratio[col],  # Keep original value otherwise
+                merged[col + "_ratio"] = np.where(
+                    (merged[col + "_ratio"] > 1)
+                    & (
+                        merged[col + "_target"] > 0
+                    ),  # set ratio to 1 when target growth is larger than estimated growth when both are positive
+                    1,
+                    merged[col + "_ratio"],
                 )
+
+            # Reconstruct adjusted sector_ratio DataFrame
+            adjusted_cols = sector_index_columns + [
+                col + "_ratio" for col in future_year_columns
+            ]
+            sector_ratio_adjusted = merged[adjusted_cols].copy()
+
+            # Rename columns back to original
+            sector_ratio_adjusted.rename(
+                columns={col + "_ratio": col for col in future_year_columns},
+                inplace=True,
+            )
+
+            # sector_ratio = sector_ratio.set_index(sector_index_columns)
+            # sector_target_growth = sector_target_growth.set_index(sector_index_columns)
+            # # Apply conditional transformation
+            # for col in future_year_columns:
+            #     sector_ratio[col] = np.where(
+            #         ((sector_ratio[col] > 1) & (sector_target_growth[col] > 0)),
+            #         1,  # set gap to 1 to target growth is larger than estimated growth when both are positive
+            #         sector_ratio[col],  # Keep original value otherwise
+            #     )
             # print("sector_ratio:", sector_ratio)
             # Dlog estimated growth at lower geographical level
             zone_estimated_growth = results[f"zone_dlog_{id}"]["AbsoluteGrowth"]
@@ -884,6 +946,7 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
             )
+
             # print(zone_target_growth)
             # Create a list of columns for index
             zone_index_column_count = zone_target_growth.columns.get_loc(
@@ -898,11 +961,22 @@ def run(config: inputs.DLitConfig):
             zone_etmt_growth = zone_estimated_growth[
                 zone_index_columns + future_year_columns
             ]
+            # Set zonal estimtaed growth to zero if negative whilst the corresponding target growth is positive
+            zone_etmt_growth = zone_etmt_growth.set_index(zone_index_columns)
+            zone_target_growth = zone_target_growth.set_index(zone_index_columns)
+            zone_etmt_growth[future_year_columns] = np.where(
+                (zone_etmt_growth[future_year_columns] < 0)
+                & (zone_target_growth[future_year_columns] >= 0),
+                0,  # Set negative estimated growth to zero when target growth is positive
+                zone_etmt_growth[future_year_columns],  # Keep original value otherwise
+            )
+            zone_etmt_growth = zone_etmt_growth.reset_index()
+            zone_target_growth = zone_target_growth.reset_index()
 
-            # Get zone scaler from sector gratio
+            # Get zone scaler from sector ratio
             zone_scaler = zone_etmt_growth[zone_index_columns].copy()
             zone_scaler = zone_scaler.merge(
-                sector_ratio, on=sector_index_columns, how="left"
+                sector_ratio_adjusted, on=sector_index_columns, how="left"
             )
             zone_scaler = zone_scaler[zone_index_columns + future_year_columns]
             zone_scaled_etmt_growth = calc.calculate_product(
@@ -1045,29 +1119,46 @@ def run(config: inputs.DLitConfig):
             else:
                 print("No negative values found in 'zone_adjustment_factor'.")
 
-            # Apply the adjustment factor to te large site growth
-            zone_index_columns_initial = [zone_id, "p", "m"]
-            zone_ls_te_grth = calc.calculate_product(
-                dlog_te_lsgrth_dfs[f"dlog_{id}"],  # large site trip production growth
+            # Get trip end growth related to large sites
+            zone_ls_te_grth = dlog_te_lsgrth_dfs[f"dlog_{id}"]
+            # get LAD and Region
+            sector_ls_te_grth = te_cp.aggregate_to_sector_p_m(zone_ls_te_grth)
+
+            zone_ls_te_grth = te_cp.add_names_to_te_data(
+                zone_ls_te_grth, zone_id, use_sector_name=True, use_sector_cols=False
+            )
+            sector_ls_te_grth = te_cp.add_names_to_te_data(
+                sector_ls_te_grth, sector_id, use_sector_name=True, use_sector_cols=True
+            )
+
+            zone_ls_te_grth_scaled = calc.calculate_product(
+                zone_ls_te_grth,  # large site te growth
                 zone_adjustment_factor,  # adjustment factor
                 future_year_columns,
                 zone_index_columns_initial,
             )
-            zone_ls_te_grth[future_year_columns] = zone_ls_te_grth[
+            zone_ls_te_grth_scaled[future_year_columns] = zone_ls_te_grth_scaled[
                 future_year_columns
-            ].where(zone_ls_te_grth[future_year_columns].abs() >= 1e-5, 0)
+            ].where(zone_ls_te_grth_scaled[future_year_columns].abs() >= 1e-5, 0)
+
             LOG.info("Adding regions into final output dataframe")
             zone_forecast = zone_forecast.merge(
                 lookup_lad_region[[sector_id, "ntem_region_id"]],
                 on=sector_id,
                 how="left",
             )
+            # Get subset for negative trip end values
+            negative_records = zone_forecast[
+                (zone_forecast[future_year_columns] < 0).any(axis=1)
+            ]
             region_forecast = zone_forecast.groupby(["ntem_region_id", "p", "m"])[
                 [base_year_column] + future_year_columns
             ].sum()
             region_forecast = region_forecast.reset_index()
 
             te_output[id] = zone_forecast
+
+            te_ls_output[id] = zone_ls_te_grth
 
             LOG.info("Exporting key output data")
             inter_output_path = key_te_folder / f"output_intermediate"
@@ -1138,6 +1229,14 @@ def run(config: inputs.DLitConfig):
                     "data": zone_target_tot,
                     "file": f"zone_target_tot_{id}.csv",
                 },
+                "zone_ls_te_grth": {
+                    "data": zone_ls_te_grth,
+                    "file": f"zone_largesite_te_growth_{id}.csv",
+                },
+                "sector_ls_te_grth": {
+                    "data": sector_ls_te_grth,
+                    "file": f"{sector}_largesite_te_growth_{id}.csv",
+                },
             }
 
             # Check if sector_list is provided (not empty)
@@ -1159,23 +1258,27 @@ def run(config: inputs.DLitConfig):
             key_outputs_and_names = {
                 "zone_fy_tot": {
                     "data": zone_forecast,
-                    "file": f"Normits_tripend_fy_{id}.csv",
+                    "file": f"normits_tripend_fy_{id}.csv",
+                },
+                "zone_fy_tot_negative": {
+                    "data": negative_records,
+                    "file": f"normits_tripend_fy_{id}_negative.csv",
                 },
                 "agg_zone_future_year_tot": {
                     "data": agg_zone_forecast,
-                    "file": f"Normits_agg_tripend_fy_{id}.csv",
+                    "file": f"normits_agg_tripend_fy_{id}.csv",
                 },
                 "region_forecast": {
                     "data": region_forecast,
-                    "file": f"Normits_region_tripend_fy_{id}.csv",
+                    "file": f"normits_region_tripend_fy_{id}.csv",
                 },
                 "zone_adjustment_factor": {
                     "data": zone_adjustment_factor,
-                    "file": f"Normits_zone_ajfactor_{id}.csv",
+                    "file": f"normits_zone_ajfactor_{id}.csv",
                 },
                 "zone_fy_ls_grth": {
                     "data": zone_ls_te_grth,
-                    "file": f"Normits_largesite_tripend_fy_{id}.csv",
+                    "file": f"normits_largesite_tripend_fy_{id}.csv",
                 },
             }
 
@@ -1194,6 +1297,8 @@ def run(config: inputs.DLitConfig):
     for cat in categories:
         prod_df = te_output[f"{cat}_prod"]
         attr_df = te_output[f"{cat}_attr"]
+        # ls_prod_df = te_ls_output[f"{cat}_prod"]
+        ls_attr_df = te_ls_output[f"{cat}_attr"]
 
         # Group by (p, m) and sum across future years
         prod_totals = prod_df.groupby(["p", "m"])[future_year_columns].sum()
@@ -1203,20 +1308,53 @@ def run(config: inputs.DLitConfig):
         scaling_factor = (
             prod_totals.divide(attr_totals).replace([np.inf, -np.inf], np.nan).fillna(1)
         )
-
+        print("Scaling factor:\n", scaling_factor)
         # Apply scaling
         attr_scaled = attr_df.copy()
+        ls_attr_scaled = ls_attr_df.copy()
+        # Scale the attraction values by the scaling factor
         for year in future_year_columns:
             attr_scaled[year] = attr_scaled.apply(
                 lambda row: row[year] * scaling_factor.loc[(row["p"], row["m"]), year],
                 axis=1,
             )
+            ls_attr_scaled[year] = ls_attr_scaled.apply(
+                lambda row: row[year] * scaling_factor.loc[(row["p"], row["m"]), year],
+                axis=1,
+            )
+        # Make sure the attraction values of larges sites are not bigger than those of total
+        ls_attr_scaled = ls_attr_scaled.set_index(zone_index_columns_initial)
+        attr_scaled = attr_scaled.set_index(zone_index_columns_initial)
+        ls_attr_scaled_aj = ls_attr_scaled.copy()
 
+        # Apply the condition safely with proper parentheses
+        condition = (
+            ls_attr_scaled[future_year_columns] > attr_scaled[future_year_columns]
+        ) & (ls_attr_scaled[future_year_columns] > 0)
+
+        ls_attr_scaled_aj[future_year_columns] = ls_attr_scaled[
+            future_year_columns
+        ].where(
+            condition,
+            attr_scaled[future_year_columns],
+        )
+        # Reset index to original structure if needed
+        attr_scaled = attr_scaled.reset_index()
+        ls_attr_scaled = ls_attr_scaled.reset_index()
+        ls_attr_scaled_aj = ls_attr_scaled_aj.reset_index()
         # Filter for m == 3
-        filtered_scaled = attr_scaled[attr_scaled["m"].isin(mode_list)]
+        filtered_attr_scaled = attr_scaled[attr_scaled["m"].isin(mode_list)]
+        filtered_ls_attr_scaled = ls_attr_scaled[ls_attr_scaled["m"].isin(mode_list)]
 
         # Write to CSV
-        output_path = key_te_folder / f"Normits_tripend_fy_{cat}_attr_scaled.csv"
-        utilities.write_to_csv(output_path, filtered_scaled)
+        LOG.info(f"Writing scaled tripends for {cat} category")
+        utilities.write_to_csv(
+            key_te_folder / f"normits_tripend_fy_{cat}_attr_scaled.csv",
+            filtered_attr_scaled,
+        )
+        utilities.write_to_csv(
+            key_te_folder / f"normits_largesite_tripend_fy_{cat}_attr_scaled.csv",
+            filtered_ls_attr_scaled,
+        )
 
     LOG.info("Data processing completed")

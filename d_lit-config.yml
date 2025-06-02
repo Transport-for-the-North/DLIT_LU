@@ -2,10 +2,10 @@
 run_infill: False # M1
 run_land_use: False # M2
 run_large_sites: False  # M3
-run_split: True # M4
-run_constraint: True # M5
+run_split: False # M4
+run_constraint: False # M5
 run_tem: False # M6- currently in caf.tem
-run_tripend: False # M7
+run_tripend: True # M7
 
 #Mandatory Parameters
 #--str
@@ -149,7 +149,7 @@ constraint:
   dlog_emp: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_aggregation\lad_job.csv
   dlog_pop: I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M3_ls_aggregation\lad_population.csv
 
-  # Ratio value to determing the proportion of Dlog growth. E,g, 0.75 means the 75% percent of target growth from constraint will from Dlog pattern
+  # Ratio value to determing the proportion of Dlog growth contributes. E,g, 0.75 means the 75% percent of target growth from constraint will from Dlog pattern
   cap_ratio: 0.95
 
 tripend:
@@ -157,8 +157,8 @@ tripend:
   sector: lad #lad, region
 
   # key tem input path
-  dlog_te_tot_path: T:\Yan_Kavana\tem_new_outputs\Dlog_test20_total\Core
-  dlog_te_lsgrth_path: T:\Yan_Kavana\tem_new_outputs\Dlog_test20_ls_growth\Core
+  dlog_te_tot_path: T:\Yan_Kavana\tem_new_outputs\Dlog_test21_total_unbalanced\Core
+  dlog_te_lsgrth_path: T:\Yan_Kavana\tem_new_outputs\Dlog_test21_ls_growth\Core
 
   # key input paths from ntem trip end
   ntem_zone_hb_prod: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_production_hb.csv.bz2
@@ -168,5 +168,7 @@ tripend:
 
   # Whether or not to export files for viz
   export_for_viz: True
+
+  # proportion of 
 
   

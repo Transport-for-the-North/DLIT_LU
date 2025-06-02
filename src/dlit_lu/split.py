@@ -2186,6 +2186,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     zone_hh_fy = input_data.fy_zone_tot_hh
     zone_pop_fy = input_data.fy_zone_tot_pop
     zone_job_sic_fy = input_data.fy_zone_tot_emp_sic
+    # Check if the negative values exist in the dataframes (i.e. for employment data)
     negatives_df_before = zone_job_sic_fy[
         zone_job_sic_fy[build_out_columns].lt(0).any(axis=1)
     ]
@@ -2526,7 +2527,9 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
                 f"Negative difference in household totals for year {year}: {neg_diff_hh.shape[0]} zones"
             )
         else:
-            LOG.info(f"No negative household difference identified for year {year}")
+            LOG.info(
+                f"No negative household difference identified after subtracting growth of large sites for year {year}"
+            )
 
         # filtered_zone_hh = fy_zone_hh[fy_zone_hh[zone_id].isin(zone_list)]
 
@@ -2543,7 +2546,9 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
                 f"Negative difference in population totals for year {year}: {neg_diff_pop.shape[0]} zones"
             )
         else:
-            LOG.info(f"No negative population difference identified for year {year}")
+            LOG.info(
+                f"No negative population difference identified after subtracting growth of large sites for year {year}"
+            )
 
         # filtered_zone_pop = fy_zone_pop[
         #     fy_zone_pop[zone_id].isin(zone_list)
@@ -2563,7 +2568,9 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
                 f"Negative difference in job totals for year {year}: {neg_diff_job.shape[0]} zones"
             )
         else:
-            LOG.info(f"No negative job difference identified for year {year}")
+            LOG.info(
+                f"No negative job difference identified after subtracting growth of large sites for year {year}"
+            )
 
         # filtered_zone_job = fy_zone_job[
         #     fy_zone_job[zone_id].isin(zone_list)
