@@ -641,6 +641,52 @@ class ConstraintCalculation:
     """
 
     @staticmethod
+    def combine_growth(
+        df1: pd.DataFrame,
+        df2: pd.DataFrame,
+        index_columns: list[str],
+        future_year_columns: list[str],
+        ratio_df1: float,
+    ) -> pd.DataFrame:
+        """
+        Merge two dataframes on index_columns and calculate weighted average for future_year_columns.
+
+        Parameters
+        ----------
+        df1 : pd.DataFrame
+            First dataframe (e.g., estimated growth).
+        df2 : pd.DataFrame
+            Second dataframe (e.g., target growth).
+        index_columns : list[str]
+            List of columns to join on.
+        future_year_columns : list[str]
+            List of columns for future years to compute the weighted average.
+        ratio : float
+            The weight to apply to df1. (1 - ratio) will be applied to df2.
+
+        Returns
+        -------
+        pd.DataFrame
+            A dataframe containing index_columns and the weighted average of future_year_columns.
+        """
+        merged = df1.merge(
+            df2, on=index_columns, suffixes=("_df1", "_df2"), how="inner"
+        )
+
+        # Calculate weighted average for each future year
+        for year in future_year_columns:
+            col_df1 = f"{year}_df1"
+            col_df2 = f"{year}_df2"
+            merged[year] = merged[col_df1] * ratio_df1 + merged[col_df2] * (
+                1 - ratio_df1
+            )
+
+        # Keep only index columns + new computed columns
+        result = merged[index_columns + future_year_columns]
+
+        return result
+
+    @staticmethod
     def calculate_zone_weights(
         zone_data: pd.DataFrame,
         build_out_columns: list,
@@ -702,7 +748,7 @@ class ConstraintCalculation:
         target_data: pd.DataFrame,
         estimated_data: pd.DataFrame,
         build_out_columns: list,
-        sector_index_columns: list,
+        index_columns: list,
         tolerance: float,
     ) -> pd.DataFrame:
         """
@@ -723,8 +769,8 @@ class ConstraintCalculation:
         build_out_columns : list
             List of column names representing growth-related data.
 
-        sector_index_columns : list
-            List of columns used for indexing and merging sector-level data.
+        index_columns : list
+            List of columns used for indexing and merging sector-level or zone_level data.
 
         tolerance : float, optional (default=1e-10)
             Threshold below which estimated values are considered zero to avoid division errors.
@@ -745,9 +791,7 @@ class ConstraintCalculation:
         )
 
         # Merge on sector index columns
-        merged_data = target_data.merge(
-            estimated_data, on=sector_index_columns, how="left"
-        )
+        merged_data = target_data.merge(estimated_data, on=index_columns, how="left")
 
         # Compute ratio while handling division by zero safely
         for col in build_out_columns:
@@ -755,7 +799,7 @@ class ConstraintCalculation:
             denom[np.isclose(denom, 0, atol=tolerance)] = np.nan
             merged_data[col] = (merged_data[f"{col}_tgt"] * cap_ratio / denom).fillna(1)
 
-        return merged_data[sector_index_columns + build_out_columns]
+        return merged_data[index_columns + build_out_columns]
 
     @staticmethod
     def calculate_gap(

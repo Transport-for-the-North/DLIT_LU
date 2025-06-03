@@ -579,7 +579,8 @@ def run(config: inputs.DLitConfig):
     future_years = config.split.future_years
     future_year_columns = [str(year) for year in future_years]
     # future_year_column = str(2024)
-    cap_ratio = config.constraint.cap_ratio
+    dlog_ratio = config.tripend.dlog_grth_proportion
+    cap_ls_aj = config.tripend.cap_ls_adj_factor
     key_te_folder = config.output_folder / "M7_tripend"
     key_te_folder.mkdir(exist_ok=True)
     model_zone = config.large_sites.geo_boundary.value
@@ -595,6 +596,7 @@ def run(config: inputs.DLitConfig):
         "Cheshire West and Chester",
         "Barrow-in-Furness",
         "Dumfries and Galloway",
+        "Salford",
     ]  # ["Bury", "Manchester", "Oldham", "Rochdale", "Salford", "Stockport", "Tameside", "Trafford"]
     mode_list = [3]  # list of mode to be filtered
     LOG.info("Instantiating TEConstraintProcessor")
@@ -847,6 +849,7 @@ def run(config: inputs.DLitConfig):
 
             LOG.info(f"Working out the background growth at sector level for {id}")
 
+            # Get both sector and zone level target totals and growth
             sector_target_tot = growth_calculator.target_yeartot(
                 results[f"{sector}_dlog_{id}"][
                     "YearTotal"
@@ -877,7 +880,6 @@ def run(config: inputs.DLitConfig):
                 future_year_columns,
             )
             # print(sector_target_growth)
-            sector_estimated_growth = results[f"{sector}_dlog_{id}"]["AbsoluteGrowth"]
 
             sector_index_column_count = sector_target_growth.columns.get_loc(
                 base_year_column
@@ -885,59 +887,6 @@ def run(config: inputs.DLitConfig):
             sector_index_columns = list(
                 sector_target_growth.columns[:sector_index_column_count]
             )
-            # print(sector_index_columns)
-
-            sector_ratio = calc.calculate_ratio(
-                cap_ratio,
-                sector_target_growth,
-                sector_estimated_growth,
-                future_year_columns,
-                sector_index_columns,
-                1e-5,
-            )
-            # Apply conditional transformation
-            # Merge the two dataframes on sector_index_columns
-            merged = sector_ratio.merge(
-                sector_target_growth,
-                on=sector_index_columns,
-                suffixes=("_ratio", "_target"),
-            )
-
-            # Apply conditional transformation for each future year column
-            for col in future_year_columns:
-                merged[col + "_ratio"] = np.where(
-                    (merged[col + "_ratio"] > 1)
-                    & (
-                        merged[col + "_target"] > 0
-                    ),  # set ratio to 1 when target growth is larger than estimated growth when both are positive
-                    1,
-                    merged[col + "_ratio"],
-                )
-
-            # Reconstruct adjusted sector_ratio DataFrame
-            adjusted_cols = sector_index_columns + [
-                col + "_ratio" for col in future_year_columns
-            ]
-            sector_ratio_adjusted = merged[adjusted_cols].copy()
-
-            # Rename columns back to original
-            sector_ratio_adjusted.rename(
-                columns={col + "_ratio": col for col in future_year_columns},
-                inplace=True,
-            )
-
-            # sector_ratio = sector_ratio.set_index(sector_index_columns)
-            # sector_target_growth = sector_target_growth.set_index(sector_index_columns)
-            # # Apply conditional transformation
-            # for col in future_year_columns:
-            #     sector_ratio[col] = np.where(
-            #         ((sector_ratio[col] > 1) & (sector_target_growth[col] > 0)),
-            #         1,  # set gap to 1 to target growth is larger than estimated growth when both are positive
-            #         sector_ratio[col],  # Keep original value otherwise
-            #     )
-            # print("sector_ratio:", sector_ratio)
-            # Dlog estimated growth at lower geographical level
-            zone_estimated_growth = results[f"zone_dlog_{id}"]["AbsoluteGrowth"]
 
             # Relative NTEM related growth at lower geographical level
             zone_target_growth = growth_calculator.target_growth(
@@ -955,134 +904,78 @@ def run(config: inputs.DLitConfig):
             zone_index_columns = list(
                 zone_target_growth.columns[:zone_index_column_count]
             )
+
+            # Get sector and zone level estimated growth from dlog
+            sector_estimated_growth = results[f"{sector}_dlog_{id}"]["AbsoluteGrowth"]
+            # print(sector_index_columns)
+            zone_estimated_growth = results[f"zone_dlog_{id}"]["AbsoluteGrowth"]
+
             # print(zone_index_columns)
             zone_base_year = zone_target_growth[zone_index_columns + [base_year_column]]
-            # Adjust zone_etmt growth using scaler to make sure the sector level total estimated growth won't exceed 95% of target growth
-            zone_etmt_growth = zone_estimated_growth[
-                zone_index_columns + future_year_columns
-            ]
-            # Set zonal estimtaed growth to zero if negative whilst the corresponding target growth is positive
-            zone_etmt_growth = zone_etmt_growth.set_index(zone_index_columns)
-            zone_target_growth = zone_target_growth.set_index(zone_index_columns)
-            zone_etmt_growth[future_year_columns] = np.where(
-                (zone_etmt_growth[future_year_columns] < 0)
-                & (zone_target_growth[future_year_columns] >= 0),
-                0,  # Set negative estimated growth to zero when target growth is positive
-                zone_etmt_growth[future_year_columns],  # Keep original value otherwise
-            )
-            zone_etmt_growth = zone_etmt_growth.reset_index()
-            zone_target_growth = zone_target_growth.reset_index()
 
+            # Combine target growth with estimated growth to get a combined zone growth pattern
+            zone_comb_growth = calc.combine_growth(
+                zone_estimated_growth,
+                zone_target_growth,
+                zone_index_columns,
+                future_year_columns,
+                dlog_ratio,
+            )
+
+            # Merged combined future year growth with base year df
+            zone_comb_grth_base = zone_comb_growth.merge(
+                zone_base_year, on=zone_index_columns, how="left"
+            )
+            # Get estimated future year total
+            zone_estimated_tot = growth_calculator.yearly_totals_from_base(
+                zone_comb_grth_base, base_year_column, future_year_columns
+            )
+
+            sector_estimated_tot = zone_estimated_tot.groupby(sector_index_columns)[
+                future_year_columns
+            ].sum()
+            sector_estimated_tot = sector_estimated_tot.reset_index()
+
+            # Calculate sector ratio to scale the estimated fy totals to the target fy totals using NTEM's growth
+            sector_ratio = calc.calculate_ratio(
+                1,
+                sector_target_tot,
+                sector_estimated_tot,
+                future_year_columns,
+                sector_index_columns,
+                1e-5,
+            )
             # Get zone scaler from sector ratio
-            zone_scaler = zone_etmt_growth[zone_index_columns].copy()
+            zone_scaler = zone_estimated_tot[zone_index_columns].copy()
             zone_scaler = zone_scaler.merge(
-                sector_ratio_adjusted, on=sector_index_columns, how="left"
+                sector_ratio, on=sector_index_columns, how="left"
             )
             zone_scaler = zone_scaler[zone_index_columns + future_year_columns]
-            zone_scaled_etmt_growth = calc.calculate_product(
-                zone_etmt_growth,
+            # Scale the estimated fy total by the zone scaler to get the scaled estimated total: should be the final zonal tot for future years
+            zone_scaled_etmt_tot = calc.calculate_product(
+                zone_estimated_tot,
                 zone_scaler,
                 future_year_columns,
                 zone_index_columns,
             )
-
-            agg_zone_scaled_etmt_growth = zone_scaled_etmt_growth.groupby(
-                sector_index_columns
-            )[future_year_columns].sum()
-            sector_scaled_etmt_growth = sector_target_growth[
-                sector_index_columns
-            ].copy()
-            sector_scaled_etmt_growth = sector_scaled_etmt_growth.merge(
-                agg_zone_scaled_etmt_growth, on=sector_index_columns, how="left"
-            )
-
-            sector_bg_growth = calc.calculate_gap(
-                sector_target_growth,
-                sector_scaled_etmt_growth,
-                future_year_columns,
-                sector_index_columns,
-            )
-
-            # print(sector_bg_growth)
-
-            LOG.info(
-                f"Calculating weight to distribute background growth for each zone for {id}"
-            )
-
-            # calculate gap of growth between target (trend-based forecast) and estimated (from dlog) for each zone
-            zone_gap_growth = calc.calculate_gap(
-                zone_target_growth,
-                zone_scaled_etmt_growth,
-                future_year_columns,
-                zone_index_columns,
-            )
-            zone_etmt_growth = zone_etmt_growth.rename(
-                columns={col: f"{col}_etmt" for col in future_year_columns}
-            )
-            zone_gap_growth = zone_gap_growth.merge(
-                zone_etmt_growth, on=zone_index_columns, how="left"
-            )
-            # Apply conditional transformation
-            for col in future_year_columns:
-                zone_gap_growth[col] = np.where(
-                    (zone_gap_growth[col] < 0)
-                    & (~np.isclose(zone_gap_growth[f"{col}_etmt"], 0, atol=1e-5)),
-                    0,  # Set gap to zero when estimated growth isn't (almost) zero and gap is negative
-                    zone_gap_growth[col],  # Keep original value otherwise
-                )
-            # zone_gap_growth["zone_count"] = zone_gap_growth.groupby(
-            #     zone_index_columns[1:]
-            # )[zone_id].transform("count")
-            # Calculate weight to be used to distribute sector level background growth
-            zone_weight = calc.calculate_zone_weights(
-                zone_gap_growth,
-                future_year_columns,
-                zone_index_columns,
-                sector_index_columns,
-            )
-            # Get lower geographical level background growth
-            zone_bg_growth = zone_target_growth[zone_index_columns].copy()
-            zone_bg_growth = zone_bg_growth.merge(
-                sector_bg_growth, on=sector_index_columns, how="left"
-            )
-            zone_bg_growth = calc.calculate_product(
-                zone_bg_growth,
-                zone_weight,
-                future_year_columns,
-                zone_index_columns,
-            )
-            agg_zone_bg_growth = zone_bg_growth.groupby(sector_index_columns)[
-                future_year_columns
-            ].sum()
-            agg_zone_bg_growth = agg_zone_bg_growth.reset_index()
-
-            # Generating final adjusted data
-            zone_adjusted_growth = calc.calculate_sum(
-                zone_bg_growth,
-                zone_scaled_etmt_growth,
-                future_year_columns,
-                zone_index_columns,
-            )
-            zone_adjusted_growth = zone_adjusted_growth.merge(
+            zone_scaled_etmt_tot_base = zone_scaled_etmt_tot.merge(
                 zone_base_year, on=zone_index_columns, how="left"
             )
-            agg_zone_adj_growth = zone_adjusted_growth.groupby(sector_index_columns)[
-                future_year_columns
-            ].sum()
-            agg_zone_adj_growth = agg_zone_adj_growth.reset_index()
+            zone_scaled_etmt_tot_base = zone_scaled_etmt_tot_base[
+                zone_index_columns + [base_year_column] + future_year_columns
+            ]
+            # Get sector level scaled estimated tot
+            sector_scaled_etmt_tot = zone_scaled_etmt_tot_base.groupby(
+                sector_index_columns
+            )[[base_year_column] + future_year_columns].sum()
+            sector_scaled_etmt_tot = sector_scaled_etmt_tot.reset_index()
 
-            # Create target year total
-            zone_forecast = growth_calculator.yearly_totals_from_base(
-                zone_adjusted_growth, base_year_column, future_year_columns
-            )
-            agg_zone_forecast = zone_forecast.groupby(sector_index_columns)[
-                future_year_columns
-            ].sum()
-            agg_zone_forecast = agg_zone_forecast.reset_index()
-
+            # QA1: Check if sector level tot match between scaled estimated val and target tot val
             # Filter your dataframes before comparison for car mode only "m" == 3
             filtered_sector_target = sector_target_tot[sector_target_tot["m"] == 3]
-            filtered_sector_output = agg_zone_forecast[agg_zone_forecast["m"] == 3]
+            filtered_sector_output = sector_scaled_etmt_tot[
+                sector_scaled_etmt_tot["m"] == 3
+            ]
             # Check sector level output against target values
             comparator = ForecastComparator(
                 df1=filtered_sector_target,
@@ -1097,28 +990,55 @@ def run(config: inputs.DLitConfig):
 
             comparator.run_comparison()
 
-            # Calculate final adjustment factor between forecast (adjusted future year total) and estimated total to scale te growth related to large sites
+            # QA2: Check if there is negative tot in zone_scaled_etmt_tot
+            negative_tots = zone_scaled_etmt_tot[
+                zone_scaled_etmt_tot[future_year_columns].lt(0).any(axis=1)
+            ]
+            if not negative_tots.empty:
+                LOG.warning(
+                    f"Negative total values found in zone_scaled_etmt_tot for {id}: {negative_tots}"
+                )
+                print(negative_tots)
+            else:
+                print("No negative values found in zone_scaled_etmt_tot.")
+
+            # Calculate final adjustment factor between adjusted estimated growth and initial estimated growth to scale te growth related to large sites
+            zone_scaled_etmt_growth = growth_calculator.calculate_growth(
+                zone_scaled_etmt_tot_base,
+                base_year_column,
+                future_year_columns,
+                growth_type="absolute",
+            )
+
             zone_adjustment_factor = calc.calculate_ratio(
                 cap_ratio=1,  # no scaling
-                target_data=zone_forecast,  # final future year total combined ntem and dlog
-                estimated_data=results[f"zone_dlog_{id}"][
-                    "YearTotal"
-                ],  # original estimated future year total from dlog
+                target_data=zone_scaled_etmt_growth,  # final future year growth
+                estimated_data=zone_estimated_growth,  # original estimated future year growth from dlog
                 build_out_columns=future_year_columns,
-                sector_index_columns=zone_index_columns,
+                index_columns=zone_index_columns,
                 tolerance=1e-5,
             )
+            zone_adjustment_factor[future_year_columns] = zone_adjustment_factor[
+                future_year_columns
+            ].mask(
+                zone_adjustment_factor[future_year_columns] <= cap_ls_aj, cap_ls_aj
+            )  # for adjustment factors which are smaller than threshold value, set them to threshold value
             # Check for any negative values in the specified future year columns
-            negative_values_df = zone_adjustment_factor[
+            negative_ratios = zone_adjustment_factor[
                 zone_adjustment_factor[future_year_columns].lt(0).any(axis=1)
             ]
 
-            if not negative_values_df.empty:
-                print("Negative values found in dataframe 'zone_adjustment_factor':")
-                print(negative_values_df)
+            if not negative_ratios.empty:
+                LOG.warning(
+                    f"Negative values found in dataframe zone_adjustment_factor for {id}: : {negative_ratios}"
+                )
+                print(negative_ratios)
             else:
-                print("No negative values found in 'zone_adjustment_factor'.")
-
+                print("No negative values found in zone_adjustment_factor.")
+            LOG.info(
+                f"Scaling large site te growth for {id} with adjustment factor: {zone_adjustment_factor.shape}"
+            )
+            # Scale the large site te growth by the adjustment factor
             # Get trip end growth related to large sites
             zone_ls_te_grth = dlog_te_lsgrth_dfs[f"dlog_{id}"]
             # get LAD and Region
@@ -1135,30 +1055,32 @@ def run(config: inputs.DLitConfig):
                 zone_ls_te_grth,  # large site te growth
                 zone_adjustment_factor,  # adjustment factor
                 future_year_columns,
-                zone_index_columns_initial,
+                zone_index_columns,
+            )
+            sum_bf = zone_ls_te_grth[future_year_columns].sum()
+            sum_af = zone_ls_te_grth_scaled[future_year_columns].sum()
+            LOG.info(
+                f"Sum of large site te growth before scaling: {sum_bf}, after scaling: {sum_af}"
             )
             zone_ls_te_grth_scaled[future_year_columns] = zone_ls_te_grth_scaled[
                 future_year_columns
             ].where(zone_ls_te_grth_scaled[future_year_columns].abs() >= 1e-5, 0)
 
             LOG.info("Adding regions into final output dataframe")
-            zone_forecast = zone_forecast.merge(
+            zone_scaled_etmt_tot_base = zone_scaled_etmt_tot_base.merge(
                 lookup_lad_region[[sector_id, "ntem_region_id"]],
                 on=sector_id,
                 how="left",
             )
-            # Get subset for negative trip end values
-            negative_records = zone_forecast[
-                (zone_forecast[future_year_columns] < 0).any(axis=1)
-            ]
-            region_forecast = zone_forecast.groupby(["ntem_region_id", "p", "m"])[
-                [base_year_column] + future_year_columns
-            ].sum()
+
+            region_forecast = zone_scaled_etmt_tot_base.groupby(
+                ["ntem_region_id", "p", "m"]
+            )[[base_year_column] + future_year_columns].sum()
             region_forecast = region_forecast.reset_index()
 
-            te_output[id] = zone_forecast
+            te_output[id] = zone_scaled_etmt_tot
 
-            te_ls_output[id] = zone_ls_te_grth
+            te_ls_output[id] = zone_ls_te_grth_scaled
 
             LOG.info("Exporting key output data")
             inter_output_path = key_te_folder / f"output_intermediate"
@@ -1176,66 +1098,58 @@ def run(config: inputs.DLitConfig):
                     "data": sector_estimated_growth,
                     "file": f"{sector}_estimated_growth_{id}.csv",
                 },
-                "sector_ratio": {
-                    "data": sector_ratio,
-                    "file": f"{sector}_ratio_{id}.csv",
-                },
-                "sector_bg_growth": {
-                    "data": sector_bg_growth,
-                    "file": f"{sector}_background_growth_{id}.csv",
-                },
                 "zone_target_growth": {
                     "data": zone_target_growth,
                     "file": f"zone_target_growth_{id}.csv",
-                },
-                "zone_gap_growth": {
-                    "data": zone_gap_growth,
-                    "file": f"zone_gap_growth_{id}.csv",
-                },
-                "zone_weight": {
-                    "data": zone_weight,
-                    "file": f"zone_weight_{id}.csv",
-                },
-                "zone_bg_growth": {
-                    "data": zone_bg_growth,
-                    "file": f"zone_background_growth_{id}.csv",
-                },
-                "agg_zone_bg_growth": {
-                    "data": agg_zone_bg_growth,
-                    "file": f"agg_zone_background_growth_{id}.csv",
                 },
                 "zone_estimated_growth": {
                     "data": zone_estimated_growth,
                     "file": f"zone_estimated_growth_{id}.csv",
                 },
+                "zone_combined_growth": {
+                    "data": zone_comb_growth,
+                    "file": f"zone_combined_growth_{id}.csv",
+                },
+                "zone_estimated_tot": {
+                    "data": zone_estimated_tot,
+                    "file": f"zone_estimated_tot_{id}.csv",
+                },
+                "sector_estimated_tot": {
+                    "data": sector_estimated_tot,
+                    "file": f"{sector}_estimated_tot_{id}.csv",
+                },
+                "sector_ratio": {
+                    "data": sector_ratio,
+                    "file": f"{sector}_ratio_{id}.csv",
+                },
                 "zone_scaler": {"data": zone_scaler, "file": f"zone_scaler_{id}.csv"},
+                "zone_scaled_etmt_tot": {
+                    "data": zone_scaled_etmt_tot,
+                    "file": f"zone_scaled_estimated_tot_{id}.csv",  # final output
+                },
+                "sector_scaled_etmt_tot": {
+                    "data": sector_scaled_etmt_tot,
+                    "file": f"{sector}_scaled_estimated_tot_{id}.csv",  # final output
+                },
+                "sector_target_tot": {
+                    "data": sector_target_tot,
+                    "file": f"{sector}_target_tot_{id}.csv",  # for comparison
+                },
                 "zone_scaled_etmt_growth": {
                     "data": zone_scaled_etmt_growth,
                     "file": f"zone_scaled_estimated_growth_{id}.csv",
                 },
-                "zone_adjusted_growth": {
-                    "data": zone_adjusted_growth,
-                    "file": f"zone_adjusted_growth_{id}.csv",
-                },
-                "agg_zone_adj_growth": {
-                    "data": agg_zone_adj_growth,
-                    "file": f"agg_zone_adjusted_growth_{id}.csv",
-                },
-                "sector_target_tot": {
-                    "data": sector_target_tot,
-                    "file": f"{sector}_target_tot_{id}.csv",
-                },
-                "zone_target_tot": {
-                    "data": zone_target_tot,
-                    "file": f"zone_target_tot_{id}.csv",
+                "zone_adjustment_factor": {
+                    "data": zone_adjustment_factor,
+                    "file": f"zone_adjustment_factor_{id}.csv",  # for checking
                 },
                 "zone_ls_te_grth": {
                     "data": zone_ls_te_grth,
-                    "file": f"zone_largesite_te_growth_{id}.csv",
+                    "file": f"zone_largesite_te_growth_{id}.csv",  # for checking
                 },
                 "sector_ls_te_grth": {
                     "data": sector_ls_te_grth,
-                    "file": f"{sector}_largesite_te_growth_{id}.csv",
+                    "file": f"{sector}_largesite_te_growth_{id}.csv",  # for checking
                 },
             }
 
@@ -1256,17 +1170,17 @@ def run(config: inputs.DLitConfig):
 
             # Combine data and file names into a single dictionary
             key_outputs_and_names = {
-                "zone_fy_tot": {
-                    "data": zone_forecast,
+                "zone_scaled_etmt_tot": {
+                    "data": zone_scaled_etmt_tot,
                     "file": f"normits_tripend_fy_{id}.csv",
                 },
-                "zone_fy_tot_negative": {
-                    "data": negative_records,
-                    "file": f"normits_tripend_fy_{id}_negative.csv",
+                "sector_scaled_etmt_tot": {
+                    "data": sector_scaled_etmt_tot,
+                    "file": f"{sector}_tripend_fy_{id}.csv",
                 },
-                "agg_zone_future_year_tot": {
-                    "data": agg_zone_forecast,
-                    "file": f"normits_agg_tripend_fy_{id}.csv",
+                "zone_fy_tot_negative": {
+                    "data": negative_tots,
+                    "file": f"normits_tripend_fy_{id}_negative.csv",
                 },
                 "region_forecast": {
                     "data": region_forecast,
@@ -1276,8 +1190,8 @@ def run(config: inputs.DLitConfig):
                     "data": zone_adjustment_factor,
                     "file": f"normits_zone_ajfactor_{id}.csv",
                 },
-                "zone_fy_ls_grth": {
-                    "data": zone_ls_te_grth,
+                "zone_fy_ls_grth_scaled": {
+                    "data": zone_ls_te_grth_scaled,
                     "file": f"normits_largesite_tripend_fy_{id}.csv",
                 },
             }
@@ -1292,7 +1206,7 @@ def run(config: inputs.DLitConfig):
                 # Export without filtering if sector_list is empty
                 for key, value in key_outputs_and_names.items():
                     utilities.write_to_csv(key_te_folder / value["file"], value["data"])
-    LOG.info("Finally scale attraction according to the production total")
+    LOG.info("Finally scale the attraction according to the production total")
     # Scale attraction according to the production total
     for cat in categories:
         prod_df = te_output[f"{cat}_prod"]
@@ -1330,31 +1244,41 @@ def run(config: inputs.DLitConfig):
         # Apply the condition safely with proper parentheses
         condition = (
             ls_attr_scaled[future_year_columns] > attr_scaled[future_year_columns]
-        ) & (ls_attr_scaled[future_year_columns] > 0)
+        )  # & (ls_attr_scaled[future_year_columns] > 0)
 
-        ls_attr_scaled_aj[future_year_columns] = ls_attr_scaled[
-            future_year_columns
-        ].where(
-            condition,
-            attr_scaled[future_year_columns],
+        ls_attr_scaled_aj[future_year_columns] = attr_scaled[future_year_columns].where(
+            condition, ls_attr_scaled[future_year_columns]
         )
         # Reset index to original structure if needed
         attr_scaled = attr_scaled.reset_index()
         ls_attr_scaled = ls_attr_scaled.reset_index()
         ls_attr_scaled_aj = ls_attr_scaled_aj.reset_index()
-        # Filter for m == 3
-        filtered_attr_scaled = attr_scaled[attr_scaled["m"].isin(mode_list)]
-        filtered_ls_attr_scaled = ls_attr_scaled[ls_attr_scaled["m"].isin(mode_list)]
 
-        # Write to CSV
-        LOG.info(f"Writing scaled tripends for {cat} category")
-        utilities.write_to_csv(
-            key_te_folder / f"normits_tripend_fy_{cat}_attr_scaled.csv",
-            filtered_attr_scaled,
-        )
-        utilities.write_to_csv(
-            key_te_folder / f"normits_largesite_tripend_fy_{cat}_attr_scaled.csv",
-            filtered_ls_attr_scaled,
-        )
+        # Prepare the mapping of output keys, dataframes, and file names
+        key_scaled_attrs = {
+            "attr_scaled": {
+                "data": attr_scaled,
+                "file": f"normits_tripend_fy_{cat}_attr_scaled.csv",
+            },
+            "ls_attr_scaled": {
+                "data": ls_attr_scaled,
+                "file": f"normits_largesite_tripend_fy_{cat}_attr_scaled.csv",
+            },
+            "ls_attr_scaled_aj": {
+                "data": ls_attr_scaled_aj,
+                "file": f"normits_largesite_tripend_fy_{cat}_attr_scaled_aj.csv",
+            },
+        }
+
+        LOG.info(f"Writing scaled attractions for {cat} category")
+
+        # If mode_list is provided and not empty, filter by it
+        if mode_list:
+            for key, value in key_scaled_attrs.items():
+                filtered_data = value["data"][value["data"]["m"].isin(mode_list)]
+                utilities.write_to_csv(key_te_folder / value["file"], filtered_data)
+        else:
+            for key, value in key_outputs_and_names.items():
+                utilities.write_to_csv(key_te_folder / value["file"], value["data"])
 
     LOG.info("Data processing completed")

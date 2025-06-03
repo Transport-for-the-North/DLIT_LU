@@ -169,6 +169,8 @@ tripend:
   # Whether or not to export files for viz
   export_for_viz: True
 
-  # proportion of 
+  # proportion of growth from estimated Dlog data
+  dlog_grth_proportion: 0.5
+  cap_ls_adj_factor: 0.5
 
   
