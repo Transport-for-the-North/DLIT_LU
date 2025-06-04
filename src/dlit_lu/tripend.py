@@ -860,14 +860,14 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
             )
-            zone_target_tot = growth_calculator.target_yeartot(
-                results[f"zone_dlog_{id}"]["YearTotal"],  # base year total from dlog
-                results[f"zone_ntem_{id}"][
-                    "YearTotal"
-                ],  # fugure year target derived from ntem growth
-                base_year_column,
-                future_year_columns,
-            )
+            # zone_target_tot = growth_calculator.target_yeartot(
+            #     results[f"zone_dlog_{id}"]["YearTotal"],  # base year total from dlog
+            #     results[f"zone_ntem_{id}"][
+            #         "YearTotal"
+            #     ],  # fugure year target derived from ntem growth
+            #     base_year_column,
+            #     future_year_columns,
+            # )
 
             sector_target_growth = growth_calculator.target_growth(
                 results[f"{sector}_dlog_{id}"][
@@ -1059,9 +1059,18 @@ def run(config: inputs.DLitConfig):
             )
             sum_bf = zone_ls_te_grth[future_year_columns].sum()
             sum_af = zone_ls_te_grth_scaled[future_year_columns].sum()
+            # Combine into a DataFrame
+            summary_df = pd.DataFrame(
+                [sum_bf, sum_af], index=["BeforeScaling", "AfterScaling"]
+            )
+            utilities.write_to_csv(
+                key_te_folder / f"large_site_te_growth_summary_{id}.csv", summary_df
+            )
             LOG.info(
                 f"Sum of large site te growth before scaling: {sum_bf}, after scaling: {sum_af}"
             )
+            # Create a dataframe contaiting the sum_bf and sum_af to be exported
+
             zone_ls_te_grth_scaled[future_year_columns] = zone_ls_te_grth_scaled[
                 future_year_columns
             ].where(zone_ls_te_grth_scaled[future_year_columns].abs() >= 1e-5, 0)
@@ -1222,7 +1231,7 @@ def run(config: inputs.DLitConfig):
         scaling_factor = (
             prod_totals.divide(attr_totals).replace([np.inf, -np.inf], np.nan).fillna(1)
         )
-        print("Scaling factor:\n", scaling_factor)
+        # print("Scaling factor:\n", scaling_factor)
         # Apply scaling
         attr_scaled = attr_df.copy()
         ls_attr_scaled = ls_attr_df.copy()

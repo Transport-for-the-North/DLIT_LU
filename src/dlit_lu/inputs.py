@@ -425,7 +425,8 @@ class TripendsConfig:
     ntem_zone_nhb_prod: pydantic.FilePath
     ntem_zone_nhb_attr: pydantic.FilePath
     export_for_viz: bool
-    dlog_grth_ratio: float
+    dlog_grth_proportion: float
+    cap_ls_adj_factor: float
     dlog_te_tot_path: Optional[pathlib.Path] = None
     dlog_te_lsgrth_path: Optional[pathlib.Path] = None
 
