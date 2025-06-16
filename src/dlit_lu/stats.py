@@ -1,14 +1,10 @@
-"""determination of cut-off values (thresholds) 
-"""
+"""determination of cut-off values (thresholds)"""
 
 import pandas as pd
 import numpy as np
 import pathlib
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-
-
 
 
 def plot_distribution(
@@ -27,7 +23,7 @@ def plot_distribution(
     """
     for col in columns:
         plt.figure(figsize=(8, 6))
-        sns.histplot(df[col], kde=True, bins=100, color="skyblue")
+        sns.histplot(df[col], kde=True, bins=100, color="skyblue", stat="density")
 
         # Calculate key statistics
         mean = df[col].mean()

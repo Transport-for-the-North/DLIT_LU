@@ -33,6 +33,33 @@ LOG = logging.getLogger(__name__)
 
 
 class BaseZoneHandler:
+    """
+    Handles geographic zone configuration and data loading for different spatial boundary types
+    used in the land use and forecasting model.
+
+    This class manages metadata and resources associated with multiple geographic zoning systems
+    such as LSOA, MSOA, NorMITs, NOHAM, and NORMS. It provides a unified interface to access key
+    zone information including shapefile paths, grouping columns, proportion columns for data
+    translation, centroid files for households, employment, and population, as well as mappings
+    to local authority districts (LADs).
+
+    Attributes:
+        config (inputs.DLitConfig): The configuration object containing all relevant paths and settings.
+        geo_boundary (inputs.GeoBoundary): The geographic boundary type in use, either passed as an
+            override or taken from the config.
+        zone_info_map (Dict[inputs.GeoBoundary, Dict[str, Any]]): Mapping from geo boundary types
+            to their respective metadata dictionaries.
+        zone_info (Dict[str, Any]): Metadata for the selected geographic boundary.
+        zone_gdf (GeoDataFrame): The loaded shapefile as a GeoDataFrame for the selected zone.
+
+    Raises:
+        ValueError: If an unsupported geographic boundary is specified.
+
+    Usage:
+        Initialize with a config and optionally specify a geo boundary override. Access
+        `zone_info` for metadata and `zone_gdf` for spatial data associated with the zone.
+    """
+
     def __init__(
         self,
         config: inputs.DLitConfig,
@@ -1728,15 +1755,33 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     base_year_int = int(base_year)
     end_year = config.large_sites.end_year
     end_year_int = int(end_year)
-    key_output_path = config.output_folder / f"M3_ls_key_outputs"
+    key_output_path = config.output_folder / "M3_ls_key_outputs"
     key_output_path.mkdir(exist_ok=True)
-    key_agg_path = config.output_folder / f"M3_ls_aggregation"
+    # subfolders for key outputs
+    key_site_path = key_output_path / f"sites_{model_zone}_outputs"
+    key_site_path.mkdir(exist_ok=True)
+    key_normits_path = key_output_path / "normits_outputs"
+    key_normits_path.mkdir(exist_ok=True)
+    key_agg_path = config.output_folder / "M3_ls_aggregation"
     key_agg_path.mkdir(exist_ok=True)
 
     key_columns = ["site_reference_id", "easting", "northing", "web_tag_certainty"]
     build_out_columns = [
         str(year) for year in range(base_year_int + 1, end_year_int + 1)
     ]
+    visualization = config.large_sites.viz_distribution
+    export_by_output = config.large_sites.export_by_output
+
+    LOG.info("Instantiating the key classes")
+    zt = ZoneTranslator(config)
+    zp = ZoneProcessor(config)
+    site_zone_processer = SiteZoneProcessor(config)
+    zone_info = zp.zone_info_map.get(zp.geo_boundary, {})
+    if not zone_info:
+        LOG.error(f"No zone information found for zone {zp.geo_boundary}")
+        return
+
+    zone_id = zone_info.get("group_by_column")
 
     LOG.info("Loading key inputs")
     # Create probability values for each certainty
@@ -1760,7 +1805,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     columns_to_explore = (
         res_weight_dict_df["variables"].str.replace("_index", "", regex=False).tolist()
     )
-    print(columns_to_explore)
+    # print(columns_to_explore)
     # Create emp_weight_dict directly by loading the relevant columns and converting them into a dictionary
     emp_weight_dict_df = pd.read_csv(
         config.large_sites.index_weights_path, usecols=["variables", "employment"]
@@ -1820,34 +1865,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         index_col=None,
     )
 
-    LOG.info("Instantiating the key classes")
-    zt = ZoneTranslator(config)
-    zp = ZoneProcessor(config)
-    site_zone_processer = SiteZoneProcessor(config)
-    zone_info = zp.zone_info_map.get(zp.geo_boundary, {})
-    if not zone_info:
-        LOG.error(f"No zone information found for zone {zp.geo_boundary}")
-        return
-
-    zone_id = zone_info.get("group_by_column")
-    # zone_to_lad_path = zone_info.get("zone_to_lad_path")
-    # lad_id = zone_info.get("lad_id_col")
-    # zone_to_lad_prop = zone_info.get("zone_to_lad_prop")
-
-    LOG.info("Creating list of sites with estimated development values")
-    # list of residential sites with estimated values
-    resi_estsite_reference_ids = get_site_reference_ids(
-        site_assessment["residential"],
-        "missing_area",
-        "missing_gfa_or_dwellings_no_site_area",
-    )
-    # list of employment sites with estimated values
-    emp_estsite_reference_ids = get_site_reference_ids(
-        site_assessment["employment"],
-        "missing_area",
-        "missing_gfa_or_dwellings_no_site_area",
-    )
-
     LOG.info("Processing base year land use data")
     by_data_tot = tot_by_pop_dwel_emp(
         by_lsoa_hh_type,
@@ -1897,14 +1914,14 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
 
     # Concatenate the DataFrames along the columns
     combined_by = pd.concat([by_hh, by_pop, by_job], axis=1)
-    # by_columns_stats = [
-    #     "household",
-    #     "population",
-    #     "jobs",
-    #     "ho_den",
-    #     "po_den",
-    #     "jo_den",
-    # ]
+    by_columns_stats = [
+        "household",
+        "population",
+        "jobs",
+        "ho_den",
+        "po_den",
+        "jo_den",
+    ]
     # Optionally, remove duplicate columns if they exist
     combined_by = combined_by.loc[:, ~combined_by.columns.duplicated()]
 
@@ -1952,21 +1969,9 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         # Save the DataFrame to a CSV file
         utilities.write_to_csv(key_output_path / totals_df_file, totals_df)
 
-    # # print(combined_by)
-
-    # # Check for duplicated LSOA21CD values
-    # # Boolean mask of duplicated values
-    # duplicates_mask = combined_by["LSOA21CD"].duplicated(keep=False)
-    # # Print how many are duplicated
-    # print("Number of duplicated LSOA21CD values:", duplicates_mask.sum())
-    # # Optionally view the duplicates
-    # print(combined_by[duplicates_mask].sort_values("LSOA21CD"))
-
     LOG.info("Processing base year emp with sic_2d")
-
     # Translate LSOA to pre-defined model zone
     if model_zone_enum == inputs.GeoBoundary.LSOA:
-
         by_zone_job_sic_data = zt.translate_data(
             data=by_lsoa_jobs_sic_soc,
             category="employment",
@@ -1976,7 +1981,6 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             aggregate_by_zone=True,
         )
     else:
-
         by_zone_job_sic_data = zt.translate_data(
             data=by_lsoa_jobs_sic_soc,
             category="employment",
@@ -1986,13 +1990,28 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
             aggregate_by_zone=True,
         )
 
-    # LOG.info("Processing base year stats")
+    LOG.info("Processing base year stats")
+    by_data_stats = stats.basic_statistics(combined_by, by_columns_stats)
+    by_data_file = f"by_{model_zone}_data.csv"
+    by_data_stats_file = f"by_{model_zone}_data_stats.csv"
 
-    # by_data_stats = stats.basic_statistics(combined_by, by_columns_stats)
-    # by_data_file = f"by_{model_zone}_data.csv"
-    # by_data_stats_file = f"by_{model_zone}_data_stats.csv"
-    # utilities.write_to_csv(key_output_path / by_data_file, combined_by)
-    # utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
+    if export_by_output:
+        utilities.write_to_csv(key_output_path / by_data_file, combined_by)
+        utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
+
+    LOG.info("Creating list of sites with estimated development values")
+    # list of residential sites with estimated values
+    resi_estsite_reference_ids = get_site_reference_ids(
+        site_assessment["residential"],
+        "missing_area",
+        "missing_gfa_or_dwellings_no_site_area",
+    )
+    # list of employment sites with estimated values
+    emp_estsite_reference_ids = get_site_reference_ids(
+        site_assessment["employment"],
+        "missing_area",
+        "missing_gfa_or_dwellings_no_site_area",
+    )
 
     LOG.info("Processing site data for year 2024 upwards")
     res_zone_sites = process_site_data(
@@ -2034,6 +2053,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     )
 
     LOG.info("Procesing stats and calculating zscores of each attribute")
+
     res_site_count, res_site_zone, res_large_site_zone, res_large_site_list = (
         large_sites_res.large_sites_selection(
             category="residential",
@@ -2057,47 +2077,32 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         )
     )
 
-    LOG.info("Exporting key outputs by sites")
+    LOG.info("Exporting key outputs by sites including statistics")
 
-    res_site_count_summary_file = f"residential_sites_count_{model_zone}_summary.csv"
-    emp_site_count_summary_file = f"employment_sites_count_{model_zone}_summary.csv"
-    utilities.write_to_csv(
-        config.output_folder / res_site_count_summary_file, res_site_count
-    )
-    utilities.write_to_csv(
-        config.output_folder / emp_site_count_summary_file, emp_site_count
-    )
+    site_exports = [
+        (f"residential_sites_count_{model_zone}_summary.csv", res_site_count),
+        (f"employment_sites_count_{model_zone}_summary.csv", emp_site_count),
+        (f"residential_site_{model_zone}.csv", res_site_zone),
+        (f"employment_site_{model_zone}.csv", emp_site_zone),
+        (f"large_residential_site_{model_zone}.csv", res_large_site_zone),
+        (f"large_employment_site_{model_zone}.csv", emp_large_site_zone),
+        (
+            f"residential_sites_stats_{model_zone}.csv",
+            large_sites_res._calculate_statistics(),
+        ),
+        (
+            f"employment_sites_stats_{model_zone}.csv",
+            large_sites_emp._calculate_statistics(),
+        ),
+    ]
 
-    res_file_name = f"residential_site_{model_zone}.csv"
-    emp_file_name = f"employment_site_{model_zone}.csv"
-
-    utilities.write_to_csv(key_output_path / res_file_name, res_site_zone)
-    utilities.write_to_csv(key_output_path / emp_file_name, emp_site_zone)
-
-    large_res_sites_file_name = f"large_residential_site_{model_zone}.csv"
-    large_emp_sites_file_name = f"large_employment_site_{model_zone}.csv"
-    utilities.write_to_csv(
-        key_output_path / large_res_sites_file_name, res_large_site_zone
-    )
-    utilities.write_to_csv(
-        key_output_path / large_emp_sites_file_name, emp_large_site_zone
-    )
-
-    LOG.info("Calculating statistics for residential and employment sites")
-    res_stats = large_sites_res._calculate_statistics()
-    emp_stats = large_sites_emp._calculate_statistics()
-
-    res_stats_file = f"residential_sites_stats_{model_zone}.csv"
-    emp_stats_file = f"employment_sites_stats_{model_zone}.csv"
-
-    utilities.write_to_csv(key_output_path / res_stats_file, res_stats)
-    utilities.write_to_csv(key_output_path / emp_stats_file, emp_stats)
-
-    visualization = config.large_sites.viz_distribution
+    # Write each to CSV
+    for filename, data in site_exports:
+        utilities.write_to_csv(key_site_path / filename, data)
 
     if visualization:
         LOG.info("Attribute value distribution plot")
-        plot_path = config.output_folder / "M3_plot_distribution_attributes"
+        plot_path = key_site_path / "plot_variable_distribution"
         plot_path.mkdir(exist_ok=True)
 
         LOG.info(f"Visualizing the distribution of residential site attributes")
@@ -2406,7 +2411,7 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
         }
         for name, df in normits_datasets.items():
             # Write to CSV
-            utilities.write_to_csv(key_output_path / f"{name}.csv", df)
+            utilities.write_to_csv(key_normits_path / f"{name}.csv", df)
 
     else:
         LOG.info(

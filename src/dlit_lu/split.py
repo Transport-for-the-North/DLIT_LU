@@ -31,7 +31,7 @@ LOG = logging.getLogger(__name__)
 
 
 class Ratios(ls.BaseZoneHandler):
-    """A class for calculating GB-wide distributions for households, travellers, and employment types."""
+    """A class for calculating distributions for households, travellers, and employment types."""
 
     def __init__(
         self,
@@ -234,36 +234,6 @@ class Ratios(ls.BaseZoneHandler):
 
         return ratios.reset_index()
 
-    # def zone_soc_over_sic_ratios(
-    #     self, df: pd.DataFrame, job_type_columns: List[str]
-    # ) -> pd.DataFrame:
-    #     """
-    #     Calculates the SOC ratio within each (zone_id, sic_2d) based on jobs, using MultiIndex.
-
-    #     Parameters
-    #     ----------
-    #     df : pd.DataFrame
-    #         Input DataFrame with columns: 'zone_id', 'sic_2d', 'soc', 'jobs'
-
-    #     Returns
-    #     -------
-    #     pd.DataFrame
-    #         DataFrame with MultiIndex (zone_id, sic_2d, soc) and 'jobs' and 'soc_ratio' columns.
-    #     """
-    #     zone_id = self.zone_info["group_by_column"]
-    #     group_by = [zone_id] + job_type_columns
-    #     # Set MultiIndex
-    #     zonal_ratios = df.groupby(group_by)["jobs"].sum().to_frame()
-    #     # Calculate SOC ratios
-    #     zonal_ratios["ratios"] = zonal_ratios["jobs"] / zonal_ratios.groupby(
-    #         level=[0, 1]
-    #     )["jobs"].transform("sum")
-
-    #     # Step 3: Fill NaNs caused by division by zero with 0
-    #     zonal_ratios["ratios"] = zonal_ratios["ratios"].fillna(0)
-
-    #     return zonal_ratios.reset_index()
-
     def zone_soc_over_sic_ratios(
         self,
         df: pd.DataFrame,
@@ -415,72 +385,72 @@ class Ratios(ls.BaseZoneHandler):
         # # zonal_ratios = zonal_ratios.fillna(0)
         # return grouped.reset_index()
 
-    def zone_ratios_by_type_fy_dask(
-        self,
-        data: dd.DataFrame,
-        dimension_columns: Optional[List[str]],
-        build_out_columns: List[str],
-        npartitions: int,
-    ) -> pd.DataFrame:
-        """
-        Calculates the proportion of each household type per zone and year using Dask.
+    # def zone_ratios_by_type_fy_dask(
+    #     self,
+    #     data: dd.DataFrame,
+    #     dimension_columns: Optional[List[str]],
+    #     build_out_columns: List[str],
+    #     npartitions: int,
+    # ) -> pd.DataFrame:
+    #     """
+    #     Calculates the proportion of each household type per zone and year using Dask.
 
-        Parameters
-        ----------
-        data : dd.DataFrame
-            Input dask data by zone and data type, with counts in year columns.
-        dimension_columns : Optional[List[str]]
-            Columns that define household segmentations (e.g. size, age, income).
-        build_out_columns : List[str]
-            List of year-based columns (e.g., ['2024', '2025', ...]) with household counts.
-        npartitions : int, default=4
-            Number of partitions to divide the Dask DataFrame into. Higher values may improve parallelism
-            but increase overhead. Lower values reduce overhead but may use more memory per partition.
+    #     Parameters
+    #     ----------
+    #     data : dd.DataFrame
+    #         Input dask data by zone and data type, with counts in year columns.
+    #     dimension_columns : Optional[List[str]]
+    #         Columns that define household segmentations (e.g. size, age, income).
+    #     build_out_columns : List[str]
+    #         List of year-based columns (e.g., ['2024', '2025', ...]) with household counts.
+    #     npartitions : int, default=4
+    #         Number of partitions to divide the Dask DataFrame into. Higher values may improve parallelism
+    #         but increase overhead. Lower values reduce overhead but may use more memory per partition.
 
-        Returns
-        -------
-        dd.DataFrame
-            Dask DataFrame with household type proportions per zone and year.
-        """
-        zone_id = self.zone_info["group_by_column"]
-        index_cols = [zone_id] + (dimension_columns if dimension_columns else [])
+    #     Returns
+    #     -------
+    #     dd.DataFrame
+    #         Dask DataFrame with household type proportions per zone and year.
+    #     """
+    #     zone_id = self.zone_info["group_by_column"]
+    #     index_cols = [zone_id] + (dimension_columns if dimension_columns else [])
 
-        data = data.repartition(npartitions=npartitions)
+    #     data = data.repartition(npartitions=npartitions)
 
-        # Optionally, persist intermediate results to avoid recomputation
-        data = data.persist()
+    #     # Optionally, persist intermediate results to avoid recomputation
+    #     data = data.persist()
 
-        # Convert columns to float32 to reduce memory usage
-        for col in build_out_columns:
-            data[col] = data[col].astype("float32")
+    #     # Convert columns to float32 to reduce memory usage
+    #     for col in build_out_columns:
+    #         data[col] = data[col].astype("float32")
 
-        # Group by zone + dimension(s) to get household counts
-        grouped = data.groupby(index_cols)[build_out_columns].sum()
+    #     # Group by zone + dimension(s) to get household counts
+    #     grouped = data.groupby(index_cols)[build_out_columns].sum()
 
-        # Group by zone only to get totals
-        total_per_zone = data.groupby(zone_id)[build_out_columns].sum()
+    #     # Group by zone only to get totals
+    #     total_per_zone = data.groupby(zone_id)[build_out_columns].sum()
 
-        # Reset index to merge
-        grouped = grouped.reset_index()
-        total_per_zone = total_per_zone.reset_index()
+    #     # Reset index to merge
+    #     grouped = grouped.reset_index()
+    #     total_per_zone = total_per_zone.reset_index()
 
-        # Rename total columns
-        total_per_zone = total_per_zone.rename(
-            columns={col: f"{col}_total" for col in build_out_columns}
-        )
+    #     # Rename total columns
+    #     total_per_zone = total_per_zone.rename(
+    #         columns={col: f"{col}_total" for col in build_out_columns}
+    #     )
 
-        # Merge and compute proportions
-        merged = grouped.merge(total_per_zone, on=zone_id, how="left")
-        for year in build_out_columns:
-            merged[year] = merged[year] / merged[f"{year}_total"]
+    #     # Merge and compute proportions
+    #     merged = grouped.merge(total_per_zone, on=zone_id, how="left")
+    #     for year in build_out_columns:
+    #         merged[year] = merged[year] / merged[f"{year}_total"]
 
-        merged = merged.drop(columns=[f"{col}_total" for col in build_out_columns])
-        merged = merged.fillna(0)
-        # Convert merged columns to float32 to reduce memory usage after computation
-        for year in build_out_columns:
-            merged[year] = merged[year].astype("float32")
+    #     merged = merged.drop(columns=[f"{col}_total" for col in build_out_columns])
+    #     merged = merged.fillna(0)
+    #     # Convert merged columns to float32 to reduce memory usage after computation
+    #     for year in build_out_columns:
+    #         merged[year] = merged[year].astype("float32")
 
-        return merged
+    #     return merged
 
     def zone_ratios_by_type_single_year(
         self,
@@ -639,107 +609,233 @@ class Ratios(ls.BaseZoneHandler):
         )
         return data_ratios.reset_index()
 
+    # def ntem_pop_car_ratios(
+    #     self, base_year_column: str, build_out_columns: List[str]
+    # ) -> pd.DataFrame:
+    #     """
+    #     Extrapolate missing future year values and calculate ratios
+    #     relative to a specified base year.
+
+    #     Parameters:
+    #     -----------
+    #     base_year : str
+    #         The year used as the reference for ratio calculations (e.g., "2023").
+    #     build_out_column : List[str]
+    #         Full list of desired build-out years as strings (e.g., ["2024", ..., "2066"]).
+
+    #     Returns:
+    #     --------
+    #     pd.DataFrame
+    #         DataFrame with extrapolated values and ratio columns.
+    #     """
+    #     data = pd.read_csv(self.zone_info["ntem_pop_car_ratio"])
+    #     # Extract available year columns in the DataFrame
+    #     year_cols_in_data = [col for col in data.columns if col.isdigit()]
+    #     ntem_future_year_list = [
+    #         y for y in year_cols_in_data if int(y) >= int(base_year_column)
+    #     ]
+    #     extrapolated_years = [
+    #         y for y in build_out_columns if y not in ntem_future_year_list
+    #     ]
+
+    #     extended_data = data.copy()
+    #     x_known = np.array([int(y) for y in ntem_future_year_list])
+
+    #     for row_idx, row in extended_data.iterrows():
+    #         y_known = row[ntem_future_year_list].values.astype("float32")
+
+    #         # Fit linear trend
+    #         coeffs = np.polyfit(x_known, y_known, deg=1)
+    #         y_pred = np.polyval(coeffs, [int(y) for y in extrapolated_years])
+
+    #         # Fill extrapolated values
+    #         for i, year in enumerate(extrapolated_years):
+    #             extended_data.at[row_idx, year] = y_pred[i]
+
+    #     # Calculate ratios for all years in build_out_column vs base_year
+    #     for year in build_out_columns:
+    #         extended_data[year] = extended_data[year].astype("float32") / extended_data[
+    #             base_year_column
+    #         ].astype("float32")
+
+    #     return extended_data.drop(columns=[base_year_column])
+
     def ntem_pop_car_ratios(
         self, base_year_column: str, build_out_columns: List[str]
     ) -> pd.DataFrame:
         """
-        Extrapolate missing future year values and calculate ratios
-        relative to a specified base year.
+        Extrapolates missing NTEM population car ownership values using compound growth
+        based on the last two known forecast years. Then, calculates the ratio of each
+        future year relative to the specified base year.
 
         Parameters:
         -----------
-        base_year : str
-            The year used as the reference for ratio calculations (e.g., "2023").
-        build_out_column : List[str]
-            Full list of desired build-out years as strings (e.g., ["2024", ..., "2066"]).
+        base_year_column : str
+            The reference year for ratio calculations (e.g., "2023").
+        build_out_columns : List[str]
+            Full list of desired future years as strings (e.g., ["2024", ..., "2066"]).
 
         Returns:
         --------
         pd.DataFrame
-            DataFrame with extrapolated values and ratio columns.
+            A DataFrame containing ratio values for each build-out year,
+            normalized against the base year.
         """
+        # Load input NTEM population car ownership ratio data
         data = pd.read_csv(self.zone_info["ntem_pop_car_ratio"])
-        # Extract available year columns in the DataFrame
-        year_cols_in_data = [col for col in data.columns if col.isdigit()]
-        ntem_future_year_list = [
-            y for y in year_cols_in_data if int(y) >= int(base_year_column)
-        ]
-        extrapolated_years = [
-            y for y in build_out_columns if y not in ntem_future_year_list
-        ]
 
-        extended_data = data.copy()
-        x_known = np.array([int(y) for y in ntem_future_year_list])
+        # Identify year columns in the input file
+        year_cols = [col for col in data.columns if col.isdigit()]
+        known_years = sorted(
+            [y for y in year_cols if int(y) >= int(base_year_column)], key=int
+        )
+        extrap_years = [y for y in build_out_columns if y not in known_years]
 
-        for row_idx, row in extended_data.iterrows():
-            y_known = row[ntem_future_year_list].values.astype("float32")
+        if len(known_years) < 2:
+            raise ValueError(
+                "At least two known NTEM years are required for extrapolation."
+            )
 
-            # Fit linear trend
-            coeffs = np.polyfit(x_known, y_known, deg=1)
-            y_pred = np.polyval(coeffs, [int(y) for y in extrapolated_years])
+        lower_year, upper_year = known_years[-2], known_years[-1]
+        lower = data[lower_year].astype("float32")
+        upper = data[upper_year].astype("float32")
 
-            # Fill extrapolated values
-            for i, year in enumerate(extrapolated_years):
-                extended_data.at[row_idx, year] = y_pred[i]
+        # Compute annual compound growth rate (can handle division by zero)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            annual_growth = (upper / lower).replace([np.inf, -np.inf], 0).fillna(0)
 
-        # Calculate ratios for all years in build_out_column vs base_year
+        # Create output dataframe including known data
+        extended = data.copy()
+        start_year = int(upper_year)
+
+        # Extrapolate missing years
+        for year in extrap_years:
+            year_diff = int(year) - start_year
+            extended[year] = upper * (annual_growth**year_diff)
+            extended[year] = extended[year].fillna(0)
+
+        # Calculate ratio of each year vs base year
         for year in build_out_columns:
-            extended_data[year] = extended_data[year].astype("float32") / extended_data[
+            extended[year] = extended[year].astype("float32") / extended[
                 base_year_column
             ].astype("float32")
+            extended[year] = extended[year].replace([np.inf, -np.inf], 0).fillna(0)
 
-        return extended_data.drop(columns=[base_year_column])
+        return extended.drop(columns=[base_year_column])
 
     def ntem_hh_car_ratios(
         self, base_year_column: str, build_out_columns: List[str]
     ) -> pd.DataFrame:
         """
-        Extrapolate missing future year values and calculate ratios
-        relative to a specified base year.
+        Extrapolates missing NTEM population car ownership values using compound growth
+        based on the last two known forecast years. Then, calculates the ratio of each
+        future year relative to the specified base year.
 
         Parameters:
         -----------
-        base_year : str
-            The year used as the reference for ratio calculations (e.g., "2023").
-        build_out_column : List[str]
-            Full list of desired build-out years as strings (e.g., ["2024", ..., "2066"]).
+        base_year_column : str
+            The reference year for ratio calculations (e.g., "2023").
+        build_out_columns : List[str]
+            Full list of desired future years as strings (e.g., ["2024", ..., "2066"]).
 
         Returns:
         --------
         pd.DataFrame
-            DataFrame with extrapolated values and ratio columns.
+            A DataFrame containing ratio values for each build-out year,
+            normalized against the base year.
         """
+        # Load input NTEM population car ownership ratio data
         data = pd.read_csv(self.zone_info["ntem_hh_car_ratio"])
-        # Extract available year columns in the DataFrame
-        year_cols_in_data = [col for col in data.columns if col.isdigit()]
-        ntem_future_year_list = [
-            y for y in year_cols_in_data if int(y) >= int(base_year_column)
-        ]
-        extrapolated_years = [
-            y for y in build_out_columns if y not in ntem_future_year_list
-        ]
 
-        extended_data = data.copy()
-        x_known = np.array([int(y) for y in ntem_future_year_list])
+        # Identify year columns in the input file
+        year_cols = [col for col in data.columns if col.isdigit()]
+        known_years = sorted(
+            [y for y in year_cols if int(y) >= int(base_year_column)], key=int
+        )
+        extrap_years = [y for y in build_out_columns if y not in known_years]
 
-        for row_idx, row in extended_data.iterrows():
-            y_known = row[ntem_future_year_list].values.astype("float32")
+        if len(known_years) < 2:
+            raise ValueError(
+                "At least two known NTEM years are required for extrapolation."
+            )
 
-            # Fit linear trend
-            coeffs = np.polyfit(x_known, y_known, deg=1)
-            y_pred = np.polyval(coeffs, [int(y) for y in extrapolated_years])
+        lower_year, upper_year = known_years[-2], known_years[-1]
+        lower = data[lower_year].astype("float32")
+        upper = data[upper_year].astype("float32")
 
-            # Fill extrapolated values
-            for i, year in enumerate(extrapolated_years):
-                extended_data.at[row_idx, year] = y_pred[i]
+        # Compute annual compound growth rate (can handle division by zero)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            annual_growth = (upper / lower).replace([np.inf, -np.inf], 0).fillna(0)
 
-        # Calculate ratios for all years in build_out_column vs base_year
+        # Create output dataframe including known data
+        extended = data.copy()
+        start_year = int(upper_year)
+
+        # Extrapolate missing years
+        for year in extrap_years:
+            year_diff = int(year) - start_year
+            extended[year] = upper * (annual_growth**year_diff)
+            extended[year] = extended[year].fillna(0)
+
+        # Calculate ratio of each year vs base year
         for year in build_out_columns:
-            extended_data[year] = extended_data[year].astype("float32") / extended_data[
+            extended[year] = extended[year].astype("float32") / extended[
                 base_year_column
             ].astype("float32")
+            extended[year] = extended[year].replace([np.inf, -np.inf], 0).fillna(0)
 
-        return extended_data.drop(columns=[base_year_column])
+        return extended.drop(columns=[base_year_column])
+
+    # def ntem_hh_car_ratios(
+    #     self, base_year_column: str, build_out_columns: List[str]
+    # ) -> pd.DataFrame:
+    #     """
+    #     Extrapolate missing future year values and calculate ratios
+    #     relative to a specified base year.
+
+    #     Parameters:
+    #     -----------
+    #     base_year : str
+    #         The year used as the reference for ratio calculations (e.g., "2023").
+    #     build_out_column : List[str]
+    #         Full list of desired build-out years as strings (e.g., ["2024", ..., "2066"]).
+
+    #     Returns:
+    #     --------
+    #     pd.DataFrame
+    #         DataFrame with extrapolated values and ratio columns.
+    #     """
+    #     data = pd.read_csv(self.zone_info["ntem_hh_car_ratio"])
+    #     # Extract available year columns in the DataFrame
+    #     year_cols_in_data = [col for col in data.columns if col.isdigit()]
+    #     ntem_future_year_list = [
+    #         y for y in year_cols_in_data if int(y) >= int(base_year_column)
+    #     ]
+    #     extrapolated_years = [
+    #         y for y in build_out_columns if y not in ntem_future_year_list
+    #     ]
+
+    #     extended_data = data.copy()
+    #     x_known = np.array([int(y) for y in ntem_future_year_list])
+
+    #     for row_idx, row in extended_data.iterrows():
+    #         y_known = row[ntem_future_year_list].values.astype("float32")
+
+    #         # Fit linear trend
+    #         coeffs = np.polyfit(x_known, y_known, deg=1)
+    #         y_pred = np.polyval(coeffs, [int(y) for y in extrapolated_years])
+
+    #         # Fill extrapolated values
+    #         for i, year in enumerate(extrapolated_years):
+    #             extended_data.at[row_idx, year] = y_pred[i]
+
+    #     # Calculate ratios for all years in build_out_column vs base_year
+    #     for year in build_out_columns:
+    #         extended_data[year] = extended_data[year].astype("float32") / extended_data[
+    #             base_year_column
+    #         ].astype("float32")
+
+    #     return extended_data.drop(columns=[base_year_column])
 
     def apply_ntem_trend(
         self,
@@ -875,234 +971,6 @@ class Ratios(ls.BaseZoneHandler):
 
         wide.columns.name = None  # Clean up column index name
         return wide
-
-    def dask_pivot_table_like(
-        self,
-        ddf: dd.DataFrame,
-        index_cols: list[str],
-        column: str,
-        values: str,
-    ) -> dd.DataFrame:
-        ddf[column] = ddf[column].astype(str)
-
-        grouped = ddf.groupby(index_cols + [column])[values].sum().reset_index()
-
-        def pivot_partition(pdf):
-            return pdf.pivot_table(
-                index=index_cols,
-                columns=column,
-                values=values,
-            )
-
-        pivoted = grouped.map_partitions(pivot_partition)
-        pivoted = pivoted.reset_index().fillna(0)
-
-        return pivoted
-
-    def expand_by_dimension_dask(
-        self,
-        zone_data: pd.DataFrame,
-        zone_ratio_ddf: dd.DataFrame,
-        build_out_columns: list[str],
-        dimension_columns: list[str],
-        npartitions: int,
-    ) -> pd.DataFrame:
-        """
-        Calculate the number of households by given dimension categories per zone and year using Dask.
-
-        Parameters
-        ----------
-        zone_data : pd.DataFrame
-            DataFrame with total projected households per zone and year.
-            Expected columns: [zone_id] + build_out_columns.
-
-        zone_ratio : pd.DataFrame
-            DataFrame with ratios per zone and dimension (e.g., car availability) for each year.
-            Expected columns: [zone_id, *dimension_columns] + build_out_columns.
-
-        build_out_columns : list[str]
-            List of column names representing future years (e.g. ['2024', '2025', ..., '2066']).
-
-        dimension_columns : list[str]
-            List of columns representing the dimensions (e.g., car availability, income group).
-            Must be explicitly provided.
-        npartitions : int
-            Number of partitions to divide the Dask DataFrame into. Higher values may improve parallelism
-            but increase overhead. Lower values reduce overhead but may use more memory per partition.
-
-
-        Returns
-        -------
-        pd.DataFrame
-            A wide-format DataFrame with [zone_id, dimension_categories] and one column per year,
-            representing the number of households by each dimension category.
-        """
-        zone_id = self.zone_info["group_by_column"]
-        # Ensure year columns (e.g., build_out_columns) are float32 before Dask conversion
-        zone_data[build_out_columns] = zone_data[build_out_columns].astype("float32")
-        # Dask conversions
-        zone_data_ddf = dd.from_pandas(zone_data, npartitions=npartitions)
-        zone_data_ddf[build_out_columns] = zone_data_ddf[build_out_columns].astype(
-            "float32"
-        )
-        zone_ratio_ddf = zone_ratio_ddf.repartition(npartitions=npartitions)
-        # zone_ratio_ddf = dd.from_pandas(zone_ratio, npartitions=npartitions)
-
-        # Determine ID columns
-        id_list = [zone_id, "sic_2d"] if "sic_2d" in zone_data.columns else [zone_id]
-
-        # Melt to long format
-        data_long = dd.melt(
-            zone_data_ddf,
-            id_vars=id_list,
-            value_vars=build_out_columns,
-            var_name="year_variant",
-            value_name="vals",
-        )
-
-        ratio_long = dd.melt(
-            zone_ratio_ddf,
-            id_vars=id_list + dimension_columns,
-            value_vars=build_out_columns,
-            var_name="year_variant",
-            value_name="ratios",
-        )
-
-        # Merge on keys
-        merged = data_long.merge(ratio_long, on=id_list + ["year_variant"], how="left")
-
-        # Compute values by dimension
-        merged["val_by_dimension"] = merged["vals"].astype("float32") * merged[
-            "ratios"
-        ].astype("float32")
-
-        # Aggregate by group
-        group_cols = id_list + dimension_columns + ["year_variant"]
-        grouped = merged.groupby(group_cols)["val_by_dimension"].sum().reset_index()
-
-        # # Pivot to wide format
-        # pivoted = grouped.pivot_table(
-        #     index=id_list + dimension_columns,
-        #     columns="year_variant",
-        #     values="val_by_dimension",
-        # ).reset_index()
-
-        # # Final conversion back to pandas
-        # result_df = pivoted.compute()
-        # result_df.columns.name = None
-        # return result_df
-
-        # # Compute before pivoting
-        # grouped_pd = grouped.compute()
-
-        # # Pivot using Pandas
-        # pivot_result = self.dask_pivot_table_like(
-        #     grouped,
-        #     index_cols=id_list + dimension_columns,
-        #     column="year_variant",
-        #     values="val_by_dimension",
-        #     # aggfunc="sum",  # explicitly add aggfunc
-        # ).reset_index()
-
-        return grouped
-
-    def slice_dask_df_by_year(
-        self,
-        ddf: dd.DataFrame,
-        year_column: str,
-        value_column: str,
-        index_columns: List[str],
-        years: List[str],
-    ) -> Dict[str, dd.DataFrame]:
-        """
-        Slice a Dask DataFrame into separate DataFrames by year.
-
-        Parameters
-        ----------
-        df : dd.DataFrame
-            The Dask DataFrame in long format.
-        year_column : str
-            Column name containing year identifiers (e.g., "year_variant").
-        value_column : str
-            Name of the value column to be renamed per year (e.g., "val_by_dimension").
-        index_columns : List[str]
-            List of columns to retain (e.g., ['zone_id', 'dimension_1', ...]).
-        years : List[str]
-            List of years (as strings or values convertible to str) to extract.
-
-        Returns
-        -------
-        Dict[str, dd.DataFrame]
-            Dictionary mapping each year to its corresponding sliced and renamed Dask DataFrame.
-        """
-        results = {}
-
-        for year in years:
-            temp = ddf[ddf[year_column] == year][index_columns + [value_column]]
-            temp = temp.rename(columns={value_column: year})
-
-            results[year] = temp
-
-        return results
-
-    # def expand_by_dimension_single_year(
-    #     self,
-    #     zone_data_dict: dict[str, pd.DataFrame],
-    #     zone_ratio_dict: dict[str, pd.DataFrame],
-    #     dimension_columns: list[str],
-    # ) -> dict[str, pd.DataFrame]:
-    #     """
-    #     Expand zone-level totals by a dimension (e.g., car availability), using ratios for each zone and dimension.
-
-    #     Parameters
-    #     ----------
-    #     zone_data_dict : dict[str, pd.DataFrame]
-    #         Dictionary of DataFrames keyed by year (e.g., "2024"), each containing zone totals with columns: [zone_id, "value"].
-
-    #     zone_ratio_dict : dict[str, pd.DataFrame]
-    #         Dictionary of DataFrames keyed by year (e.g., "2024"), each with ratios by zone and dimension columns:
-    #         [zone_id, *dimension_columns, "value"].
-
-    #     dimension_columns : list[str]
-    #         List of columns representing the segmentation (e.g., ["car_availability"]).
-
-    #     Returns
-    #     -------
-    #     dict[str, pd.DataFrame]
-    #         Dictionary of DataFrames for each year with expanded values: [zone_id, *dimension_columns, "value"].
-    #     """
-
-    #     zone_id = self.zone_info["group_by_column"]
-    #     result = {}
-
-    #     for year in zone_data_dict:
-    #         zone_df = zone_data_dict[year]
-    #         ratio_df = zone_ratio_dict.get(year)
-
-    #         if ratio_df is None:
-    #             raise ValueError(f"Ratio data for year {year} is missing.")
-
-    #         # Dynamically determine if 'sic_2d' is present
-    #         if "sic_2d" in zone_df.columns:
-    #             id_list = [zone_id, "sic_2d"]
-    #         else:
-    #             id_list = [zone_id]
-
-    #         # Merge on zone_id (+ sic_2d if present)
-    #         merged = ratio_df.merge(
-    #             zone_df[id_list + ["value"]],
-    #             on=id_list,
-    #             how="left",
-    #             suffixes=("_ratio", "_total"),
-    #         )
-
-    #         # Calculate disaggregated value
-    #         merged["value"] = merged["value_total"] * merged["value_ratio"]
-
-    #         # Return only relevant columns
-    #         result[year] = merged[id_list + dimension_columns + ["value"]]
-
-    #     return result
 
     def scaling_factors(
         self,
@@ -1274,44 +1142,6 @@ class Ratios(ls.BaseZoneHandler):
 
         return merged
 
-    # def apply_scaling_factor_dask(
-    #     segmented_ddf: dd.DataFrame,
-    #     scaler_ddf: dd.DataFrame,
-    #     build_out_columns: list[str],
-    #     dimension_columns: list[str],
-    #     zone_col: str = "zone_id",
-    # ) -> dd.DataFrame:
-    #     """
-    #     Apply scaling factors to a wide-format Dask DataFrame over multiple years.
-    #     """
-    #     scaled_frames = []
-
-    #     for year in build_out_columns:
-    #         # Merge on the dimension and zone columns
-    #         merged = segmented_ddf[[zone_col] + dimension_columns + [year]].merge(
-    #             scaler_ddf[[zone_col] + dimension_columns + [year]],
-    #             on=[zone_col] + dimension_columns,
-    #             suffixes=("", "_scaler"),
-    #         )
-
-    #         # Scale values
-    #         merged[year] = merged[year] * merged[f"{year}_scaler"]
-
-    #         # Drop the scaler column
-    #         merged = merged.drop(columns=[f"{year}_scaler"])
-
-    #         scaled_frames.append(merged)
-
-    #     # Combine scaled yearly frames column-wise
-    #     from functools import reduce
-
-    #     scaled_df = reduce(
-    #         lambda left, right: left.merge(right, on=[zone_col] + dimension_columns),
-    #         scaled_frames,
-    #     )
-
-    #     return scaled_df
-
     def apply_scaling_factor_dask(
         self,
         df: pd.DataFrame,
@@ -1408,40 +1238,40 @@ class Ratios(ls.BaseZoneHandler):
 
     #     return scaled_dict
 
-    def apply_scaling_factor_single_year_df(
-        self,
-        segmented_df: pd.DataFrame,
-        scaler_df: pd.DataFrame,
-        zone_col: str,
-        dimension_columns: list[str],
-    ) -> pd.DataFrame:
-        """
-        Apply scaling factors to a segmented single-year DataFrame.
+    # def apply_scaling_factor_single_year_df(
+    #     self,
+    #     segmented_df: pd.DataFrame,
+    #     scaler_df: pd.DataFrame,
+    #     zone_col: str,
+    #     dimension_columns: list[str],
+    # ) -> pd.DataFrame:
+    #     """
+    #     Apply scaling factors to a segmented single-year DataFrame.
 
-        Parameters
-        ----------
-        segmented_df : pd.DataFrame
-            Year-specific segmented DataFrame with 'value'.
-        scaler_df : pd.DataFrame
-            Year-specific scaler DataFrame with 'value'.
-        zone_col : str
-            Column name for zone ID.
-        dimension_columns : list[str]
-            Dimension columns to match on.
+    #     Parameters
+    #     ----------
+    #     segmented_df : pd.DataFrame
+    #         Year-specific segmented DataFrame with 'value'.
+    #     scaler_df : pd.DataFrame
+    #         Year-specific scaler DataFrame with 'value'.
+    #     zone_col : str
+    #         Column name for zone ID.
+    #     dimension_columns : list[str]
+    #         Dimension columns to match on.
 
-        Returns
-        -------
-        pd.DataFrame
-            Scaled DataFrame with updated 'value'.
-        """
-        merged = segmented_df.merge(
-            scaler_df,
-            on=[zone_col] + dimension_columns,
-            how="left",
-            suffixes=("", "_scaler"),
-        )
-        merged["value"] = merged["value"] * merged["value_scaler"]
-        return merged.drop(columns=["value_scaler"])
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         Scaled DataFrame with updated 'value'.
+    #     """
+    #     merged = segmented_df.merge(
+    #         scaler_df,
+    #         on=[zone_col] + dimension_columns,
+    #         how="left",
+    #         suffixes=("", "_scaler"),
+    #     )
+    #     merged["value"] = merged["value"] * merged["value_scaler"]
+    #     return merged.drop(columns=["value_scaler"])
 
     # def export_singleyear_file(
     #     self,
@@ -1919,7 +1749,7 @@ class PrepTripends:
                     self.perform_segmentation_and_zoning(
                         pivoted, data_type_base, output_file
                     )
-                    print(f"✅ Saved: {output_file}")
+                    print(f"Saved: {output_file}")
 
 
 def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
@@ -1939,6 +1769,38 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
 
     LOG.info("Initialising Split Module")
     config.output_folder.mkdir(exist_ok=True)
+
+    LOG.info("Loading key parameter and paths")
+    model_zone = config.large_sites.geo_boundary.value
+    model_zone_enum = inputs.GeoBoundary(model_zone.lower())
+    base_year = config.large_sites.base_year
+    base_year_int = int(base_year)
+    end_year = config.large_sites.end_year
+    end_year_int = int(end_year)
+    key_output_path = config.output_folder / f"M4_split"
+    key_output_path.mkdir(exist_ok=True)
+    check_output_path = key_output_path / "check"
+    check_output_path.mkdir(exist_ok=True)
+    yearly_output_folder = key_output_path / f"yearly_zonal_data"
+    yearly_output_folder.mkdir(exist_ok=True)
+
+    build_out_columns = [
+        str(year) for year in range(base_year_int + 1, end_year_int + 1)
+    ]
+    future_years = config.split.future_years
+    future_year_columns = [str(year) for year in future_years]
+    LOG.info("Instantiating the key classes")
+    zt = ls.ZoneTranslator(config)
+    cal_ratios = Ratios(config)
+    zone_info = cal_ratios.zone_info_map.get(cal_ratios.geo_boundary, {})
+    if not zone_info:
+        LOG.error(f"No zone information found for zone {cal_ratios.geo_boundary}")
+        return
+
+    zone_id = zone_info.get("group_by_column")
+    # zone_to_lad_path = zone_info.get("zone_to_lad_path")
+    # lad_id = zone_info.get("lad_id_col")
+    # zone_to_lad_prop = zone_info.get("zone_to_lad_prop")
 
     LOG.info("Loading key inputs")
     tfn_tt = pd.read_csv(config.split.tfn_tt)
@@ -2018,34 +1880,6 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         header=0,
         index_col=None,
     )
-
-    LOG.info("Loading key parameter and paths")
-    model_zone = config.large_sites.geo_boundary.value
-    model_zone_enum = inputs.GeoBoundary(model_zone.lower())
-    base_year = config.large_sites.base_year
-    base_year_int = int(base_year)
-    end_year = config.large_sites.end_year
-    end_year_int = int(end_year)
-    key_output_path = config.output_folder / f"M4_split"
-    key_output_path.mkdir(exist_ok=True)
-
-    build_out_columns = [
-        str(year) for year in range(base_year_int + 1, end_year_int + 1)
-    ]
-    future_years = config.split.future_years
-    future_year_columns = [str(year) for year in future_years]
-    LOG.info("Instantiating the key classes")
-    zt = ls.ZoneTranslator(config)
-    cal_ratios = Ratios(config)
-    zone_info = cal_ratios.zone_info_map.get(cal_ratios.geo_boundary, {})
-    if not zone_info:
-        LOG.error(f"No zone information found for zone {cal_ratios.geo_boundary}")
-        return
-
-    zone_id = zone_info.get("group_by_column")
-    # zone_to_lad_path = zone_info.get("zone_to_lad_path")
-    # lad_id = zone_info.get("lad_id_col")
-    # zone_to_lad_prop = zone_info.get("zone_to_lad_prop")
 
     LOG.info(
         "Processing base year data to get profiles for household, population and jobs"
@@ -2140,15 +1974,15 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.drop(
         columns=["default_ratio"]
     )
-    print("sum of soc_ratios", by_zone_job_soc_over_sic_ratio["soc_ratios"].sum())
-    # further adjust ratios to make sure the sum is 1
-    by_zone_job_soc_over_sic_ratio_aj = cal_ratios.zone_soc_over_sic_ratios(
-        by_zone_job_soc_over_sic_ratio,
-        job_type_columns,
-        "soc_ratios",
-        "ratios",
-    )
-    print("sum of ratios", by_zone_job_soc_over_sic_ratio_aj["ratios"].sum())
+    # print("sum of soc_ratios", by_zone_job_soc_over_sic_ratio["soc_ratios"].sum())
+    # # further adjust ratios to make sure the sum is 1
+    # by_zone_job_soc_over_sic_ratio_aj = cal_ratios.zone_soc_over_sic_ratios(
+    #     by_zone_job_soc_over_sic_ratio,
+    #     job_type_columns,
+    #     "soc_ratios",
+    #     "ratios",
+    # )
+    # print("sum of ratios", by_zone_job_soc_over_sic_ratio_aj["ratios"].sum())
     # Define filenames and corresponding DataFrames
     by_zone_ratios = [
         (f"by_zone_hh_car_ratio_{model_zone}.csv", by_zone_hh_car_ratio),
@@ -2247,7 +2081,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         zone_job_sic_fy,
         build_out_columns,
         job_type_columns,
-        by_zone_job_soc_over_sic_ratio_aj,
+        by_zone_job_soc_over_sic_ratio,
     )
 
     LOG.info(
@@ -2302,8 +2136,6 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     ]
 
     # Creating dict to contain yearly dataframes for further calculation on hh and pop data
-    yearly_output_folder = key_output_path / f"yearly_zonal_data"
-    yearly_output_folder.mkdir(exist_ok=True)
 
     fy_zone_hh_seged_dict = cal_ratios.create_singleyear_df(
         df=zone_hh_segmented_scaled,
@@ -2357,43 +2189,9 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         tt_zone_count = fy_zone_pop_seged_dict[year][zone_id].nunique()
         LOG.info(f"Sum of ratios: {tt_ratio_sum}, Number of zones: {tt_zone_count}")
 
-    # # Work out the ratios (profile) of dimensions based on scaled zonal data for household and population, and the segmetned jobs for future year
-    # fy_zone_hh_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
-    #     zone_hh_segmented_scaled,
-    #     hh_type_columns,
-    #     future_year_columns,
-    #     10,
-    # )
-    # # print("fy_zone_hh_type_ratio", fy_zone_hh_type_ratio.head(10))
-
-    # fy_zone_traveller_type_ratio = cal_ratios.zone_ratios_by_type_fy_dask(
-    #     zone_pop_segmented_scaled,
-    #     ["tt"],
-    #     future_year_columns,
-    #     30,
-    # )
-
     LOG.info(
         "Slicing yearly dataframe (optionally exporting compressed csv file) for household and pop before expanding zonal data derived from large sites to full dimensions"
     )
-
-    # Creating dict to contain yearly dataframes for further calculation on hh and pop data
-    # fy_zone_hh_type_ratio_dict = cal_ratios.create_singleyear_df(
-    #     fy_zone_hh_type_ratio,
-    #     hh_type_columns,
-    #     future_year_columns,
-    #     yearly_output_folder,
-    #     "fy_zone_hh_type_ratio",
-    #     False,
-    # )
-    # fy_zone_traveller_type_ratio_dict = cal_ratios.create_singleyear_df(
-    #     fy_zone_traveller_type_ratio,
-    #     ["tt"],
-    #     future_year_columns,
-    #     yearly_output_folder,
-    #     "fy_zone_traveller_type_ratio",
-    #     False,
-    # )
 
     fy_zone_lsgrth_hh_dict = cal_ratios.create_singleyear_df(
         df=input_data.fy_zone_lsgrth_hh,
@@ -2443,28 +2241,13 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         input_data.fy_zone_lsgrth_emp_sic,
         build_out_columns,
         job_type_columns,
-        by_zone_job_soc_over_sic_ratio_aj,
+        by_zone_job_soc_over_sic_ratio,
     )
 
     LOG.info(
         "Creating dictionaries of segmented future year zonal data for all key outputs"
     )
-    # fy_zone_hh_seged_dict = cal_ratios.create_singleyear_df(
-    #     df=zone_hh_segmented_scaled,
-    #     dimension_cols=hh_type_columns,
-    #     year_cols=future_year_columns,
-    #     output_dir=yearly_output_folder,
-    #     file_name="fy_zone_hh_segmented",
-    #     export_csv=False,
-    # )
-    # fy_zone_pop_seged_dict = cal_ratios.create_singleyear_df(
-    #     df=zone_pop_segmented_scaled,
-    #     dimension_cols=["tt"],
-    #     year_cols=future_year_columns,
-    #     output_dir=yearly_output_folder,
-    #     file_name="fy_zone_pop_segmented",
-    #     export_csv=False,
-    # )
+
     fy_zone_job_seged_dict = cal_ratios.create_singleyear_df(
         df=zone_job_sic_segmented,
         dimension_cols=job_type_columns,
@@ -2510,7 +2293,6 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     utilities.write_to_csv(key_output_path / summary_file, summary_df)
 
     LOG.info("Checking detailed zonal results")
-    # zone_list = ["E01013306", "E01011232", "E01011233", "E01011235", "E01011237"]
 
     for year in future_year_columns:
         fy_zone_hh = fy_zone_hh_seged_dict[year].merge(
@@ -2550,10 +2332,6 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
                 f"No negative population difference identified after subtracting growth of large sites for year {year}"
             )
 
-        # filtered_zone_pop = fy_zone_pop[
-        #     fy_zone_pop[zone_id].isin(zone_list)
-        # ]
-
         fy_zone_job = fy_zone_job_seged_dict[year].merge(
             fy_zone_lsgrth_job_seged_dict[year],
             on=[zone_id] + job_type_columns,
@@ -2572,35 +2350,19 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
                 f"No negative job difference identified after subtracting growth of large sites for year {year}"
             )
 
-        # filtered_zone_job = fy_zone_job[
-        #     fy_zone_job[zone_id].isin(zone_list)
-        # ]
-
         # Save to CSV
         utilities.write_to_csv(
-            key_output_path / f"neg_zone_hh_diff_{year}.csv",
+            check_output_path / f"neg_zone_hh_diff_{year}.csv",
             neg_diff_hh,
         )
         utilities.write_to_csv(
-            key_output_path / f"neg_zone_pop_diff_{year}.csv",
+            check_output_path / f"neg_zone_pop_diff_{year}.csv",
             neg_diff_pop,
         )
         utilities.write_to_csv(
-            key_output_path / f"neg_zone_job_diff_{year}.csv",
+            check_output_path / f"neg_zone_job_diff_{year}.csv",
             neg_diff_job,
         )
-
-    LOG.info("Exporting segmented zonal results on future year totals")
-
-    write_large_files = False  # Set to False if you want to skip the big files
-    zonal_outputs = []  # Always define it, even if empty
-    if write_large_files:
-        zonal_outputs = [
-            (f"{model_zone}_zonal_fy_job_by_sic_soc.csv.bz2", zone_job_sic_segmented),
-        ]
-
-    for file_name, df in zonal_outputs:
-        utilities.write_to_csv(key_output_path / file_name, df)
 
     LOG.info("Further transforming and processing land use data for tripend module")
     data_dicts = {

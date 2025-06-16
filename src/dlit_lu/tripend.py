@@ -21,6 +21,32 @@ import pandas as pd
 
 
 class TEMOutputProcessor(ls.BaseZoneHandler):
+    """
+    A class to process segmented D-Log (TEM) output data for trip end modeling.
+
+    This class handles the loading, aggregation, and transformation of D-Log output files
+    (in .h5 format) for different trip end types (e.g., home-based productions/attractions,
+    non-home-based productions/attractions). It supports processing for multiple future years,
+    and outputs the data in a consistent zone-year format, grouped by person type and mode.
+
+    Inherits from:
+        BaseZoneHandler: Provides zone metadata and boundary handling.
+
+    Attributes:
+        config (inputs.DLitConfig): Configuration object containing paths and settings.
+        geo_boundary_override (Optional[inputs.GeoBoundary]): Optional override for default geo boundary.
+        base_dir (Path): Base directory where the D-Log output files are stored.
+        subfolders (dict): Mapping of trip end types to corresponding filename templates.
+        zone_dvec_id (str): Column used to identify zones in the D-Vector format.
+        zone_id (str): Final zone identifier column for aggregation and merging.
+
+    Methods:
+        process_output(subfolder: str, years: list[str]) -> pd.DataFrame | None:
+            Loads and processes D-Log output for a specified subfolder (trip end type)
+            and list of years. Returns a pivoted DataFrame with trip ends by zone, person
+            type, and mode. Returns None if no valid files are found.
+    """
+
     def __init__(
         self,
         config: inputs.DLitConfig,
@@ -384,66 +410,28 @@ class TEConstraintProcessor(constraint.ConstraintProcessor):
         return data_with_name
 
 
-# class ByTeTransformation:
-#     def __init__(self, df: pd.DataFrame, base_year_column: str):
-#         """
-#         Initialize the class with the given DataFrame and base year.
-
-#         Parameters
-#         ----------
-#         df : pd.DataFrame
-#             Input DataFrame with mode and period columns.
-#         base_year : int
-#             The base year to rename "prod" and "attr".
-#         """
-#         self.df = df.copy()
-
-#         # Exclude unwanted categories for mode and period
-#         self.df = self.df[~self.df["mode"].isin([7])]  # Exclude mode category 7 for Air
-#         self.df = self.df[
-#             self.df["period"].isin([1, 2, 3, 4])
-#         ]  # Keep only period categories 1, 2, 3, and 4
-#         self.df["mode"] = self.df["mode"].replace(
-#             {4: 3}
-#         )  # Merge 4 into 3 for mode to combine car driver and car passenger
-#         self.base_year_column = base_year_column
-
-#     def groupby_sum(self, val: str):
-#         """
-#         Group the DataFrame by "normits_v3.3_id", "purpose", "mode", and "period",
-#         summing the specified value column.
-
-#         Parameters
-#         ----------
-#         val : str
-#             The column to be summed, either "prod" or "attr".
-
-#         Returns
-#         -------
-#         pd.DataFrame
-#             Grouped DataFrame with summed values.
-#         """
-#         if val not in self.df.columns:
-#             raise ValueError(f"Column '{val}' not found in DataFrame")
-
-#         grouped_df = self.df.groupby(
-#             ["normits_v3.3_id", "purpose", "mode"], as_index=False
-#         )[val].sum()
-#         # Divide the summed value by 5 to get average week day totals
-#         grouped_df[val] = grouped_df[val] / 5
-#         # Rename columns
-#         grouped_df = grouped_df.rename(
-#             columns={
-#                 "purpose": "p",
-#                 "mode": "m",
-#                 val: self.base_year_column,  # Rename "prod" or "attr" to base year
-#             }
-#         )
-
-#         return grouped_df
-
-
 class ForecastComparator:
+    """
+    A utility class for comparing forecast data between two DataFrames over specified years.
+
+    This class facilitates validation of model outputs by identifying discrepancies between
+    a target dataset and a forecasted dataset. It supports customizable column matching,
+    optional tolerance-based comparisons, and exporting of mismatched records.
+
+    Attributes:
+        df1 (pd.DataFrame): First DataFrame (e.g., target data).
+        df2 (pd.DataFrame): Second DataFrame (e.g., model output data).
+        key_columns (list[str]): List of columns used to join the two DataFrames.
+        year_columns (list[str]): List of year columns to compare between df1 and df2.
+        df1_label (str): Suffix label for columns from df1 in merged output.
+        df2_label (str): Suffix label for columns from df2 in merged output.
+        use_tolerance (bool): If True, uses numpy.isclose for floating-point comparison.
+        tol (float): Absolute tolerance used when use_tolerance is True.
+        output_path (str): Directory path where difference report will be saved.
+        merged (pd.DataFrame | None): Merged DataFrame after join operation.
+        differences (list[tuple[str, pd.DataFrame]]): List of mismatched rows per year.
+    """
+
     def __init__(
         self,
         df1,
@@ -601,7 +589,7 @@ def run(config: inputs.DLitConfig):
     mode_list = [3]  # list of mode to be filtered
     LOG.info("Instantiating TEConstraintProcessor")
     te_cp = TEConstraintProcessor(config)
-    zone_translation = te_cp.load_zone_translation(model_zone)
+    # zone_translation = te_cp.load_zone_translation(model_zone)
     sector_info = te_cp.sector_info
     zone_id = sector_info["zone_id"]
     sector_id = sector_info["sector_id"]
@@ -609,10 +597,10 @@ def run(config: inputs.DLitConfig):
     zone_index_columns_initial = [zone_id, "p", "m"]
 
     LOG.info(
-        "Instantiating GrowthCalculator and ConstraintCalculation from constraint module"
+        "Instantiating GrowthCalculator and ConstraintCalculator from constraint module"
     )
     growth_calculator = constraint.GrowthCalculator()
-    calc = constraint.ConstraintCalculation()
+    calc = constraint.ConstraintCalculator()
     LOG.info("Loading and transforming trip end dvec h5 data")
     # Load datasets
     # Instantiate TEMOutputProcessor
@@ -649,14 +637,15 @@ def run(config: inputs.DLitConfig):
     print("Summary of totals:\n", summary_totals)
     print("\nSummary of growths:\n", summary_ls_growth)
 
-    # Export individual total DataFrames
-    for key, df in dlog_te_tot_dfs.items():
-        file_path = os.path.join(key_te_folder, f"{key}_total.csv")
-        utilities.write_to_csv(file_path, df)
-        print(f"Saved {file_path}")
-    for key, df in dlog_te_lsgrth_dfs.items():
-        file_path = os.path.join(key_te_folder, f"{key}_lsgrowth.csv")
-        utilities.write_to_csv(file_path, df)
+    # # Export individual total DataFrames
+    # for key, df in dlog_te_tot_dfs.items():
+    #     file_path = os.path.join(key_te_folder, f"{key}_total.csv")
+    #     utilities.write_to_csv(file_path, df)
+    #     print(f"Saved {file_path}")
+    # for key, df in dlog_te_lsgrth_dfs.items():
+    #     file_path = os.path.join(key_te_folder, f"{key}_lsgrowth.csv")
+    #     utilities.write_to_csv(file_path, df)
+
     # Export key dataFrames to CSV files
     utilities.write_to_csv(key_te_folder / "summary_totals.csv", summary_totals)
     utilities.write_to_csv(key_te_folder / "summary_growth.csv", summary_ls_growth)
@@ -860,14 +849,6 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
             )
-            # zone_target_tot = growth_calculator.target_yeartot(
-            #     results[f"zone_dlog_{id}"]["YearTotal"],  # base year total from dlog
-            #     results[f"zone_ntem_{id}"][
-            #         "YearTotal"
-            #     ],  # fugure year target derived from ntem growth
-            #     base_year_column,
-            #     future_year_columns,
-            # )
 
             sector_target_growth = growth_calculator.target_growth(
                 results[f"{sector}_dlog_{id}"][
@@ -1187,14 +1168,6 @@ def run(config: inputs.DLitConfig):
                     "data": sector_scaled_etmt_tot,
                     "file": f"{sector}_tripend_fy_{id}.csv",
                 },
-                "zone_fy_tot_negative": {
-                    "data": negative_tots,
-                    "file": f"normits_tripend_fy_{id}_negative.csv",
-                },
-                "region_forecast": {
-                    "data": region_forecast,
-                    "file": f"normits_region_tripend_fy_{id}.csv",
-                },
                 "zone_adjustment_factor": {
                     "data": zone_adjustment_factor,
                     "file": f"normits_zone_ajfactor_{id}.csv",
@@ -1215,7 +1188,9 @@ def run(config: inputs.DLitConfig):
                 # Export without filtering if sector_list is empty
                 for key, value in key_outputs_and_names.items():
                     utilities.write_to_csv(key_te_folder / value["file"], value["data"])
-    LOG.info("Finally scale the attraction according to the production total")
+    LOG.info(
+        "Finally scale the attraction according to the production total - balancing the tripends"
+    )
     # Scale attraction according to the production total
     for cat in categories:
         prod_df = te_output[f"{cat}_prod"]

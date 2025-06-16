@@ -186,6 +186,8 @@ class LargeSitesConfig:
         Specifies the model zone boundary.
     viz_distribution : bool
         Flag indicating whether to visualize distribution.
+    export_by_output : bool
+        Flag indicating whether to export base year output.
     index_weights_path : pydantic.FilePath
         Path to the weights file, defining variables for the final weighted index to determine large sites.
     normits_shapefile_path : pydantic.FilePath
@@ -253,6 +255,7 @@ class LargeSitesConfig:
     end_year: str
     geo_boundary: GeoBoundary
     viz_distribution: bool
+    export_by_output: bool
     index_weights_path: pydantic.FilePath
     normits_shapefile_path: pydantic.FilePath
     noham_shapefile_path: pydantic.FilePath
@@ -357,18 +360,18 @@ class ConstraintConfig:
         Path to the file containing LAD names.
     region_name : pydantic.FilePath
         Path to the file containing region names.
+    ntem_constraint : bool
+        Flag indicating whether to apply NTEM constraints.
+    cap_ratio : float
+        The ratio for the constraints, used to control the proportion of regional total to be met by Dlog growth when Dlog growth exceed the DDG growth.
     ddg_pop : pydantic.FilePath
         Path to the DDG (Demand Distribution Generator) population data.
     ddg_emp : pydantic.FilePath
         Path to the DDG employment data.
-    ntem_hh : pydantic.FilePath
-        Path to the NTEM (National Trip End Model) household data.
     ntem_pop : pydantic.FilePath
         Path to the NTEM population data.
     ntem_emp : pydantic.FilePath
         Path to the NTEM employment data.
-    dlog_hh : Optional[pathlib.Path], default=None
-        Path to the DLOG household data, if available.
     dlog_emp : Optional[pathlib.Path], default=None
         Path to the DLOG employment data, if available.
     dlog_pop : Optional[pathlib.Path], default=None
@@ -379,13 +382,14 @@ class ConstraintConfig:
     lad_to_region_file: pydantic.FilePath
     lad_name: pydantic.FilePath
     region_name: pydantic.FilePath
+    ntem_constraint: bool
+    cap_ratio: float
     ddg_pop: pydantic.FilePath
     ddg_emp: pydantic.FilePath
-    ntem_hh: pydantic.FilePath
+    # ntem_hh: pydantic.FilePath
     ntem_pop: pydantic.FilePath
     ntem_emp: pydantic.FilePath
-    cap_ratio: float
-    dlog_hh: Optional[pathlib.Path] = None
+    # dlog_hh: Optional[pathlib.Path] = None
     dlog_emp: Optional[pathlib.Path] = None
     dlog_pop: Optional[pathlib.Path] = None
 
@@ -573,7 +577,7 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("constraint is required if run_constraint is true")
 
         if not values.get("run_large_sites") and not all(
-            [value.dlog_hh, value.dlog_emp, value.dlog_pop]
+            [value.dlog_emp, value.dlog_pop]
         ):
             raise ValueError(
                 "dlog_household, dlog_employment, and dlog_population at LAD level are required if not running large_sites module"
