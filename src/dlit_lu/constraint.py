@@ -21,27 +21,6 @@ class ConstraintProcessor:
         sector_info (Dict[str, Any]): The sector metadata for the selected sector.
     """
 
-    # def __init__(self, config: inputs.DLitConfig) -> None:
-    #     """
-    #     Initializes the ConstraintProcessor with configuration settings.
-
-    #     Args:
-    #         config (inputs.DLitConfig): The configuration object containing constraint details.
-    #     """
-    #     self.sector: inputs.Sector = config.constraint.sector
-    #     self.config: inputs.DLitConfig = config
-    #     self.sector_info_map: Dict[inputs.Sector, Dict[str, Any]] = {
-    #         inputs.Sector.REGION: {
-    #             "lookup_path": self.config.constraint.lad_to_region_file,
-    #             "zone_id": "lad2013_id",
-    #             "base_year_column": self.config.large_sites.base_year,
-    #             "sector_id": "ntem_region_id",
-    #             "zone_to_sector_prop_col": "lad2013_to_ntem_region",
-    #             "sector_name": self.config.constraint.region_name,
-    #         }
-    #     }
-
-    #     self.sector_info: Dict[str, Any] = self.sector_info_map[self.sector]
     def __init__(self, config: inputs.DLitConfig) -> None:
         """
         Initializes the ConstraintProcessor with configuration settings.
@@ -325,6 +304,40 @@ class ConstraintProcessor:
 
 
 class GrowthCalculator:
+    """
+    A utility class to perform various growth calculations on time-series data within pandas DataFrames.
+
+    This class provides methods to calculate:
+    - Absolute growth, growth ratios, and growth rates between a base year and future years.
+    - Compound Annual Growth Rate (CAGR) between consecutive years.
+    - Target growth projections based on base year data and source growth rates.
+    - Cumulative yearly totals.
+    - Yearly totals calculated from a base year.
+
+    Each method accepts data with year columns and performs calculations respecting specified base years and build-out (future) years.
+
+    Typical usage involves providing a DataFrame with time-series data indexed or identified by key columns, specifying the base year and the years to forecast or analyze growth for.
+
+    Methods
+    -------
+    calculate_growth(data, base_year_column, build_out_columns, growth_type='absolute')
+        Calculates absolute, ratio, or rate growth for specified years relative to a base year.
+
+    calculate_annual_growth_rate(data, year_columns)
+        Calculates Compound Annual Growth Rate (CAGR) between consecutive year columns.
+
+    target_growth(data_base, data_source, base_year_column, build_out_columns)
+        Calculates projected target growth values using growth rates derived from source data.
+
+    target_yeartot(data_base, data_source, base_year_column, build_out_columns)
+        Calculates target growth using growth ratios to project future totals from a base year.
+
+    cumulative_yearly_totals(data, base_year_column, build_out_columns)
+        Calculates cumulative yearly totals where each year accumulates prior years' values.
+
+    yearly_totals_from_base(data, base_year_column, build_out_columns)
+        Calculates yearly totals by summing base year values with future year increments.
+    """
 
     def calculate_growth(
         self,
@@ -641,7 +654,7 @@ class GrowthCalculator:
         return updated_data
 
 
-class ConstraintCalculation:
+class ConstraintCalculator:
     """
     A class for performing constraint-based calculations related to growth gaps, scaling, and weighting of data.
     """
@@ -959,7 +972,7 @@ def run(config: inputs.DLitConfig):
     # Instantiate the Classes
     processor = ConstraintProcessor(config)
     growth_calculator = GrowthCalculator()
-    calc = ConstraintCalculation()
+    calc = ConstraintCalculator()
 
     LOG.info("Loading Key Inputs")
     apply_ntem_constraint = config.constraint.ntem_constraint

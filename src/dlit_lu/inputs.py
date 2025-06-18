@@ -301,20 +301,26 @@ class SplitConfig:
         Path to ntem household profile segmented by household car availability at lsoa level.
     lsoa_pop_car : pydantic.FilePath
         Path to ntem population profile segmented by household car ownership at lsoa level.
-    lsoa_pop_age : pydantic.FilePath
-        Path to ntem population profile segmented by age bands at lsoa level.
     normits_hh_car : pydantic.FilePath
         Path to ntem household profile segmented by household car availability at normits zone level.
     normits_pop_car : pydantic.FilePath
         Path to ntem population profile segmented by household car ownership at normits zone level.
-    normits_pop_age : pydantic.FilePath
-        Path to ntem population profile segmented by age bands at normits zone level.
+    noham_hh_car : pydantic.FilePath
+        Path to ntem household profile segmented by household car availability at noham zone level.
+    noham_pop_car : pydantic.FilePath
+        Path to ntem population profile segmented by household car ownership at noham zone level.
+    norms_hh_car : pydantic.FilePath
+        Path to ntem household profile segmented by household car availability at norms zone level.
+    norms_pop_car : pydantic.FilePath
+        Path to ntem population profile segmented by household car ownership at norms zone level.
+    msoa_hh_car : pydantic.FilePath
+        Path to ntem household profile segmented by household car availability at msoa level.
+    msoa_pop_car : pydantic.FilePath
+        Path to ntem population profile segmented by household car ownership at msoa level.
     lad_hh_car : pydantic.FilePath
         Path to ntem household profile segmented by household car availability at LAD level.
     lad_pop_car : pydantic.FilePath
         Path to ntem population profile segmented by household car ownership at LAD level.
-    lad_pop_age : pydantic.FilePath
-        Path to ntem population profile segmented by age bands at LAD level.
     lsoa_data_path : Optional[pathlib.Path], default=None
         Path to the zonal totals file containing population, dwelling, and employment data.
 
@@ -324,13 +330,16 @@ class SplitConfig:
     tfn_tt: pydantic.FilePath
     lsoa_hh_car: pydantic.FilePath
     lsoa_pop_car: pydantic.FilePath
-    lsoa_pop_age: pydantic.FilePath
     normits_hh_car: pydantic.FilePath
     normits_pop_car: pydantic.FilePath
-    normits_pop_age: pydantic.FilePath
+    noham_hh_car: pydantic.FilePath
+    noham_pop_car: pydantic.FilePath
+    norms_hh_car: pydantic.FilePath
+    norms_pop_car: pydantic.FilePath
+    msoa_hh_car: pydantic.FilePath
+    msoa_pop_car: pydantic.FilePath
     lad_hh_car: pydantic.FilePath
     lad_pop_car: pydantic.FilePath
-    lad_pop_age: pydantic.FilePath
     zone_fy_tot_hh: Optional[pathlib.Path] = None
     zone_fy_tot_pop: Optional[pathlib.Path] = None
     zone_fy_tot_emp: Optional[pathlib.Path] = None
@@ -486,27 +495,6 @@ class DLitConfig(caf.toolkit.BaseConfig):
             raise ValueError("land_use_input required if not running land_use")
 
         return value
-
-    # @pydantic.validator("dev_pattern")
-    # def dev_pattern_input_check(  # pylint: disable=no-self-argument
-    #     cls, value: DevPatnConfig | None, values: dict[str, Any]
-    # ) -> DevPatnConfig:
-    #     """Check dev pattern is given if running module."""
-    #     if not values["run_dev_pattern"]:
-    #         # Don't need to check if we aren't running dev_pattern module
-    #         return value
-
-    #     if value is None:
-    #         raise ValueError("dev_pattern is required if run_dev_pattern is true")
-
-    #     if not values.get("run_land_use") and not all(
-    #         [value.lsoa_by_data_path, value.emp_site_data, value.res_site_data]
-    #     ):
-    #         raise ValueError(
-    #             "lsoa_data_path, emp_site_data, and res_site_data are required if not running land use module"
-    #         )
-
-    #     return value
 
     @pydantic.validator("large_sites")
     def large_sites_input_check(  # pylint: disable=no-self-argument

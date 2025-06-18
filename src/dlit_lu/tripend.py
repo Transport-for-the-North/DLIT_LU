@@ -571,6 +571,8 @@ def run(config: inputs.DLitConfig):
     cap_ls_aj = config.tripend.cap_ls_adj_factor
     key_te_folder = config.output_folder / "M7_tripend"
     key_te_folder.mkdir(exist_ok=True)
+    check_folder = key_te_folder / "check"
+    check_folder.mkdir(exist_ok=True)
     model_zone = config.large_sites.geo_boundary.value
 
     lookup_lad_region_file = config.constraint.lad_to_region_file
@@ -634,8 +636,8 @@ def run(config: inputs.DLitConfig):
     }
     summary_ls_growth = summarize_year_sums(dlog_te_lsgrth_dfs, future_year_columns)
 
-    print("Summary of totals:\n", summary_totals)
-    print("\nSummary of growths:\n", summary_ls_growth)
+    print("Summary of totals before constraining process :\n", summary_totals)
+    print("\nSummary of growths before constraining process :\n", summary_ls_growth)
 
     # # Export individual total DataFrames
     # for key, df in dlog_te_tot_dfs.items():
@@ -647,8 +649,12 @@ def run(config: inputs.DLitConfig):
     #     utilities.write_to_csv(file_path, df)
 
     # Export key dataFrames to CSV files
-    utilities.write_to_csv(key_te_folder / "summary_totals.csv", summary_totals)
-    utilities.write_to_csv(key_te_folder / "summary_growth.csv", summary_ls_growth)
+    utilities.write_to_csv(
+        check_folder / "summary_totals_before_constraining.csv", summary_totals
+    )
+    utilities.write_to_csv(
+        check_folder / "summary_growth_before_constraining.csv", summary_ls_growth
+    )
 
     ntem_zone_te = {
         "ntem_hb_prod": pd.read_csv(config.tripend.ntem_zone_hb_prod)[
@@ -1042,10 +1048,11 @@ def run(config: inputs.DLitConfig):
             sum_af = zone_ls_te_grth_scaled[future_year_columns].sum()
             # Combine into a DataFrame
             summary_df = pd.DataFrame(
-                [sum_bf, sum_af], index=["BeforeScaling", "AfterScaling"]
+                [sum_bf, sum_af],
+                index=["BeforeConstraintScaling", "AfterConstraintScaling"],
             )
             utilities.write_to_csv(
-                key_te_folder / f"large_site_te_growth_summary_{id}.csv", summary_df
+                check_folder / f"large_site_te_growth_summary_{id}.csv", summary_df
             )
             LOG.info(
                 f"Sum of large site te growth before scaling: {sum_bf}, after scaling: {sum_af}"
@@ -1141,6 +1148,14 @@ def run(config: inputs.DLitConfig):
                     "data": sector_ls_te_grth,
                     "file": f"{sector}_largesite_te_growth_{id}.csv",  # for checking
                 },
+                "sector_scaled_etmt_tot": {
+                    "data": sector_scaled_etmt_tot,
+                    "file": f"{sector}_forecast_fy_{id}.csv",
+                },
+                "region_forecast": {
+                    "data": region_forecast,
+                    "file": f"region_forecast_fy_{id}.csv",
+                },
             }
 
             # Check if sector_list is provided (not empty)
@@ -1163,14 +1178,6 @@ def run(config: inputs.DLitConfig):
                 "zone_scaled_etmt_tot": {
                     "data": zone_scaled_etmt_tot,
                     "file": f"normits_tripend_fy_{id}.csv",
-                },
-                "sector_scaled_etmt_tot": {
-                    "data": sector_scaled_etmt_tot,
-                    "file": f"{sector}_tripend_fy_{id}.csv",
-                },
-                "zone_adjustment_factor": {
-                    "data": zone_adjustment_factor,
-                    "file": f"normits_zone_ajfactor_{id}.csv",
                 },
                 "zone_fy_ls_grth_scaled": {
                     "data": zone_ls_te_grth_scaled,
@@ -1195,7 +1202,7 @@ def run(config: inputs.DLitConfig):
     for cat in categories:
         prod_df = te_output[f"{cat}_prod"]
         attr_df = te_output[f"{cat}_attr"]
-        # ls_prod_df = te_ls_output[f"{cat}_prod"]
+        ls_prod_df = te_ls_output[f"{cat}_prod"]
         ls_attr_df = te_ls_output[f"{cat}_attr"]
 
         # Group by (p, m) and sum across future years
@@ -1264,5 +1271,31 @@ def run(config: inputs.DLitConfig):
         else:
             for key, value in key_outputs_and_names.items():
                 utilities.write_to_csv(key_te_folder / value["file"], value["data"])
+
+        LOG.info(
+            f"Get totals before and after balancing attractions for {cat} category"
+        )
+        # Create a DataFrame to hold the totals before and after balancing for future years
+        summary_output_totals_df = pd.DataFrame(
+            {
+                "year": future_year_columns,
+                "tot_prod_before_balancing": prod_df[future_year_columns].sum(),
+                "tot_attr_before_balancing": attr_df[future_year_columns].sum(),
+                "tot_attr_after_balancing": attr_scaled[future_year_columns].sum(),
+                "tot_ls_prod_before_balancing": ls_prod_df[future_year_columns].sum(),
+                "tot_ls_attr_before_balancing": ls_attr_df[future_year_columns].sum(),
+                "tot_ls_attr_after_balancing": ls_attr_scaled[
+                    future_year_columns
+                ].sum(),
+                "tot_ls_attr_after_adjusting": ls_attr_scaled_aj[
+                    future_year_columns
+                ].sum(),
+            }
+        )
+        # Export the DataFrame to a CSV file
+        utilities.write_to_csv_no_index(
+            check_folder / f"totals_before_and_after_balancing_{cat}.csv",
+            summary_output_totals_df,
+        )
 
     LOG.info("Data processing completed")

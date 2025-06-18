@@ -88,7 +88,6 @@ class BaseZoneHandler:
                 "zone_to_lad_prop": "lsoa2021_to_lad2013",
                 "ntem_hh_car_ratio": config.split.lsoa_hh_car,
                 "ntem_pop_car_ratio": config.split.lsoa_pop_car,
-                "ntem_pop_age_ratio": config.split.lsoa_pop_age,
             },
             inputs.GeoBoundary.NORMITS: {
                 "shapefile_path": config.large_sites.normits_shapefile_path,
@@ -108,7 +107,6 @@ class BaseZoneHandler:
                 "zone_to_lad_prop": "normits_v3.3_to_lad2013",
                 "ntem_hh_car_ratio": config.split.normits_hh_car,
                 "ntem_pop_car_ratio": config.split.normits_pop_car,
-                "ntem_pop_age_ratio": config.split.normits_pop_age,
             },
             inputs.GeoBoundary.NOHAM: {
                 "shapefile_path": config.large_sites.noham_shapefile_path,
@@ -1758,6 +1756,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     key_output_path = config.output_folder / "M3_ls_key_outputs"
     key_output_path.mkdir(exist_ok=True)
     # subfolders for key outputs
+    base_year_path = key_output_path / f"by_{model_zone}_outputs"
+    base_year_path.mkdir(exist_ok=True)
     key_site_path = key_output_path / f"sites_{model_zone}_outputs"
     key_site_path.mkdir(exist_ok=True)
     key_normits_path = key_output_path / "normits_outputs"
@@ -1996,8 +1996,8 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     by_data_stats_file = f"by_{model_zone}_data_stats.csv"
 
     if export_by_output:
-        utilities.write_to_csv(key_output_path / by_data_file, combined_by)
-        utilities.write_to_csv(key_output_path / by_data_stats_file, by_data_stats)
+        utilities.write_to_csv(base_year_path / by_data_file, combined_by)
+        utilities.write_to_csv(base_year_path / by_data_stats_file, by_data_stats)
 
     LOG.info("Creating list of sites with estimated development values")
     # list of residential sites with estimated values
@@ -2248,6 +2248,37 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     zone_job_fy = zonal_job[[zone_id] + build_out_columns]
     zone_job_sic_fy = zonal_job_sic[[zone_id, "sic_2d"] + build_out_columns]
 
+    # Extract and export future year growth from Dlog
+
+    # zone_hh_grth_fy = zonal_household_grth[[zone_id] + build_out_columns]
+    # zone_pop_grth_fy = zonal_population_grth[[zone_id] + build_out_columns]
+    # zone_job_grth_fy = zonal_job_grth[[zone_id] + build_out_columns]
+    # utilities.write_to_csv(
+    #     key_output_path / f"zone_hh_grth_{model_zone}.csv", zone_hh_grth_fy
+    # )
+    # utilities.write_to_csv(
+    #     key_output_path / f"zone_pop_grth_{model_zone}.csv", zone_pop_grth_fy
+    # )
+    # utilities.write_to_csv(
+    #     key_output_path / f"zone_job_grth_{model_zone}.csv", zone_job_grth_fy
+    # )
+
+    # Summary year totals across all build-out future years
+    hh_grth_totals = zonal_household_grth[build_out_columns].sum(axis=0)
+    pop_grth_totals = zonal_population_grth[build_out_columns].sum(axis=0)
+    job_grth_totals = zonal_job_grth[build_out_columns].sum(axis=0)
+    summary_grth_totals = pd.DataFrame(
+        {
+            "year": build_out_columns,
+            "hh_grth": hh_grth_totals,
+            "pop_grth": pop_grth_totals,
+            "job_grth": job_grth_totals,
+        }
+    )
+    utilities.write_to_csv_no_index(
+        key_output_path / f"summary_grth_totals.csv", summary_grth_totals
+    )
+
     # Call function for accumulated sum
     column_prefixes = ["", "_large", "_small"]
     hh_grth_zone_fy = site_zone_processer.accumulated_growth(
@@ -2262,6 +2293,12 @@ def run(input_data: global_classes.AssessData, config: inputs.DLitConfig):
     job_sic_grth_zone_fy = site_zone_processer.accumulated_growth(
         zonal_job_sic_grth, build_out_columns, column_prefixes
     )
+    # # Extract and export future year growth from Dlog
+    # zone_hh_grth_fy = hh_grth_zone_fy[[zone_id] + build_out_columns]
+    # zone_pop_grth_fy = pop_grth_zone_fy[[zone_id] + build_out_columns]
+    # zone_job_grth_fy = job_grth_zone_fy[[zone_id] + build_out_columns]
+
+    # Extract large site growth for future years
     zone_hh_largesites_fy = hh_grth_zone_fy[
         [zone_id]
         + [

@@ -182,7 +182,11 @@ class Ratios(ls.BaseZoneHandler):
         return zonal_ratios.reset_index()
 
     def gb_job_type_ratios(
-        self, data: pd.DataFrame, job_type_columns: List[str]
+        self,
+        data: pd.DataFrame,
+        job_type_columns: List[str],
+        input_col: str = "jobs",
+        output_col: str = "default_ratios",
     ) -> pd.DataFrame:
         """
         Calculates the traveller type distribution for each zone.
@@ -204,15 +208,19 @@ class Ratios(ls.BaseZoneHandler):
         else:
             filtered_data = data
         ratios = (
-            filtered_data.groupby(job_type_columns)["jobs"]
+            filtered_data.groupby(job_type_columns)[input_col]
             .sum()
             .pipe(lambda x: x / x.sum())
-            .reset_index(name="ratios")
+            .reset_index(name=output_col)
         )
         return ratios
 
     def gb_soc_over_sic_ratios(
-        self, data: pd.DataFrame, job_type_columns: List[str]
+        self,
+        data: pd.DataFrame,
+        job_type_columns: List[str],
+        input_col: str = "jobs",
+        output_col: str = "gb_soc_ratios",
     ) -> pd.DataFrame:
         """
         Calculates the ratio of SOC within each SIC across all zones.
@@ -228,18 +236,75 @@ class Ratios(ls.BaseZoneHandler):
             DataFrame with zone, SIC, SOC and their associated ratio.
         """
 
-        ratios = data.groupby(job_type_columns)["jobs"].sum()
+        # Group and aggregate jobs
+        grouped = data.groupby(job_type_columns, as_index=False)[input_col].sum()
 
-        ratios["ratios"] = ratios["jobs"] / ratios.groupby(level=0).transform("sum")
+        # Compute total jobs per SIC level (or whatever level[0] is)
+        total_jobs_per_sic = grouped.groupby(job_type_columns[0])[input_col].transform(
+            "sum"
+        )
 
-        return ratios.reset_index()
+        # Compute ratios
+        grouped[output_col] = grouped[input_col] / total_jobs_per_sic
+
+        return grouped
+
+    def fill_zero_soc_ratios_with_defaults(
+        self,
+        soc_over_sic_df: pd.DataFrame,
+        soc_default_df: pd.DataFrame,
+        default_ratio_col: str = "default_ratios",
+        soc_col: str = "soc",
+    ) -> pd.DataFrame:
+        """
+        Pivot SOC over SIC ratios and replace zero values using default SOC-level ratios.
+
+        Parameters
+        ----------
+        soc_over_sic_df : pd.DataFrame
+            Long-format DataFrame with columns: 'soc', 'sic_2d', 'gb_soc_ratios'.
+        soc_default_df : pd.DataFrame
+            DataFrame with columns: 'soc', 'default_ratio'.
+        default_ratio_col : str
+            Name of the default ratio column in soc_default_df.
+        soc_col : str
+            Name of the SOC column.
+        Returns
+        -------
+        pd.DataFrame
+            Pivoted DataFrame with zero values replaced by default_ratio.
+        """
+        # # Pivot to wide format with 'soc' as rows and 'sic_2d' as columns
+        # pivoted = soc_over_sic_df.pivot_table(
+        #     index="soc",
+        #     columns="sic_2d",
+        #     values=gb_ratio_col,
+        #     fill_value=0,
+        # ).reset_index()
+
+        # Merge default ratios per 'soc'
+        merged = soc_over_sic_df.merge(
+            soc_default_df[[soc_col, default_ratio_col]], on=soc_col, how="left"
+        )
+
+        # Identify SIC columns (exclude 'soc' and 'default_ratio')
+        sic_columns = [
+            col for col in merged.columns if col not in {soc_col, default_ratio_col}
+        ]
+
+        # Replace zeros with default_ratio per row
+        for col in sic_columns:
+            zero_mask = merged[col] == 0
+            merged.loc[zero_mask, col] = merged.loc[zero_mask, default_ratio_col]
+
+        return merged.drop(columns=default_ratio_col)
 
     def zone_soc_over_sic_ratios(
         self,
         df: pd.DataFrame,
         job_type_columns: List[str],
         input_col: str = "jobs",
-        output_col: str = "soc_ratio",
+        output_col: str = "soc_ratios",
     ) -> pd.DataFrame:
         """
         Calculates the SOC ratio within each (zone_id, sic_2d) group based on job counts.
@@ -275,6 +340,111 @@ class Ratios(ls.BaseZoneHandler):
         zonal_ratios[output_col] = zonal_ratios[output_col].fillna(0)
 
         return zonal_ratios.reset_index()
+
+    def fill_zone_ratios_with_gb_ratios(
+        self,
+        zonal_pivot: pd.DataFrame,
+        gb_defaults: pd.DataFrame,
+        soc_col: str = "soc",
+    ) -> pd.DataFrame:
+        """
+        Fill zero values in a wide-format zonal pivot table using wide-format GB defaults.
+
+        Parameters
+        ----------
+        zonal_pivot : pd.DataFrame
+            Zonal pivot table with [zone_id, soc] and sic_2d columns.
+        gb_defaults : pd.DataFrame
+            GB-level defaults with [soc] and sic_2d columns (same structure as pivot).
+        soc_col : str
+            Name of the SOC column.
+
+        Returns
+        -------
+        pd.DataFrame
+            Zonal pivot table with zeros filled using GB defaults.
+        """
+        zone_col = self.zone_info["group_by_column"]
+        # Identify SIC columns to fill
+        sic_columns = [
+            col
+            for col in zonal_pivot.columns
+            if col not in {zone_col, soc_col} and isinstance(col, int) and col != -1
+        ]
+        # print([(col, type(col)) for col in zonal_pivot.columns])
+        # print([(col, type(col)) for col in gb_defaults.columns])
+
+        # Merge GB defaults on 'soc'
+        merged = zonal_pivot.merge(
+            gb_defaults, on=soc_col, how="left", suffixes=("", "_gb")
+        ).fillna(0)
+
+        # print([(col, type(col)) for col in merged.columns])
+
+        merged.columns = [
+            int(col) if isinstance(col, str) and col.isdigit() else col
+            for col in merged.columns
+        ]
+        # Fill zero values using GB defaults
+        for col in sic_columns:
+            gb_col = f"{col}_gb"
+
+            if col not in merged.columns:
+                print(f"Skipping missing column: {col}")
+                continue
+            if gb_col not in merged.columns:
+                print(f"Skipping missing GB column: {gb_col}")
+                continue
+
+            mask = merged[col] == 0
+
+            merged.loc[mask, col] = merged.loc[mask, gb_col]
+
+        # Drop the GB default columns
+        gb_columns_to_drop = [
+            f"{col}_gb" for col in sic_columns if f"{col}_gb" in merged.columns
+        ]
+        merged.drop(columns=gb_columns_to_drop, inplace=True)
+
+        return merged
+
+    def convert_wide_to_long_soc_sic_ratios(
+        self,
+        df_wide: pd.DataFrame,
+        soc_col: str = "soc",
+        ratio_col: str = "ratios",
+    ) -> pd.DataFrame:
+        """
+        Converts wide-format DataFrame (SOC x SIC_2d (columns) per zone) to long format.
+
+        Parameters
+        ----------
+        df_wide : pd.DataFrame
+            Wide-format DataFrame with [zone_id, soc] and sic_2d columns.
+        zone_col : str
+            Name of the zone ID column.
+        soc_col : str
+            Name of the SOC column.
+
+        Returns
+        -------
+        pd.DataFrame
+            Long-format DataFrame with columns: zone_id, soc, sic_2d, soc_ratios
+        """
+        zone_col = self.zone_info["group_by_column"]
+        # Identify SIC columns
+        id_vars = [zone_col, soc_col]
+        value_vars = [col for col in df_wide.columns if col not in id_vars]
+
+        # Melt to long format
+        df_long = df_wide.melt(
+            id_vars=id_vars,
+            value_vars=value_vars,
+            var_name="sic_2d",
+            value_name=ratio_col,
+        )
+
+        return df_long
 
     def zone_vals_by_type_fy(
         self,
@@ -1496,18 +1666,87 @@ class Ratios(ls.BaseZoneHandler):
 
 
 class TotalsComparison:
-    def __init__(self, build_out_columns: List[str]):
+    def __init__(self, future_year_columns: List[str]):
         """
-        Initialize with year-based columns.
+        Initialize with a list of future year column names.
 
         Parameters
         ----------
-        build_out_columns : List[str]
-            Year columns (e.g., ['2024', '2025', '2026', ...]).
+        future_year_columns : List[str]
+            List of year strings (e.g., ['2024', '2025', '2026']).
         """
-        self.build_out_columns = build_out_columns
+        self.future_year_columns = future_year_columns
         self.results = []
 
+    # -------- Method 1: Dictionary (Year-wise) Comparison --------
+    def compare_yearly_dicts(
+        self,
+        label_prefix: str,
+        df_dict_before: Dict[str, pd.DataFrame],
+        df_dict_after: Dict[str, pd.DataFrame],
+    ) -> pd.DataFrame:
+        """
+        Compare total 'value' across years using two dictionaries of DataFrames.
+
+        Parameters
+        ----------
+        label_prefix : str
+            Label prefix for the comparison group (e.g., 'Household').
+        df_dict_before : Dict[str, pd.DataFrame]
+            Dictionary of pre-segmentation DataFrames keyed by year.
+        df_dict_after : Dict[str, pd.DataFrame]
+            Dictionary of post-segmentation DataFrames keyed by year.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame summarising total, absolute difference, and percentage difference.
+        """
+        data = {}
+
+        for year in self.future_year_columns:
+            df_before = df_dict_before.get(year)
+            df_after = df_dict_after.get(year)
+
+            if df_before is None or df_after is None:
+                continue  # Skip if missing data
+
+            before_sum = df_before["value"].sum()
+            after_sum = df_after["value"].sum()
+            abs_diff = after_sum - before_sum
+            pct_diff = (100 * abs_diff / before_sum) if before_sum != 0 else pd.NA
+
+            data[year] = {
+                f"{label_prefix}_Zonal": before_sum,
+                f"{label_prefix}_Segmented": after_sum,
+                f"{label_prefix}_AbsDiff": abs_diff,
+                f"{label_prefix}_PctDiff": pct_diff,
+            }
+
+        return pd.DataFrame.from_dict(data, orient="index")
+
+    def add_comparison_from_dicts(
+        self,
+        label_prefix: str,
+        df_dict_before: Dict[str, pd.DataFrame],
+        df_dict_after: Dict[str, pd.DataFrame],
+    ):
+        """
+        Add comparison results between two dictionaries of year-based DataFrames.
+
+        Parameters
+        ----------
+        label_prefix : str
+            Label prefix for the comparison.
+        df_dict_before : Dict[str, pd.DataFrame]
+            Pre-disaggregation dictionary keyed by year.
+        df_dict_after : Dict[str, pd.DataFrame]
+            Post-disaggregation dictionary keyed by year.
+        """
+        result = self.compare_yearly_dicts(label_prefix, df_dict_before, df_dict_after)
+        self.results.append(result)
+
+    # -------- Method 2: Single DataFrame Comparison (Original) --------
     def compare_pair(
         self,
         label_prefix: str,
@@ -1533,9 +1772,9 @@ class TotalsComparison:
         """
         df = pd.DataFrame(
             {
-                f"{label_prefix}_Zonal": df_predisagg[self.build_out_columns].sum(),
+                f"{label_prefix}_Zonal": df_predisagg[self.future_year_columns].sum(),
                 f"{label_prefix}_Segmented": df_postdisagg[
-                    self.build_out_columns
+                    self.future_year_columns
                 ].sum(),
             }
         )
@@ -1580,7 +1819,7 @@ class TotalsComparison:
             Summary DataFrame across all added comparisons.
         """
         summary = pd.concat(self.results, axis=1)
-        summary.loc["Total"] = summary.sum(numeric_only=True)
+        # summary.loc["Total"] = summary.sum(numeric_only=True)
         return summary
 
 
@@ -1947,34 +2186,128 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         .drop(columns=["population"])
         .rename(columns={"ratios": base_year})
     )
+    # base year soc over sic ratios calculation is more complicated as not zones don't have all SIC categories
+    # defaults, gb ratios are caclulated to infill zero values
     # Calculate default soc ratios for jobs (for whole gb)
     by_gb_job_soc_ratio = cal_ratios.gb_job_type_ratios(
+        by_zone_job_sic_soc_data, ["soc"], "jobs", "default_ratios"
+    )
+    # by_gb_job_soc_ratio = by_gb_job_soc_ratio.rename(
+    #     columns={"ratios": "default_ratio"}
+    # )
+    utilities.write_to_csv(
+        check_output_path / "by_gb_job_soc_ratio.csv", by_gb_job_soc_ratio
+    )
+
+    # Calculate gb soc over sic ratio for jobs
+    by_gb_job_soc_over_sic_ratio = cal_ratios.gb_soc_over_sic_ratios(
         by_zone_job_sic_soc_data,
-        ["soc"],
+        job_type_columns,
+        "jobs",
+        "gb_soc_ratios",
+    ).fillna(0)
+    # Pivot the DataFrame to have 'sic_2d' as columns
+    by_gb_job_soc_over_sic_ratio_pivot = by_gb_job_soc_over_sic_ratio.pivot_table(
+        index="soc",
+        columns="sic_2d",
+        values="gb_soc_ratios",
+        fill_value=0,
+    ).reset_index()
+    # drop column "-1"
+    for col_to_drop in [-1, "-1"]:
+        if col_to_drop in by_gb_job_soc_over_sic_ratio_pivot.columns:
+            by_gb_job_soc_over_sic_ratio_pivot = (
+                by_gb_job_soc_over_sic_ratio_pivot.drop(columns=[col_to_drop])
+            )
+    # Fill zeros
+    by_gb_job_soc_over_sic_ratio_filled = cal_ratios.fill_zero_soc_ratios_with_defaults(
+        by_gb_job_soc_over_sic_ratio_pivot,
+        by_gb_job_soc_ratio,
+        "default_ratios",
+        "soc",
     )
-    by_gb_job_soc_ratio = by_gb_job_soc_ratio.rename(
-        columns={"ratios": "default_ratio"}
+    utilities.write_to_csv(
+        check_output_path / "by_gb_job_soc_over_sic_ratio.csv",
+        by_gb_job_soc_over_sic_ratio,
     )
+    utilities.write_to_csv(
+        check_output_path / "by_gb_job_soc_over_sic_ratio_pivot.csv",
+        by_gb_job_soc_over_sic_ratio_pivot,
+    )
+    utilities.write_to_csv(
+        check_output_path / "by_gb_job_soc_over_sic_ratio_filled.csv",
+        by_gb_job_soc_over_sic_ratio_filled,
+    )
+
     # Calculate zonal soc over sic ratio
-    by_zone_job_soc_over_sic_ratio = cal_ratios.zone_soc_over_sic_ratios(
+    by_zone_job_soc_over_sic_ratio_initial = cal_ratios.zone_soc_over_sic_ratios(
         by_zone_job_sic_soc_data,
         job_type_columns,
         "jobs",
         "soc_ratios",
     )
-    by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.merge(
-        by_gb_job_soc_ratio,
-        on="soc",
-        how="left",
+    # Pivot the DataFrame to have 'sic_2d' as columns
+    by_zone_job_soc_over_sic_ratio_pivot = (
+        by_zone_job_soc_over_sic_ratio_initial.pivot_table(
+            index=[zone_id, "soc"],
+            columns="sic_2d",
+            values="soc_ratios",
+            fill_value=0,
+        ).reset_index()
     )
-    # infill nan with default ratio
-    by_zone_job_soc_over_sic_ratio["soc_ratios"] = by_zone_job_soc_over_sic_ratio[
-        "soc_ratios"
-    ].fillna(by_zone_job_soc_over_sic_ratio["default_ratio"])
-    by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.drop(
-        columns=["default_ratio"]
+    # Fill zeros
+    by_zone_job_soc_over_sic_ratio_filled = cal_ratios.fill_zone_ratios_with_gb_ratios(
+        by_zone_job_soc_over_sic_ratio_pivot,
+        by_gb_job_soc_over_sic_ratio_filled,
+        "soc",
     )
-    # print("sum of soc_ratios", by_zone_job_soc_over_sic_ratio["soc_ratios"].sum())
+
+    utilities.write_to_csv(
+        check_output_path / "by_zone_job_soc_over_sic_ratio_filled.csv",
+        by_zone_job_soc_over_sic_ratio_filled,
+    )
+    # convert wide to long format
+    # This will create a DataFrame with 'zone_id', 'soc', 'sic_2d', and 'ratios' columns
+    by_zone_job_soc_over_sic_ratio = cal_ratios.convert_wide_to_long_soc_sic_ratios(
+        by_zone_job_soc_over_sic_ratio_filled,
+        "soc",
+        "ratios",
+    )
+
+    # by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.merge(
+    #     by_gb_job_soc_ratio,
+    #     on="soc",
+    #     how="left",
+    # )
+    # # infill nan with default ratio
+    # by_zone_job_soc_over_sic_ratio["soc_ratios"] = by_zone_job_soc_over_sic_ratio[
+    #     "soc_ratios"
+    # ].fillna(by_zone_job_soc_over_sic_ratio["default_ratio"])
+    # by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.drop(
+    #     columns=["default_ratio"]
+    # )
+
+    sum_soc_ratio = by_zone_job_soc_over_sic_ratio.groupby([zone_id, "sic_2d"])[
+        "ratios"
+    ].sum()
+    # Reshape so 'sic_2d' becomes columns
+    soc_ratio_wide = sum_soc_ratio.unstack(level="sic_2d")
+    print("sum of soc_ratios", by_zone_job_soc_over_sic_ratio["ratios"].sum())
+
+    # Check if the sum of soc_ratios is 1 for each zone and sic_2d
+    if not np.isclose(
+        sum_soc_ratio,
+        1.0,
+        atol=1e-5,
+    ).all():
+        LOG.warning(
+            "The sum of soc_ratios is not close to 1 for all zones and sic_2d combinations."
+        )
+
+    utilities.write_to_csv(
+        check_output_path / "by_zone_job_sum_soc_over_sic_ratio.csv", soc_ratio_wide
+    )
+
     # # further adjust ratios to make sure the sum is 1
     # by_zone_job_soc_over_sic_ratio_aj = cal_ratios.zone_soc_over_sic_ratios(
     #     by_zone_job_soc_over_sic_ratio,
@@ -1990,7 +2323,7 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     ]
     # Save each DataFrame to a CSV file
     for filename, df in by_zone_ratios:
-        utilities.write_to_csv(key_output_path / filename, df)
+        utilities.write_to_csv(check_output_path / filename, df)
 
     LOG.info("Extracting fy trend of ntem car profile change for pop and household")
     trend_of_pop_car = cal_ratios.ntem_pop_car_ratios(base_year, build_out_columns)
@@ -2137,6 +2470,33 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
 
     # Creating dict to contain yearly dataframes for further calculation on hh and pop data
 
+    fy_zone_hh_dict = cal_ratios.create_singleyear_df(
+        df=zone_hh_fy,
+        dimension_cols=None,
+        year_cols=future_year_columns,
+        output_dir=yearly_output_folder,
+        file_name="fy_zone_hh",
+        export_csv=False,
+    )
+
+    fy_zone_pop_dict = cal_ratios.create_singleyear_df(
+        df=zone_pop_fy,
+        dimension_cols=None,
+        year_cols=future_year_columns,
+        output_dir=yearly_output_folder,
+        file_name="fy_zone_pop",
+        export_csv=False,
+    )
+
+    fy_zone_job_sic_dict = cal_ratios.create_singleyear_df(
+        df=zone_job_sic_fy,
+        dimension_cols=None,
+        year_cols=future_year_columns,
+        output_dir=yearly_output_folder,
+        file_name="fy_zone_job_sic",
+        export_csv=False,
+    )
+
     fy_zone_hh_seged_dict = cal_ratios.create_singleyear_df(
         df=zone_hh_segmented_scaled,
         dimension_cols=hh_type_columns,
@@ -2267,7 +2627,36 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     )
 
     LOG.info(
-        "Checking totals across future years before and after disaggregating zonal data into dimensions"
+        "Checking totals across selected future years before and after disaggregating zonal data into dimensions for hh, pop and emp"
+    )
+    # Instantiate with your build-out year columns
+
+    comparator_all = TotalsComparison(future_year_columns)
+
+    # Add comparisons
+
+    comparator_all.add_comparison_from_dicts(
+        "Hhs", fy_zone_hh_dict, fy_zone_hh_seged_dict
+    )
+
+    comparator_all.add_comparison_from_dicts(
+        "Pop", fy_zone_pop_dict, fy_zone_pop_seged_dict
+    )
+    comparator_all.add_comparison_from_dicts(
+        "Jobs",
+        fy_zone_job_sic_dict,
+        fy_zone_job_seged_dict,
+    )
+
+    # Get summary
+    summary_df_all = comparator_all.get_summary()
+
+    # Export if needed
+    summary_file = f"fy_total_hh_pop_emp_comparison_{model_zone}.csv"
+    utilities.write_to_csv(check_output_path / summary_file, summary_df_all)
+
+    LOG.info(
+        "Checking totals across all build out years before and after disaggregating zonal data into dimensions for employment"
     )
     # Instantiate with your build-out year columns
 
@@ -2289,8 +2678,8 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
     summary_df = comparator.get_summary()
 
     # Export if needed
-    summary_file = f"fy_totals_comparison_{model_zone}.csv"
-    utilities.write_to_csv(key_output_path / summary_file, summary_df)
+    summary_file = f"fy_total_emp_comparison_{model_zone}.csv"
+    utilities.write_to_csv(check_output_path / summary_file, summary_df)
 
     LOG.info("Checking detailed zonal results")
 
@@ -2345,24 +2734,25 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
             LOG.info(
                 f"Negative difference in job totals for year {year}: {neg_diff_job.shape[0]} zones"
             )
+
+            # Save to CSV
+            utilities.write_to_csv(
+                check_output_path / f"neg_zone_hh_diff_{year}.csv",
+                neg_diff_hh,
+            )
+            utilities.write_to_csv(
+                check_output_path / f"neg_zone_pop_diff_{year}.csv",
+                neg_diff_pop,
+            )
+            utilities.write_to_csv(
+                check_output_path / f"neg_zone_job_diff_{year}.csv",
+                neg_diff_job,
+            )
+
         else:
             LOG.info(
                 f"No negative job difference identified after subtracting growth of large sites for year {year}"
             )
-
-        # Save to CSV
-        utilities.write_to_csv(
-            check_output_path / f"neg_zone_hh_diff_{year}.csv",
-            neg_diff_hh,
-        )
-        utilities.write_to_csv(
-            check_output_path / f"neg_zone_pop_diff_{year}.csv",
-            neg_diff_pop,
-        )
-        utilities.write_to_csv(
-            check_output_path / f"neg_zone_job_diff_{year}.csv",
-            neg_diff_job,
-        )
 
     LOG.info("Further transforming and processing land use data for tripend module")
     data_dicts = {
