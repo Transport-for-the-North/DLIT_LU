@@ -480,22 +480,25 @@ class ForecastComparator:
 
     def cal_diff(self):
         """
-        calculate absolute difference and percentage difference of self.merged DataFrame
+        Calculate absolute difference and percentage difference of self.merged DataFrame.
+        Returns a DataFrame with differences.
         """
         df = self.merged.copy()
         for year in self.year_columns:
             col1 = f"{year}_{self.df1_label}"
             col2 = f"{year}_{self.df2_label}"
-            # Calculate absolute difference
             df[f"{year}_abs_diff"] = df[col1] - df[col2]
-            # Calculate percentage difference, avoiding division by zero
+            # Safe percent diff: original uses col1 as denominator
             df[f"{year}_perc_diff"] = (
                 df[f"{year}_abs_diff"] / df[col1].replace(0, np.nan)
             ).fillna(0) * 100
-
-        # Return the DataFrame with differences
-        return df[[*self.key_columns, *self.year_columns, *df.columns if "diff" in col]]
-        
+        diff_cols = [col for col in df.columns if "diff" in col]
+        return df[
+            self.key_columns
+            + [f"{year}_{self.df1_label}" for year in self.year_columns]
+            + [f"{year}_{self.df2_label}" for year in self.year_columns]
+            + diff_cols
+        ]
 
     def compare(self):
         self.merge_data()
@@ -978,11 +981,13 @@ def run(config: inputs.DLitConfig):
 
             # QA1: Check if sector level tot match between scaled estimated val and target tot val
             # Filter your dataframes before comparison for car mode only "m" == 3
-            filtered_sector_target = sector_target_tot[sector_target_tot["m"] == 3]
-            filtered_sector_output = sector_scaled_etmt_tot[
-                sector_scaled_etmt_tot["m"] == 3
+            filtered_sector_target = sector_target_tot[
+                sector_target_tot["m"].isin(mode_list)
             ]
-            
+            filtered_sector_output = sector_scaled_etmt_tot[
+                sector_scaled_etmt_tot["m"].isin(mode_list)
+            ]
+
             # Check sector level output against target values
             comparator = ForecastComparator(
                 df1=filtered_sector_target,
@@ -995,8 +1000,13 @@ def run(config: inputs.DLitConfig):
                 tol=1e-6,
                 output_path=check_folder / f"sector_comparison_{id}.csv",
             )
-
             comparator.run_comparison()
+            comparator.merge_data()
+            diff_target_output = comparator.cal_diff()
+            utilities.write_to_csv(
+                check_folder / f"{sector}_target_output_diff_{id}.csv",
+                diff_target_output,
+            )
 
             # QA2: Check if there is negative tot in zone_scaled_etmt_tot
             negative_tots = zone_scaled_etmt_tot[
@@ -1016,6 +1026,27 @@ def run(config: inputs.DLitConfig):
                 base_year_column,
                 future_year_columns,
                 growth_type="absolute",
+            )
+
+            # QA3: Combine zone_target_growth, zone_estimated_growth and zone_scaled_etmt_growth into a single dataframe for comparison purpose
+            # Check the output growth against the target NTEM_related growth and D-log estimated growth
+            zone_growth_comparison = zone_scaled_etmt_growth.merge(
+                zone_target_growth,
+                on=zone_index_columns,
+                how="left",
+                suffixes=("_output", "_ntem_related"),
+            ).merge(
+                zone_estimated_growth,
+                on=zone_index_columns,
+                how="left",
+                suffixes=("", "_dlog_estimated"),
+            )
+            filtered_zone_growth_comparison = zone_growth_comparison[
+                zone_growth_comparison["m"].isin(mode_list)
+            ]
+            utilities.write_to_csv(
+                check_folder / f"zone_growth_comparison_{id}.csv",
+                filtered_zone_growth_comparison,
             )
 
             zone_adjustment_factor = calc.calculate_ratio(
@@ -1179,7 +1210,7 @@ def run(config: inputs.DLitConfig):
                 },
             }
 
-            # Check if sector_list is provided (not empty)
+            # Check if mode_llist is provided (not empty)
             if mode_list:
                 # Filter dataframes based on sector_list
                 for key, value in data_files_and_names.items():
@@ -1188,7 +1219,6 @@ def run(config: inputs.DLitConfig):
                         inter_output_path / value["file"], filtered_data
                     )
             else:
-                # Export without filtering if sector_list is empty
                 for key, value in data_files_and_names.items():
                     utilities.write_to_csv(
                         inter_output_path / value["file"], value["data"]
