@@ -478,6 +478,25 @@ class ForecastComparator:
             indicator=True,
         )
 
+    def cal_diff(self):
+        """
+        calculate absolute difference and percentage difference of self.merged DataFrame
+        """
+        df = self.merged.copy()
+        for year in self.year_columns:
+            col1 = f"{year}_{self.df1_label}"
+            col2 = f"{year}_{self.df2_label}"
+            # Calculate absolute difference
+            df[f"{year}_abs_diff"] = df[col1] - df[col2]
+            # Calculate percentage difference, avoiding division by zero
+            df[f"{year}_perc_diff"] = (
+                df[f"{year}_abs_diff"] / df[col1].replace(0, np.nan)
+            ).fillna(0) * 100
+
+        # Return the DataFrame with differences
+        return df[[*self.key_columns, *self.year_columns, *df.columns if "diff" in col]]
+        
+
     def compare(self):
         self.merge_data()
         self.differences.clear()
@@ -963,6 +982,7 @@ def run(config: inputs.DLitConfig):
             filtered_sector_output = sector_scaled_etmt_tot[
                 sector_scaled_etmt_tot["m"] == 3
             ]
+            
             # Check sector level output against target values
             comparator = ForecastComparator(
                 df1=filtered_sector_target,
