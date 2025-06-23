@@ -295,6 +295,8 @@ class SplitConfig:
 
     Attributes
     ----------
+    future_years : list[int]
+        List of future years for which the split data is relevant.
     tfn_tt : pydantic.FilePath
         Path to Transport for the North (TfN) travel time data.
     lsoa_hh_car : pydantic.FilePath
@@ -317,12 +319,14 @@ class SplitConfig:
         Path to ntem household profile segmented by household car availability at msoa level.
     msoa_pop_car : pydantic.FilePath
         Path to ntem population profile segmented by household car ownership at msoa level.
-    lad_hh_car : pydantic.FilePath
-        Path to ntem household profile segmented by household car availability at LAD level.
-    lad_pop_car : pydantic.FilePath
-        Path to ntem population profile segmented by household car ownership at LAD level.
-    lsoa_data_path : Optional[pathlib.Path], default=None
-        Path to the zonal totals file containing population, dwelling, and employment data.
+    zone_fy_tot_hh : Optional[pathlib.Path] = None
+    zone_fy_tot_pop : Optional[pathlib.Path] = None
+    zone_fy_tot_emp : Optional[pathlib.Path] = None
+    zone_fy_tot_emp_sic : Optional[pathlib.Path] = None
+    zone_fy_lsgrth_hh : Optional[pathlib.Path] = None
+    zone_fy_lsgrth_pop : Optional[pathlib.Path] = None
+    zone_fy_lsgrth_emp : Optional[pathlib.Path] = None
+    zone_fy_lsgrth_emp_sic : Optional[pathlib.Path] = None
 
     """
 
@@ -338,8 +342,6 @@ class SplitConfig:
     norms_pop_car: pydantic.FilePath
     msoa_hh_car: pydantic.FilePath
     msoa_pop_car: pydantic.FilePath
-    lad_hh_car: pydantic.FilePath
-    lad_pop_car: pydantic.FilePath
     zone_fy_tot_hh: Optional[pathlib.Path] = None
     zone_fy_tot_pop: Optional[pathlib.Path] = None
     zone_fy_tot_emp: Optional[pathlib.Path] = None

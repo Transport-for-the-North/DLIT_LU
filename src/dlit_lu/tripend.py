@@ -507,14 +507,9 @@ class ForecastComparator:
             col1 = f"{year}_{self.df1_label}"
             col2 = f"{year}_{self.df2_label}"
             if self.use_tolerance:
-                mismatch = self.merged[
-                    ~np.isclose(
-                        self.merged[col1],
-                        self.merged[col2],
-                        atol=self.tol,
-                        equal_nan=True,
-                    )
-                ]
+                a = pd.to_numeric(self.merged[col1], errors="coerce")
+                b = pd.to_numeric(self.merged[col2], errors="coerce")
+                mismatch = self.merged[~np.isclose(a, b, atol=self.tol, equal_nan=True)]
             else:
                 mismatch = self.merged[self.merged[col1] != self.merged[col2]]
             if not mismatch.empty:
@@ -1000,7 +995,7 @@ def run(config: inputs.DLitConfig):
                 tol=1e-6,
                 output_path=check_folder / f"sector_comparison_{id}.csv",
             )
-            comparator.run_comparison()
+            comparator.compare()
             comparator.merge_data()
             diff_target_output = comparator.cal_diff()
             utilities.write_to_csv(
@@ -1030,16 +1025,21 @@ def run(config: inputs.DLitConfig):
 
             # QA3: Combine zone_target_growth, zone_estimated_growth and zone_scaled_etmt_growth into a single dataframe for comparison purpose
             # Check the output growth against the target NTEM_related growth and D-log estimated growth
+            zone_estimated_growth_renamed = zone_estimated_growth.rename(
+                columns={col: col + "_dlog_estimated" for col in future_year_columns}
+            )
             zone_growth_comparison = zone_scaled_etmt_growth.merge(
-                zone_target_growth,
+                zone_target_growth[zone_index_columns + future_year_columns],
                 on=zone_index_columns,
                 how="left",
                 suffixes=("_output", "_ntem_related"),
             ).merge(
-                zone_estimated_growth,
+                zone_estimated_growth_renamed[
+                    zone_index_columns
+                    + [col + "_dlog_estimated" for col in future_year_columns]
+                ],
                 on=zone_index_columns,
                 how="left",
-                suffixes=("", "_dlog_estimated"),
             )
             filtered_zone_growth_comparison = zone_growth_comparison[
                 zone_growth_comparison["m"].isin(mode_list)
@@ -1330,15 +1330,23 @@ def run(config: inputs.DLitConfig):
         summary_output_totals_df = pd.DataFrame(
             {
                 "year": future_year_columns,
-                "tot_prod_before_balancing": prod_df[future_year_columns].sum(),
-                "tot_attr_before_balancing": attr_df[future_year_columns].sum(),
+                "tot_prod_after_constraining_before_balancing": prod_df[
+                    future_year_columns
+                ].sum(),
+                "tot_attr_after_constraining_before_balancing": attr_df[
+                    future_year_columns
+                ].sum(),
                 "tot_attr_after_balancing": attr_scaled[future_year_columns].sum(),
-                "tot_ls_prod_before_balancing": ls_prod_df[future_year_columns].sum(),
-                "tot_ls_attr_before_balancing": ls_attr_df[future_year_columns].sum(),
+                "tot_ls_prod_after_constraining_before_balancing": ls_prod_df[
+                    future_year_columns
+                ].sum(),
+                "tot_ls_attr_after_constraining_before_balancing": ls_attr_df[
+                    future_year_columns
+                ].sum(),
                 "tot_ls_attr_after_balancing": ls_attr_scaled[
                     future_year_columns
                 ].sum(),
-                "tot_ls_attr_after_adjusting": ls_attr_scaled_aj[
+                "tot_ls_attr_after_balancing_then_adjusting": ls_attr_scaled_aj[
                     future_year_columns
                 ].sum(),
             }

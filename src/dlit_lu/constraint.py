@@ -386,8 +386,12 @@ class GrowthCalculator:
         base_year = base_year_column
         growth_funcs = {
             "absolute": lambda future_year: data[future_year] - data[base_year],
-            "ratio": lambda future_year: data[future_year] / data[base_year],
-            "rate": lambda future_year: (data[future_year] / data[base_year]) - 1,
+            "ratio": lambda future_year: (
+                data[future_year] / data[base_year].replace(0, np.nan)
+            ).fillna(1),
+            "rate": lambda future_year: (
+                (data[future_year] / data[base_year].replace(0, np.nan)) - 1
+            ).fillna(0),
         }
 
         growth = data.copy()
@@ -814,7 +818,7 @@ class ConstraintCalculator:
 
         # Compute ratio while handling division by zero safely
         for col in build_out_columns:
-            denom = merged_data[f"{col}_etmt"].copy()
+            denom = pd.to_numeric(merged_data[f"{col}_etmt"], errors="coerce")
             denom[np.isclose(denom, 0, atol=tolerance)] = np.nan
             merged_data[col] = (merged_data[f"{col}_tgt"] * cap_ratio / denom).fillna(1)
 
