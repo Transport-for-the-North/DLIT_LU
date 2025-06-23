@@ -2186,18 +2186,21 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         .drop(columns=["population"])
         .rename(columns={"ratios": base_year})
     )
-    # base year soc over sic ratios calculation is more complicated as not zones don't have all SIC categories
-    # defaults, gb ratios are caclulated to infill zero values
-    # Calculate default soc ratios for jobs (for whole gb)
+
+    # Calculating base year SOC-over-SIC ratios is more complex, as not all zones contain every SIC category.
+    # Default (GB-level) ratios are calculated to infill missing or zero values.
+    # Compute default SOC ratios for jobs across the whole of Great Britain.
+
     by_gb_job_soc_ratio = cal_ratios.gb_job_type_ratios(
         by_zone_job_sic_soc_data, ["soc"], "jobs", "default_ratios"
     )
+
     # by_gb_job_soc_ratio = by_gb_job_soc_ratio.rename(
     #     columns={"ratios": "default_ratio"}
     # )
-    utilities.write_to_csv(
-        check_output_path / "by_gb_job_soc_ratio.csv", by_gb_job_soc_ratio
-    )
+    # utilities.write_to_csv(
+    #     check_output_path / "by_gb_job_soc_ratio.csv", by_gb_job_soc_ratio
+    # )
 
     # Calculate gb soc over sic ratio for jobs
     by_gb_job_soc_over_sic_ratio = cal_ratios.gb_soc_over_sic_ratios(
@@ -2226,18 +2229,19 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         "default_ratios",
         "soc",
     )
-    utilities.write_to_csv(
-        check_output_path / "by_gb_job_soc_over_sic_ratio.csv",
-        by_gb_job_soc_over_sic_ratio,
-    )
-    utilities.write_to_csv(
-        check_output_path / "by_gb_job_soc_over_sic_ratio_pivot.csv",
-        by_gb_job_soc_over_sic_ratio_pivot,
-    )
-    utilities.write_to_csv(
-        check_output_path / "by_gb_job_soc_over_sic_ratio_filled.csv",
-        by_gb_job_soc_over_sic_ratio_filled,
-    )
+
+    # utilities.write_to_csv(
+    #     check_output_path / "by_gb_job_soc_over_sic_ratio.csv",
+    #     by_gb_job_soc_over_sic_ratio,
+    # )
+    # utilities.write_to_csv(
+    #     check_output_path / "by_gb_job_soc_over_sic_ratio_pivot.csv",
+    #     by_gb_job_soc_over_sic_ratio_pivot,
+    # )
+    # utilities.write_to_csv(
+    #     check_output_path / "by_gb_job_soc_over_sic_ratio_filled.csv",
+    #     by_gb_job_soc_over_sic_ratio_filled,
+    # )
 
     # Calculate zonal soc over sic ratio
     by_zone_job_soc_over_sic_ratio_initial = cal_ratios.zone_soc_over_sic_ratios(
@@ -2262,30 +2266,33 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         "soc",
     )
 
-    utilities.write_to_csv(
-        check_output_path / "by_zone_job_soc_over_sic_ratio_filled.csv",
-        by_zone_job_soc_over_sic_ratio_filled,
-    )
+    # utilities.write_to_csv(
+    #     check_output_path / "by_zone_job_soc_over_sic_ratio_filled.csv",
+    #     by_zone_job_soc_over_sic_ratio_filled,
+    # )
+
     # convert wide to long format
     # This will create a DataFrame with 'zone_id', 'soc', 'sic_2d', and 'ratios' columns
-    by_zone_job_soc_over_sic_ratio = cal_ratios.convert_wide_to_long_soc_sic_ratios(
-        by_zone_job_soc_over_sic_ratio_filled,
-        "soc",
-        "ratios",
+    by_zone_job_soc_over_sic_ratio_wide = (
+        cal_ratios.convert_wide_to_long_soc_sic_ratios(
+            by_zone_job_soc_over_sic_ratio_filled,
+            "soc",
+            "ratios",
+        )
     )
+    print(by_zone_job_soc_over_sic_ratio_wide.head())
 
-    # by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.merge(
-    #     by_gb_job_soc_ratio,
-    #     on="soc",
-    #     how="left",
-    # )
-    # # infill nan with default ratio
-    # by_zone_job_soc_over_sic_ratio["soc_ratios"] = by_zone_job_soc_over_sic_ratio[
-    #     "soc_ratios"
-    # ].fillna(by_zone_job_soc_over_sic_ratio["default_ratio"])
-    # by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio.drop(
-    #     columns=["default_ratio"]
-    # )
+    # Define (sic_2d, soc) pairs to exclude
+    exclude_pairs = [(-1, i) for i in range(1, 4)] + [(sic, 4) for sic in range(1, 100)]
+    exclude_set = set(exclude_pairs)
+
+    # Filter the DataFrame to remove rows matching any of the (sic_2d, soc) pairs
+    by_zone_job_soc_over_sic_ratio = by_zone_job_soc_over_sic_ratio_wide[
+        ~by_zone_job_soc_over_sic_ratio_wide[["sic_2d", "soc"]]
+        .apply(tuple, axis=1)
+        .isin(exclude_set)
+    ]
+    print(by_zone_job_soc_over_sic_ratio.head())
 
     sum_soc_ratio = by_zone_job_soc_over_sic_ratio.groupby([zone_id, "sic_2d"])[
         "ratios"
@@ -2308,19 +2315,12 @@ def run(input_data: global_classes.DlogZoneData, config: inputs.DLitConfig):
         check_output_path / "by_zone_job_sum_soc_over_sic_ratio.csv", soc_ratio_wide
     )
 
-    # # further adjust ratios to make sure the sum is 1
-    # by_zone_job_soc_over_sic_ratio_aj = cal_ratios.zone_soc_over_sic_ratios(
-    #     by_zone_job_soc_over_sic_ratio,
-    #     job_type_columns,
-    #     "soc_ratios",
-    #     "ratios",
-    # )
-    # print("sum of ratios", by_zone_job_soc_over_sic_ratio_aj["ratios"].sum())
     # Define filenames and corresponding DataFrames
     by_zone_ratios = [
         (f"by_zone_hh_car_ratio_{model_zone}.csv", by_zone_hh_car_ratio),
         (f"by_zone_pop_car_ratio_{model_zone}.csv", by_zone_pop_car_ratio),
     ]
+
     # Save each DataFrame to a CSV file
     for filename, df in by_zone_ratios:
         utilities.write_to_csv(check_output_path / filename, df)

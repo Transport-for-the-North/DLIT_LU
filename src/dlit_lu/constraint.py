@@ -446,7 +446,7 @@ class GrowthCalculator:
 
         result = growth_rate.iloc[
             :,
-            [0, 1, 2, 3, 4, 5]
+            [0, 1, 2, 3, 4]
             + [growth_rate.columns.get_loc(col) for col in cagr_columns],
         ]
         return result
@@ -1127,7 +1127,7 @@ def run(config: inputs.DLitConfig):
             "GrowthRate": growth_calculator.calculate_growth(
                 processed_data, base_year_column, build_out_columns, growth_type="rate"
             ).fillna(0),
-            "AnnualGrowthRate": growth_calculator.calculate_annual_growth_rate(
+            "AnnualGRate": growth_calculator.calculate_annual_growth_rate(
                 processed_data, year_columns
             ).fillna(0),
         }
@@ -1143,7 +1143,7 @@ def run(config: inputs.DLitConfig):
         "AbsoluteGrowth",
         "GrowthRatio",
         "GrowthRate",
-        "AnnualGrowthRate",
+        "AnnualGRate",
     ]
     output_path = key_constraint_path / f"output_for_viz"
     output_path.mkdir(exist_ok=True)

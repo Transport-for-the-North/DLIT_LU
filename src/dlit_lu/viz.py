@@ -130,8 +130,8 @@ class Visualizer:
         # Determine the subfolder based on the category
         if "GrowthRate" in category:
             subfolder = "GrowthRate"
-        elif "AnnualGrowth" in category:
-            subfolder = "AnnualGrowth"
+        elif "AnnualGRate" in category:
+            subfolder = "AnnualGRate"
         elif "AbsoluteGrowth" in category:
             subfolder = "AbsoluteGrowth"
         elif "YearTotal" in category:
@@ -155,10 +155,10 @@ class Visualizer:
 
 if __name__ == "__main__":
     input_folder = Path(
-        r"I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M5_constraint\output_for_viz"
+        r"I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M5_constraint\output_for_viz"
     )
     output_dir = Path(
-        r"I:\Data\D-Log\DLIT\Outputs\test21_v0.20\M5_constraint\output_for_viz\html_files"
+        r"I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M5_constraint\output_for_viz\html_files"
     )
 
     visualizer = Visualizer(output_dir=output_dir)

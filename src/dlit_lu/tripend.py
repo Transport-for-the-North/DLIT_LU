@@ -529,7 +529,7 @@ class ForecastComparator:
                 "Discrepancies found between input dataframes, but the process will continue."
             )
         else:
-            print("All values match across future year columns.")
+            print("All LAD values match across future year columns.")
 
     def run_comparison(self):
         self.compare()
@@ -569,7 +569,7 @@ def run(config: inputs.DLitConfig):
     # future_year_column = str(2024)
     dlog_ratio = config.tripend.dlog_grth_proportion
     cap_ls_aj = config.tripend.cap_ls_adj_factor
-    key_te_folder = config.output_folder / "M7_tripend"
+    key_te_folder = config.output_folder / "M7_constrd_tripend"
     key_te_folder.mkdir(exist_ok=True)
     check_folder = key_te_folder / "check"
     check_folder.mkdir(exist_ok=True)
@@ -579,7 +579,7 @@ def run(config: inputs.DLitConfig):
     lookup_lad_region = pd.read_csv(lookup_lad_region_file)
     LOG.info("Defining key lists")
     # Lists of categories and data types
-    categories = ["hb"]  # ["hb", "nhb"],["hb"], ["nhb"]
+    categories = ["hb", "nhb"]  # ["hb", "nhb"],["hb"], ["nhb"]
     tes = ["prod", "attr"]  # trip end to be either production or attraction
     sources = ["dlog", "ntem"]  # dlog or ntem data
     sector_list = [
@@ -783,7 +783,7 @@ def run(config: inputs.DLitConfig):
             "GrowthRate",
             "AnnualGrowthRate",
         ]
-        output_path = key_te_folder / f"output_for_viz"
+        output_path = key_te_folder / f"output_for_comparison"
         output_path.mkdir(exist_ok=True)
         for geography, _ in geographies:  # Ignore geo_data
             for subkey in subkeys:
@@ -973,6 +973,7 @@ def run(config: inputs.DLitConfig):
                 df2_label="output",
                 use_tolerance=True,
                 tol=1e-6,
+                output_path=check_folder / f"sector_comparison_{id}.csv",
             )
 
             comparator.run_comparison()
