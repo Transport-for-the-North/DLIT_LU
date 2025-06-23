@@ -669,10 +669,11 @@ class ConstraintCalculator:
         df2: pd.DataFrame,
         index_columns: list[str],
         future_year_columns: list[str],
-        ratio_df1: float,
+        zone_dlog_proportion: pd.DataFrame,
     ) -> pd.DataFrame:
         """
-        Merge two dataframes on index_columns and calculate weighted average for future_year_columns.
+        Merge two dataframes on index_columns and calculate weighted average for future_year_columns,
+        using per-zone, per-year ratios provided by zone_dlog_proportion.
 
         Parameters
         ----------
@@ -684,30 +685,91 @@ class ConstraintCalculator:
             List of columns to join on.
         future_year_columns : list[str]
             List of columns for future years to compute the weighted average.
-        ratio : float
-            The weight to apply to df1. (1 - ratio) will be applied to df2.
+        zone_dlog_proportion : pd.DataFrame
+            DataFrame providing the weight for df1 per zone and year. Should include index_columns + future_year_columns.
 
         Returns
         -------
         pd.DataFrame
             A dataframe containing index_columns and the weighted average of future_year_columns.
         """
+        # Merge df1, df2, and zone_dlog_proportion
         merged = df1.merge(
             df2, on=index_columns, suffixes=("_df1", "_df2"), how="inner"
-        )
+        ).merge(zone_dlog_proportion, on=index_columns, how="left")
 
-        # Calculate weighted average for each future year
+        # Calculate weighted average for each future year, using the relevant ratio value per row/year
         for year in future_year_columns:
             col_df1 = f"{year}_df1"
             col_df2 = f"{year}_df2"
-            merged[year] = merged[col_df1] * ratio_df1 + merged[col_df2] * (
-                1 - ratio_df1
-            )
+            col_ratio = year  # from zone_dlog_proportion, after merge
 
+            # If ratio column is missing, default to 0.5 (or another value), or raise error
+            if col_ratio not in merged.columns:
+                raise ValueError(f"Missing ratio column for year {year}")
+            merged[f"{year}_comb"] = merged[col_df1] * merged[col_ratio] + merged[
+                col_df2
+            ] * (1 - merged[col_ratio])
+
+        # Rename combined columns to remove suffixes
+        future_year_columns_combined = [f"{year}_comb" for year in future_year_columns]
+        # Get columns needed
+        results = merged[index_columns + future_year_columns_combined]
+        # Rename combined columns to future year names
+        # This will rename the combined columns to their respective future year names
+
+        results = results.rename(
+            columns={f"{year}_comb": year for year in future_year_columns}
+        )
         # Keep only index columns + new computed columns
         result = merged[index_columns + future_year_columns]
 
         return result
+
+    # def combine_growth(
+    #     df1: pd.DataFrame,
+    #     df2: pd.DataFrame,
+    #     index_columns: list[str],
+    #     future_year_columns: list[str],
+    #     ratio_df1: float,
+    # ) -> pd.DataFrame:
+    #     """
+    #     Merge two dataframes on index_columns and calculate weighted average for future_year_columns.
+
+    #     Parameters
+    #     ----------
+    #     df1 : pd.DataFrame
+    #         First dataframe (e.g., estimated growth).
+    #     df2 : pd.DataFrame
+    #         Second dataframe (e.g., target growth).
+    #     index_columns : list[str]
+    #         List of columns to join on.
+    #     future_year_columns : list[str]
+    #         List of columns for future years to compute the weighted average.
+    #     ratio : float
+    #         The weight to apply to df1. (1 - ratio) will be applied to df2.
+
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         A dataframe containing index_columns and the weighted average of future_year_columns.
+    #     """
+    #     merged = df1.merge(
+    #         df2, on=index_columns, suffixes=("_df1", "_df2"), how="inner"
+    #     )
+
+    #     # Calculate weighted average for each future year
+    #     for year in future_year_columns:
+    #         col_df1 = f"{year}_df1"
+    #         col_df2 = f"{year}_df2"
+    #         merged[year] = merged[col_df1] * ratio_df1 + merged[col_df2] * (
+    #             1 - ratio_df1
+    #         )
+
+    #     # Keep only index columns + new computed columns
+    #     result = merged[index_columns + future_year_columns]
+
+    #     return result
 
     @staticmethod
     def calculate_zone_weights(
@@ -1333,35 +1395,6 @@ def run(config: inputs.DLitConfig):
         zone_forecast = growth_calculator.yearly_totals_from_base(
             zone_adjusted_growth, base_year_column, build_out_columns
         )
-
-        # # Get Scotland zonal data from DDG
-        # zone_forecast_scotland = results[f"lad_ddg_{id}"]["YearTotal"].copy()
-        # zone_forecast_scotland = zone_forecast_scotland[
-        #     zone_forecast_scotland["REGIONNM"].str.strip().str.lower() == "scotland"
-        # ]
-        # zone_forecast_scotland = zone_forecast_scotland.drop(
-        #     "source", axis=1, errors="ignore"
-        # )
-
-        # # Merge the dataframes on the index columns (LAD13CD, LADNM, REGIONNM)
-        # zone_forecast = zone_forecast.merge(
-        #     zone_forecast_scotland[zone_index_columns + build_out_columns],
-        #     on=zone_index_columns,
-        #     how="left",  # Ensure we keep all rows from zone_forecast
-        #     suffixes=("", "_scotland"),
-        # )
-
-        # # Now update the year columns in zone_forecast with the values from zone_forecast_scotland
-        # for year in build_out_columns:
-        #     zone_forecast[year] = zone_forecast[year].fillna(
-        #         zone_forecast[f"{year}_scotland"]
-        #     )
-
-        # # Drop the extra columns from the merge (e.g., the "_scotland" suffixed columns)
-        # zone_forecast = zone_forecast.drop(
-        #     columns=[f"{year}_scotland" for year in build_out_columns]
-        # )
-
         # Agg zone forecast to sector level
         agg_zone_forecast = zone_forecast.groupby("REGIONNM")[build_out_columns].sum()
         agg_zone_forecast = agg_zone_forecast.reset_index()
@@ -1437,6 +1470,7 @@ def run(config: inputs.DLitConfig):
         for key, value in final_output_mapping.items():
             utilities.write_to_csv(key_constraint_path / value["file"], value["data"])
 
+    # Check if NTEM constraint is to be applied
     if apply_ntem_constraint:
 
         LOG.info(f"Constraining dlog data with NTEM data")

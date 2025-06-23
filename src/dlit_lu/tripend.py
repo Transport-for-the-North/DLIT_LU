@@ -911,10 +911,32 @@ def run(config: inputs.DLitConfig):
 
             # Get sector and zone level estimated growth from dlog
             sector_estimated_growth = results[f"{sector}_dlog_{id}"]["AbsoluteGrowth"]
-            # print(sector_index_columns)
             zone_estimated_growth = results[f"zone_dlog_{id}"]["AbsoluteGrowth"]
 
-            # print(zone_index_columns)
+            # Determin sector level dlog proportion
+            tol = 1e-4  # Tolerance for "close to zero"
+
+            # Start: copy the DataFrame
+            sector_dlog_proportion = sector_estimated_growth[
+                sector_index_columns + future_year_columns
+            ].copy()
+            # For each column, apply the logic
+            for col in future_year_columns:
+                # Identify where sector_estimated_growth is "close to zero"
+                values = pd.to_numeric(sector_estimated_growth[col], errors="coerce")
+                close_to_zero = np.isclose(values, 0, atol=tol)
+                # Assign
+                sector_dlog_proportion[col] = np.where(close_to_zero, 0, dlog_ratio)
+            print(sector_dlog_proportion)
+            # Get zone scaler from sector ratio
+            zone_dlog_proportion = zone_estimated_growth[zone_index_columns].copy()
+            zone_dlog_proportion = zone_dlog_proportion.merge(
+                sector_dlog_proportion, on=sector_index_columns, how="left"
+            )
+            zone_dlog_proportion = zone_dlog_proportion[
+                zone_index_columns + future_year_columns
+            ]
+
             zone_base_year = zone_target_growth[zone_index_columns + [base_year_column]]
 
             # Combine target growth with estimated growth to get a combined zone growth pattern
@@ -923,7 +945,7 @@ def run(config: inputs.DLitConfig):
                 zone_target_growth,
                 zone_index_columns,
                 future_year_columns,
-                dlog_ratio,
+                zone_dlog_proportion,
             )
 
             # Merged combined future year growth with base year df
@@ -1261,9 +1283,8 @@ def run(config: inputs.DLitConfig):
         attr_totals = attr_df.groupby(["p", "m"])[future_year_columns].sum()
 
         # Compute scaling factor
-        scaling_factor = (
-            prod_totals.divide(attr_totals).replace([np.inf, -np.inf], np.nan).fillna(1)
-        )
+        attr_totals_nonzero = attr_totals.replace(0, np.nan)  # Avoid division by zero
+        scaling_factor = prod_totals.divide(attr_totals_nonzero).fillna(1)
         # print("Scaling factor:\n", scaling_factor)
         # Apply scaling
         attr_scaled = attr_df.copy()
