@@ -687,6 +687,13 @@ def run(config: inputs.DLitConfig):
             [zone_id, "p", "m", base_year_column] + future_year_columns
         ],
     }
+    summary_ntem_totals = summarize_year_sums(
+        ntem_zone_te, [base_year_column] + future_year_columns
+    )
+    # Export key dataFrames to CSV files
+    utilities.write_to_csv(
+        check_folder / "summary_totals_before_constraining.csv", summary_ntem_totals
+    )
 
     LOG.info("Aggregating zonal data to sector level")
 
@@ -1177,6 +1184,10 @@ def run(config: inputs.DLitConfig):
                     "data": zone_estimated_growth,
                     "file": f"zone_estimated_growth_{id}.csv",
                 },
+                "zone_dlog_proportion": {
+                    "data": zone_dlog_proportion,
+                    "file": f"zone_dlog_proportion_{id}.csv",
+                },
                 "zone_combined_growth": {
                     "data": zone_comb_growth,
                     "file": f"zone_combined_growth_{id}.csv",
@@ -1221,10 +1232,6 @@ def run(config: inputs.DLitConfig):
                 "sector_ls_te_grth": {
                     "data": sector_ls_te_grth,
                     "file": f"{sector}_largesite_te_growth_{id}.csv",  # for checking
-                },
-                "sector_scaled_etmt_tot": {
-                    "data": sector_scaled_etmt_tot,
-                    "file": f"{sector}_forecast_fy_{id}.csv",
                 },
                 "region_forecast": {
                     "data": region_forecast,

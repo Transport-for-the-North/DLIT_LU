@@ -693,6 +693,10 @@ class ConstraintCalculator:
         pd.DataFrame
             A dataframe containing index_columns and the weighted average of future_year_columns.
         """
+        # Rename columns in zone_dlog_proportion to match future_year_columns
+        zone_dlog_proportion = zone_dlog_proportion.rename(
+            columns={col: col + "_dlog_ratio" for col in future_year_columns}
+        )
         # Merge df1, df2, and zone_dlog_proportion
         merged = df1.merge(
             df2, on=index_columns, suffixes=("_df1", "_df2"), how="inner"
@@ -702,29 +706,19 @@ class ConstraintCalculator:
         for year in future_year_columns:
             col_df1 = f"{year}_df1"
             col_df2 = f"{year}_df2"
-            col_ratio = year  # from zone_dlog_proportion, after merge
+            col_ratio = f"{year}_dlog_ratio"  # from zone_dlog_proportion, after merge
 
             # If ratio column is missing, default to 0.5 (or another value), or raise error
             if col_ratio not in merged.columns:
                 raise ValueError(f"Missing ratio column for year {year}")
-            merged[f"{year}_comb"] = merged[col_df1] * merged[col_ratio] + merged[
-                col_df2
-            ] * (1 - merged[col_ratio])
+            merged[year] = (merged[col_df1] * merged[col_ratio]) + (
+                merged[col_df2] * (1 - merged[col_ratio])
+            )
 
-        # Rename combined columns to remove suffixes
-        future_year_columns_combined = [f"{year}_comb" for year in future_year_columns]
         # Get columns needed
-        results = merged[index_columns + future_year_columns_combined]
-        # Rename combined columns to future year names
-        # This will rename the combined columns to their respective future year names
+        results = merged[index_columns + future_year_columns]
 
-        results = results.rename(
-            columns={f"{year}_comb": year for year in future_year_columns}
-        )
-        # Keep only index columns + new computed columns
-        result = merged[index_columns + future_year_columns]
-
-        return result
+        return results
 
     # def combine_growth(
     #     df1: pd.DataFrame,
