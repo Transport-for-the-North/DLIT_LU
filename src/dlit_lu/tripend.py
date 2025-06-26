@@ -692,7 +692,7 @@ def run(config: inputs.DLitConfig):
     )
     # Export key dataFrames to CSV files
     utilities.write_to_csv(
-        check_folder / "summary_totals_before_constraining.csv", summary_ntem_totals
+        check_folder / "summary_totals_ntem.csv", summary_ntem_totals
     )
 
     LOG.info("Aggregating zonal data to sector level")
