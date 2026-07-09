@@ -1,6 +1,7 @@
 """
 runs the DLIT_LU tool
 """
+
 import sys
 import argparse
 

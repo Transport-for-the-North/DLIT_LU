@@ -1,5 +1,6 @@
 """handles reading config file
 """
+
 # standard imports
 from __future__ import annotations
 
@@ -96,6 +97,10 @@ class LandUseConfig:
 
     Parameters
     ----------
+    zone_shapefile_path: pathlib.Path
+        path to zone shape file
+    zone_data_path: pathlib.Path
+        path to pop,household,emp by zone
     msoa_shapefile_path: pathlib.Path
         path to msoa shape file
     msoa_dwelling_pop_path: pathlib.Path
@@ -120,6 +125,8 @@ class LandUseConfig:
         at a different zone system.
     """
 
+    zone_shapefile_path: pydantic.FilePath
+    zone_data_path: pydantic.FilePath
     msoa_shapefile_path: pydantic.FilePath
     msoa_dwelling_pop_path: pydantic.FilePath
     msoa_traveller_type_path: pydantic.FilePath
@@ -127,7 +134,12 @@ class LandUseConfig:
     employment_density_matrix_path: pydantic.FilePath
     luc_sic_conversion_path: pydantic.FilePath
 
-    land_use_input: Optional[pydantic.FilePath] = None
+    # land_use_input: Optional[pydantic.FilePath] = None
+    # change from Optional[pydantic.FilePath]  to Optional[pathlib.Path]
+    # as pydantic.FilePath immediately validates whether the file exists when parsing the YAML
+    # while using pathlib.Path (or str), the validation will only happen inside the custom validator, 
+    # which properly checks run_land_use before verifying the file path
+    land_use_input: Optional[pathlib.Path] = None
     demolition_dampener: pydantic.types.confloat(ge=0, le=1, allow_inf_nan=False) = 1
     summary_data: SummaryInputs | None = None
 
