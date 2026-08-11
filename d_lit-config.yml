@@ -1,23 +1,25 @@
 #Set Up Parameters
-run_infill: True
-run_land_use: True
+run_infill: False # M1
+run_land_use: False # M2
+run_large_sites: False  # M3
+run_split: False # M4
+run_constraint: False # M5
+run_tem: False # M6- currently in caf.tem
+run_tripend: True  # M7
 
 #Mandatory Parameters
 #--str
 lookups_sheet_name: "Lookups"
 #--Read file paths
-dlog_input_file: I:\Data\D-Log\DLIT\Inputs\DLog21_v8_issued_v1.xlsx
+dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v6.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\Test
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\test22_v0.21
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\existing_luc_split_path.csv
+
 
 infill:
   user_infill: False
-  combined_sheet_name: "2021 Combined"
-  residential_sheet_name: "2021 Residential"
-  employment_sheet_name: "2021 Employment"
-  mixed_sheet_name: "2021 Mixed"
   #--Read file paths
   dlog_column_names_path: inputs\DLog_column_names.csv
   valid_luc_path: inputs\valid_luc.csv
@@ -26,23 +28,152 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test\user_input.xlsx
-  gfa_infill_method: regression_no_negatives
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\user_input.xlsx
+  gfa_infill_method: regression_no_negatives # mean, median, glbaverage, regression, regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test\03_post_fixes\post_fix_data.xlsx
-  zone_shapefile_path: I:\Data\D-Log\DLIT\Inputs\zone_shapefile\NorMITsZoneV3.3\NorMITs_zoning_v3.3.shp
-  zone_data_path: I:\Data\D-Log\DLIT\Inputs\NorMITs2023\totals.csv
-  msoa_shapefile_path: I:\Data\D-Log\DLIT\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
-  msoa_dwelling_pop_path: I:\Data\D-Log\DLIT\Inputs\gb_msoa_agg_prt_2018_hh_pop.csv
-  msoa_traveller_type_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_pop.csv
-  msoa_jobs_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_emp.csv
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M1_03_post_fixes\post_fix_data.xlsx
+
+  lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
+  lsoa_hh_types_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output P13.3.csv
+  lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
+  lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
+  lsoa_jobs_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output E4_3.csv
   employment_density_matrix_path: inputs\emp_density_matrix.csv
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
+  web_tag_certainty_path: inputs\web_tag_certainty.csv
   demolition_dampener: 0
+  luti: True
+  luti_zone_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NLUTI_v4_shapefiles\NLUTI_v4_zones_refactored.shp    
+
+
+large_sites:
+  # Key input paths
+  base_year: 2023
+  end_year: 2065 # the end year of Dlog data
+  geo_boundary: lsoa # lsoa, normits, noham, norms, mosa
+  viz_distribution: True # whether or not to export distribution of large sites for viz
+  export_by_output: True # whether or not export base year outputs
+  index_weights_path : inputs\variable_index_weights.csv
+  # lsoa_by_data_path: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\tot_by_data_out.csv
+  assessment_input: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M1_01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
+  emp_site_data: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M2_land_use_outputs\jobs_sites_uncertainty_build_out.csv
+  res_site_data: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M2_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
+  pop_site_data: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M2_land_use_outputs\population_sites_uncertainty_build_out.csv
+  emp_sic_site_data: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M2_land_use_outputs\jobs_sic_sites_uncertainty_build_out.csv
+
+  # shape file paths
+  normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
+  noham_shapefile_path: P:\02_NorTMS Rebase\01_Highway\03.Data\06. Confirmed Zone Structure\2.NoHAM_zone_updates-TfN\NoHAM_zones_v3.7\NoHAM_Zones_v3.7.shp
+  norms_shapefile_path: P:\02_NorTMS Rebase\02_Rail\02_Data_Sys_to_TfN\1.NorTMS_zones\NorTMS_zones_v3.3\NorTMS_zoning_3.3_OA21.shp
+  msoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\Middle_Layer_Super_Output_Areas_MSOA\MSOA_2021_EW\MSOA_2021_EW_BGC.shp
+  # centroids paths
+  lsoa_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_hh_centroids.csv
+  lsoa_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_emp_centroids.csv
+  lsoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_pop_centroids.csv
+  normits_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_hh_centroids.csv
+  normits_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_emp_centroids.csv
+  normits_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_pop_centroids.csv
+  noham_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_hh_centroids.csv
+  noham_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_emp_centroids.csv
+  noham_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_pop_centroids.csv
+  norms_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\norms_v3.3_hh_centroids.csv
+  norms_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\norms_v3.3_emp_centroids.csv
+  norms_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\norms_v3.3_pop_centroids.csv
+  msoa_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_hh_centroids.csv
+  msoa_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_emp_centroids.csv
+  msoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_pop_centroids.csv
+  # lookup paths between LU base year zone- lsoa and any model zone
+  lsoa_to_normits: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_normits_v3.3\normits_v3.3_lsoa21_trans.csv
+  lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_noham_v3.7\lsoa_2021_noham_v3.7_spatial.csv
+  lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_norms_v3.3\lsoa_2021_norms_v3.3_spatial.csv
+  lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
   summary_data:
-    summary_zone_name: lad_2020
-    lookup_file: I:\Data\D-Log\DLIT\Inputs\msoa_to_lad_2020_lookup.csv
-    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2020_December\Local_Authority_Districts_(December_2020)_UK_BGC.shp
-    shapefile_id_column: LAD20CD
+    # summary_lad: lad2013 # lad2013
+    ###### 2011 LAD #######
+    # lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\lsoa2021_lad2011\lsoa_2021_lad2011_spatial.csv
+    # msoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\msoa2021_lad2011\msoa_2021_lad2011_spatial.csv
+    # norms_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normsv3.3_lad2011\norms_v3.3_lad2011_spatial.csv
+    # noham_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\nohamv3.7_lad2011\noham_v3.7_lad2011_spatial.csv
+    # normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normits_v3.3_lad2011\normits_v3.3_lad2011_spatial.csv
+    ###### 2013 LAD #######
+    lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\lsoa2021_lad2013\lsoa2021_lad2013_spatial.csv
+    msoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\msoa2021_lad2013\msoa2021_lad2013_spatial.csv
+    norms_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\normsv3.3_lad2013\norms_v3.3_lad2013_spatial.csv
+    noham_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\nohamv3.7_lad2013\noham_v3.7_lad2013_spatial.csv
+    normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\normitsv3.3_lad2013\normits_v3.3_lad2013_spatial.csv
+    # shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+    lad_shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2013\LAD_DEC_2013_GB_BFC_-119125151109105358\LAD_DEC_2013_GB_BFC.shp
+    shapefile_id_column: LAD13CD 
     geometry_simplify_tolerance: 100
+
+split:
+  future_years:
+    - 2042
+    - 2052
+    # - 2062  # list[int]
+  # key input paths from large_sites
+  zone_fy_tot_hh: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_tot_hh.csv.bz2
+  zone_fy_tot_pop: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_tot_pop.csv.bz2
+  zone_fy_tot_emp: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_tot_emp.csv.bz2
+  zone_fy_tot_emp_sic: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_tot_emp_sic.csv.bz2
+  zone_fy_lsgrth_hh: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_lsgrth_hh.csv.bz2
+  zone_fy_lsgrth_pop: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_lsgrth_pop.csv.bz2
+  zone_fy_lsgrth_emp: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_lsgrth_emp.csv.bz2
+  zone_fy_lsgrth_emp_sic: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_key_outputs\fy_zone_lsgrth_emp_sic.csv.bz2
+  # key input paths from NTEM car ownership and planning data
+  lsoa_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lsoa_hh_car_proportions.csv.bz2
+  lsoa_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\lsoa_pop_car_proportions.csv.bz2
+  normits_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_hh_car_proportions.csv.bz2
+  normits_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\normits_pop_car_proportions.csv.bz2
+  noham_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\noham_hh_car_proportions.csv.bz2
+  noham_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\noham_pop_car_proportions.csv.bz2
+  norms_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\norms_hh_car_proportions.csv.bz2
+  norms_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\norms_pop_car_proportions.csv.bz2
+  msoa_hh_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\msoa_hh_car_proportions.csv.bz2
+  msoa_pop_car: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\proportions\msoa_pop_car_proportions.csv.bz2
+  tfn_tt: I:\NTS\classified builds\traveller_type_tfn.csv
+
+constraint:
+  # Zone names
+  sector: region #region, combined_lad 
+  lad_name: I:\Data\D-Log\DLIT\Inputs\zone_name\lad_2013\zoning.csv
+  region_name: I:\Data\D-Log\DLIT\Inputs\zone_name\region_ntem\zoning.csv
+  lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
+  ntem_constraint: False # whether or not to further use ntem to constraint data, in parellel with DDG constraint process
+  # Key input paths from observed data(ddg, ntem) 
+  ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan24 Central\DD_Jan24_Central_Emp_LA.csv
+  ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan24 Central\DD_Jan24_Central_Pop_LA.csv
+  # ntem_hh: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Households.csv
+  ntem_emp: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Jobs.csv
+  ntem_pop: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated\LAD13_Population.csv
+  # Dlog related inputs from previous module large_sites
+  # dlog_hh: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_aggregation\lad_household.csv
+  dlog_emp: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_aggregation\lad_job.csv
+  dlog_pop: I:\Data\D-Log\DLIT\Outputs\test22_v0.21\M3_ls_aggregation\lad_population.csv
+
+  # Ratio value to determing the proportion of Dlog growth contributes. E,g, 0.75 means the 75% percent of target growth from constraint will from Dlog pattern
+  cap_ratio: 0.95
+
+tripend:
+  # ntem_scenario: core #High #Low etc
+  sector: lad #lad, region
+
+  # key tem input path
+  dlog_te_tot_path: T:\Yan_Kavana\tem_new_outputs\Dlog_test22_total\Core  #T:\Yan_Kavana\tem_new_outputs\Dlog_test21_total_unbalanced\Core
+  dlog_te_lsgrth_path: T:\Yan_Kavana\tem_new_outputs\Dlog_test22_ls_growth\Core
+
+  # key input paths from ntem trip end
+  ntem_zone_hb_prod: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_production_hb.csv.bz2
+  ntem_zone_hb_attr: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_attraction_hb.csv.bz2
+  ntem_zone_nhb_prod: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_production_nhb.csv.bz2
+  ntem_zone_nhb_attr: I:\Data\D-Log\DLIT\Inputs\ntem_data_out\translated_pa\normits_attraction_nhb.csv.bz2
+
+  # Whether or not to export files for viz
+  export_for_viz: True
+
+  # proportion of growth from estimated Dlog data
+  dlog_grth_proportion: 0.75
+  cap_ls_adj_factor: 0.5 # ruling out negative number, cap the smallest scaling factor value to 0.5- means that the growth from Dlong large sites will be at least 50% of original estimate
+
+  

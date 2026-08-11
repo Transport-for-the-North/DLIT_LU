@@ -1,5 +1,5 @@
-"""contains NamedTuple subclasses and other classes used globally
-"""  # docstring
+"""contains NamedTuple subclasses and other classes used globally"""  # docstring
+
 # standard imports
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import NamedTuple, Optional
 # third party imports
 import pandas as pd
 import geopandas as gpd
+from dlit_lu import utilities
 
 
 class DLogValueLookup(NamedTuple):
@@ -60,6 +61,8 @@ class DLogData(NamedTuple):
     note that the DataFrames do not have identical column names
     Parameters
     ----------
+    combined_data: Optional[pd.DataFrame] = None
+        the combined data set
     residential_data: pd.DataFrame
         the residential data set
     employment_data: pd.DataFrame
@@ -68,8 +71,6 @@ class DLogData(NamedTuple):
         sites which have residential and employment developments
     lookup: Lookup
         a look up table for the IDs used in the data
-    combined_data: Optional[pd.DataFrame] = None
-        the combined data set
     proposed_land_use_split: Optional[pd.DataFrame] = None
         the split of proposed land use codes that appears in the dlog
     existing_land_use_split: Optional[pd.DataFrame] = None
@@ -147,6 +148,77 @@ class DLogData(NamedTuple):
         )
 
 
+class DlogZoneData(NamedTuple):
+    """contains the zone data from the DLog
+
+    Parameters
+    ----------
+    zone_tot_hh: pd.DataFrame
+        zonal total household data
+    zone_tot_pop: pd.DataFrame
+        zonal total population data
+    zone_tot_emp: pd.DataFrame
+        zonal total employment data
+    zone_tot_emp_sic: pd.DataFrame
+        zonal total employment segmented by sic 2 digit
+    zone_lsgrth_hh: pd.DataFrame
+        zonal household growth data from large site
+    zone_lsgrth_pop: pd.DataFrame
+        zonal population growth data from large site
+    zone_lsgrth_emp: pd.DataFrame
+        zonal employment growth data from large site
+    zone_lsgrth_emp_sic: pd.DataFrame
+        zonal employment growth segmented by sic 2 digit from large site
+    """
+
+    fy_zone_tot_hh: pd.DataFrame
+    fy_zone_tot_pop: pd.DataFrame
+    fy_zone_tot_emp: pd.DataFrame
+    fy_zone_tot_emp_sic: pd.DataFrame
+    fy_zone_lsgrth_hh: pd.DataFrame
+    fy_zone_lsgrth_pop: pd.DataFrame
+    fy_zone_lsgrth_emp: pd.DataFrame
+    fy_zone_lsgrth_emp_sic: pd.DataFrame
+
+    def export_to_csv(self, output_dir: str) -> None:
+        """Export all DataFrame attributes to CSV files in the specified directory.
+
+        Parameters
+        ----------
+        output_dir : str
+            The directory where CSV files will be saved.
+        """
+        # os.makedirs(output_dir, exist_ok=True)
+
+        for attr_name in self._fields:
+            df = getattr(self, attr_name)
+            if isinstance(df, pd.DataFrame):
+
+                output_path = output_dir / f"{attr_name}.csv.bz2"
+                utilities.write_to_csv(output_path, df)
+
+
+class DlogTEData(NamedTuple):
+    """contains the zone trip end data from the DLog
+
+    Parameters
+    ----------
+    hb_prod: pd.DataFrame
+        housing production data
+    hb_attr: pd.DataFrame
+        housing attribute data
+    nhb_prod: pd.DataFrame
+        non housing production data
+    nhb_attr: pd.DataFrame
+        non housing attribute data
+    """
+
+    hb_prod: pd.DataFrame
+    hb_attr: pd.DataFrame
+    nhb_prod: pd.DataFrame
+    nhb_attr: pd.DataFrame
+
+
 class AuxiliaryData(NamedTuple):
     """stores data not contained in the DLog required for processing
 
@@ -172,6 +244,25 @@ class AuxiliaryData(NamedTuple):
     out_of_date_luc: pd.DataFrame
     incomplete_luc: pd.DataFrame
     regions: gpd.GeoDataFrame
+
+
+class AssessData(NamedTuple):
+    """used to store and pass the read DLOg data set
+
+    note that the DataFrames do not have identical column names
+    Parameters
+    ----------
+    residential_data: pd.DataFrame
+        the residential data set
+    employment_data: pd.DataFrame
+        the employment data set
+    mixed_data: Optional[pd.DataFrame]
+        sites which have residential and employment developments
+    """
+
+    residential_data: pd.DataFrame
+    employment_data: pd.DataFrame
+    mixed_data: pd.DataFrame
 
 
 class ResultsReport:

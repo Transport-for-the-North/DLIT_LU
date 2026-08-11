@@ -3,6 +3,7 @@
 analyses the DLog to determine the values that need repairing or infilling
 then performs automatic syntax fixes, user infill and then automatic infill using infered values
 """
+
 # standard imports
 import logging
 import argparse
@@ -56,7 +57,7 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
     )
 
     # implement syntax fixes
-    initial_assessment_folder = config.output_folder / "00_initial_assessment"
+    initial_assessment_folder = config.output_folder / "M1_01_initial_assessment"
     if initial_assessment:
         initial_assessment_folder.mkdir(exist_ok=True)
 
@@ -72,6 +73,8 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
     syntax_fixed_data = data_repair.correct_inavlid_syntax(
         data_filter_columns, auxiliary_data
     )
+    syntax_fixed_data = data_repair.infill_expected_landuse(syntax_fixed_data)
+    syntax_fixed_data = data_repair.fix_expected_split(syntax_fixed_data)
 
     syntax_fixed_data = analyse.data_report(
         syntax_fixed_data,
@@ -81,16 +84,15 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         False,
         False,
     )
-    proposed_luc_split = analyse.luc_ratio(
-        utilities.to_dict(syntax_fixed_data), auxiliary_data, "proposed_land_use"
-    )
 
-    utilities.write_to_csv(config.proposed_luc_split_path, proposed_luc_split)
+    expected_luc_split = analyse.luc_ratio(
+        utilities.to_dict(syntax_fixed_data), auxiliary_data, "expected_land_use"
+    )
+    utilities.write_to_csv(config.proposed_luc_split_path, expected_luc_split)
 
     existing_luc_split = analyse.luc_ratio(
         utilities.to_dict(syntax_fixed_data), auxiliary_data, "existing_land_use"
     )
-
     utilities.write_to_csv(config.existing_luc_split_path, existing_luc_split)
 
     # user fixes
@@ -109,7 +111,7 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         if user_fixed_data is None:
             return
 
-        post_user_fix_path = config.output_folder / "02_post_user_fix"
+        post_user_fix_path = config.output_folder / "M1_02_post_user_fix"
         post_user_fix_path.mkdir(exist_ok=True)
         post_user_fix_report_path = (
             post_user_fix_path / "post_user_fix_data_report.xlsx"
@@ -154,35 +156,35 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         "res_distribution",
         "units_(dwellings)",
         res_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data_dict["employment"] = data_repair.infill_year_units(
         infilled_fixed_data_dict["employment"],
         "emp_distribution",
         "units_(floorspace)",
         emp_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data_dict["mixed"] = data_repair.infill_year_units(
         infilled_fixed_data_dict["mixed"],
         "res_distribution",
         "units_(dwellings)",
         res_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data_dict["mixed"] = data_repair.infill_year_units(
         infilled_fixed_data_dict["mixed"],
         "emp_distribution",
         "units_(floorspace)",
         emp_unit_year_columns,
-        dlog_data.lookup.years,
+        dlog_data.lookup,
     )
     infilled_fixed_data = utilities.to_dlog_data(
         infilled_fixed_data_dict, infilled_fixed_data.lookup
     )
 
     # post fixes data report and write post fix data
-    post_fix_output_path = config.output_folder / "03_post_fixes"
+    post_fix_output_path = config.output_folder / "M1_03_post_fixes"
     post_fix_output_path.mkdir(exist_ok=True)
 
     post_fix_data_filter_columns = analyse.data_report(
@@ -209,6 +211,6 @@ def run(config: inputs.DLitConfig, args: argparse.Namespace) -> global_classes.D
         post_fix_data_filter_columns.employment_data,
         post_fix_data_filter_columns.mixed_data,
         post_fix_data_filter_columns.lookup,
-        proposed_luc_split,
+        expected_luc_split,
         existing_luc_split,
     )

@@ -1,5 +1,5 @@
-"""General functions and classes used by tool. 
-"""
+"""General functions and classes used by tool."""
+
 # standard imports
 import logging
 import pathlib
@@ -136,6 +136,22 @@ def write_to_csv(file_path: pathlib.Path, output: pd.DataFrame) -> None:
         data to write
     """
     output.to_csv(file_path)
+
+
+@output_file_checks
+def write_to_csv_no_index(file_path: pathlib.Path, output: pd.DataFrame) -> None:
+    """wirtes file to csv
+
+    used so wrapper with logging and permission error checks can be applied
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        path to write csv to
+    output : pd.DataFrame
+        data to write
+    """
+    output.to_csv(file_path, index=False)
 
 
 @output_file_checks

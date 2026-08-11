@@ -1,14 +1,15 @@
 """DLit DLog land use analysis and repair tool: Version 0.0.0: 09/12/2021
 
-    This tool reads the DLog excel spreadsheet and analyses the data
-    for any invalid data, returning the findings in a excel
-    spradsheet. Any fixes that can be perfomed automatically will be
-    performed. Any issues that require user intervention will be
-    outputted to the user, to be infilled manually, read back in and
-    intergrated with the DLog
+This tool reads the DLog excel spreadsheet and analyses the data
+for any invalid data, returning the findings in a excel
+spradsheet. Any fixes that can be perfomed automatically will be
+performed. Any issues that require user intervention will be
+outputted to the user, to be infilled manually, read back in and
+intergrated with the DLog
 
-    Kieran Fishwick: kieran.fishwick@wsp.com
+Kieran Fishwick: kieran.fishwick@wsp.com
 """
+
 # standard imports
 import pathlib
 import logging
@@ -18,7 +19,17 @@ import argparse
 from tqdm.contrib import logging as tqdm_log
 
 # local imports
-from dlit_lu import infilling, inputs, utilities, land_use, parser
+from dlit_lu import (
+    constraint,
+    infilling,
+    inputs,
+    utilities,
+    land_use,
+    parser,
+    large_sites,
+    split,
+    tripend,
+)
 
 # constants
 CONFIG_PATH = pathlib.Path("d_lit-config.yml")
@@ -56,3 +67,18 @@ def main(log: utilities.DLitLog, args: argparse.Namespace) -> None:
 
     if config.run_land_use and infilled_data is not None:
         land_use.run(infilled_data, config)
+
+    assess_data = parser.parse_large_sites_input(config)
+    if config.run_large_sites and assess_data is not None:
+        fy_zone_data = large_sites.run(assess_data, config)
+    else:
+        fy_zone_data = parser.parse_fy_zone_input(config)
+
+    if config.run_split and fy_zone_data is not None:
+        split.run(fy_zone_data, config)
+
+    if config.run_constraint:
+        constraint.run(config)
+
+    if config.run_tripend:
+        tripend.run(config)

@@ -1,4 +1,5 @@
 """Automatically fixes and infills data where possible"""
+
 # standard imports
 from __future__ import annotations
 import dataclasses
@@ -32,9 +33,9 @@ _UNITS_COLUMNS = {
     "mixed": ["floorspace_sqm", "units_(floorspace)", "dwellings", "units_(dwellings)"],
 }
 _LAND_USE_COLUMNS = {
-    "residential": ["existing_land_use"],
-    "employment": ["existing_land_use", "proposed_land_use"],
-    "mixed": ["existing_land_use", "proposed_land_use"],
+    "residential": ["existing_land_use", "proposed_land_use", "expected_land_use"],
+    "employment": ["existing_land_use", "proposed_land_use", "expected_land_use"],
+    "mixed": ["existing_land_use", "proposed_land_use", "expected_land_use"],
 }
 
 
@@ -111,10 +112,88 @@ def infill_landuse_codes(
         {
             "existing_land_use": "other_issues_existing_land_use_code",
             "proposed_land_use": "other_issues_proposed_land_use_code",
+            "expected_land_use": "other_issues_expected_land_use_code",
         },
     )
 
     return global_classes.DLogData.from_data_dict(luc_infilling, data.lookup)
+
+
+def infill_expected_landuse(
+    auxiliary_data: global_classes.AuxiliaryData,
+) -> global_classes.DLogData:
+    """Infill expected landuse columns using known land use columns.
+
+    Infills with full list of valid land use codes if no
+    known lookups are found.
+
+    Returns
+    -------
+    global_classes.DLogData
+        A new instance of DLogData with expected landuse column infilled.
+    """
+
+    filled_expecations = {}
+
+    for k in _LAND_USE_COLUMNS:
+        v = getattr(auxiliary_data, f"{k}_data").copy()
+        v.loc[v["expected_land_use"].str.len() == 0, "expected_land_use"] = v[
+            "proposed_land_use"
+        ]
+        filled_expecations[k] = v.copy()
+    return global_classes.DLogData.from_data_dict(
+        filled_expecations, auxiliary_data.lookup
+    )
+
+
+def fix_expected_split(
+    auxiliary_data: global_classes.AuxiliaryData,
+) -> global_classes.DLogData:
+    """Infill expected landuse columns using known land use columns.
+
+    Infills with full list of valid land use codes if no
+    known lookups are found.
+
+    Returns
+    -------
+    global_classes.DLogData
+        A new instance of DLogData with expected landuse column infilled.
+    """
+
+    split_expecations = {}
+    for k in _LAND_USE_COLUMNS:
+        v = getattr(auxiliary_data, f"{k}_data").copy()
+
+        v["compatible_splits"] = v.apply(
+            lambda x: (
+                (set(x["expected_split"].keys()) <= set(x["expected_land_use"]))
+                | (x["expected_land_use"] == ["unknown"])
+            )
+            & (len(x["expected_split"]) != 0),
+            axis=1,
+        )
+        v["divisor"] = v["expected_land_use"].str.len().clip(lower=1)
+        v.loc[~v["compatible_splits"], "expected_split"] = v.apply(
+            lambda x: {i: f"{1/x['divisor']}" for i in x["expected_land_use"]}, axis=1
+        )
+        v["divisor"] = v["expected_split"].str.len().clip(lower=1)
+        v["expected_split"] = v.apply(
+            lambda x: {
+                i: (
+                    float(f"{1/x['divisor']}")
+                    if j == ""
+                    else float(j.replace("%", "e-2"))
+                )
+                for i, j in x["expected_split"].items()
+            },
+            axis=1,
+        )
+        v["expected_land_use"] = v["expected_split"].apply(lambda x: list(x.keys()))
+        v = v.drop(columns=["compatible_splits", "divisor"])
+        split_expecations[k] = v.copy()
+    return global_classes.DLogData.from_data_dict(
+        split_expecations, auxiliary_data.lookup
+    )
 
 
 def infill_data(
@@ -157,8 +236,20 @@ def infill_data(
     # required for regression area infill
     luc_infilled = infill_landuse_codes(data, auxiliary_data)
 
-    distribution_path = output_folder / "distribution_plots/before_infilling"
+    distribution_path = output_folder / "Aux_distribution_plots/before_infilling"
     distribution_path.mkdir(exist_ok=True, parents=True)
+
+    infill_means = _mean_factors(
+        luc_infilled,
+        distribution_path,
+        output_folder / inputs.MEAN_INFILLING_VALUES_FILE,
+    )
+
+    infill_medians = _median_factors(
+        luc_infilled,
+        distribution_path,
+        output_folder / inputs.MEDIAN_INFILLING_VALUES_FILE,
+    )
 
     infill_averages = _average_factors(
         luc_infilled,
@@ -167,23 +258,52 @@ def infill_data(
     )
 
     if gfa_method == inputs.GFAInfillMethod.MEAN:
+        infilled_area = _mean_area_infill(luc_infilled, infill_means)
+    elif gfa_method == inputs.GFAInfillMethod.MEDIAN:
+        infilled_area = _median_area_infill(luc_infilled, infill_medians)
+    elif gfa_method == inputs.GFAInfillMethod.GLBAVERAGE:
         infilled_area = _average_area_infill(luc_infilled, infill_averages)
     elif gfa_method in inputs.GFAInfillMethod.regression_methods():
         infilled_area = _regression_area_infill(
             luc_infilled,
             gfa_method == inputs.GFAInfillMethod.REGRESSION,
-            output_folder / "infilling_checks",
+            output_folder / "Aux_infilling_checks",
         )
     else:
         raise ValueError(f"invalid GFA infill method: {gfa_method}")
 
     distribution_path = distribution_path.with_name("after_infilling")
     distribution_path.mkdir(exist_ok=True)
-    _average_factors(
-        infilled_area,
-        distribution_path,
-        output_folder / ("after_" + inputs.AVERAGE_INFILLING_VALUES_FILE),
-    )
+
+    if gfa_method == inputs.GFAInfillMethod.MEAN:
+        # Handle the case for MEAN
+        _mean_factors(
+            infilled_area,
+            distribution_path,
+            output_folder / ("after_" + inputs.MEAN_INFILLING_VALUES_FILE),
+        )
+    elif gfa_method == inputs.GFAInfillMethod.MEDIAN:
+        # Handle the case for MEDIAN
+        _median_factors(
+            infilled_area,
+            distribution_path,
+            output_folder / ("after_" + inputs.MEDIAN_INFILLING_VALUES_FILE),
+        )
+    elif gfa_method == inputs.GFAInfillMethod.GLBAVERAGE:
+        # Handle the case for GLBAVERAGE
+        _average_factors(
+            infilled_area,
+            distribution_path,
+            output_folder / ("after_" + inputs.AVERAGE_INFILLING_VALUES_FILE),
+        )
+    elif gfa_method in [
+        inputs.GFAInfillMethod.REGRESSION,
+        inputs.GFAInfillMethod.REGRESSION_NO_NEGATIVES,
+    ]:
+        # Do nothing and avoid raising an error
+        pass
+    else:
+        raise ValueError(f"Invalid GFA infill method: {gfa_method}")
 
     infilled_data = infill_missing_tag(
         {k: getattr(infilled_area, f"{k}_data") for k in _LAND_USE_COLUMNS}
@@ -226,7 +346,61 @@ def _average_factors(
 
     dwelling_datatypes = ["residential", "mixed"]
 
-    dwelling_area_ratio = unit_area_ratio(
+    dwelling_area_ratio = unit_area_ratio_glb_average(
+        dict((k, get_data(k)) for k in dwelling_datatypes),
+        {"residential": "total_units", "mixed": "dwellings"},
+        dict((k, _AREA_COLUMNS[k]) for k in dwelling_datatypes),
+    )
+
+    fs_datatypes = ["employment", "mixed"]
+    floorspace_area_ratio = unit_area_ratio_glb_average(
+        dict((k, get_data(k)) for k in fs_datatypes),
+        {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
+        dict((k, _AREA_COLUMNS[k]) for k in fs_datatypes),
+    )
+
+    mean_area = calculate_mean(data, _AREA_COLUMNS_LIST, distribution_path)
+
+    infill_averages = inputs.InfillingAverages(
+        average_res_area=mean_area["residential"],
+        average_emp_area=mean_area["employment"],
+        average_mix_area=mean_area["mixed"],
+        average_gfa_site_area_ratio=floorspace_area_ratio,
+        average_dwelling_site_area_ratio=dwelling_area_ratio,
+    )
+
+    infill_averages.save_yaml(averages_path)
+    return infill_averages
+
+
+def _mean_factors(
+    data: global_classes.DLogData,
+    distribution_path: pathlib.Path,
+    means_path: pathlib.Path,
+) -> inputs.InfillingAverages:
+    """Calculate InfillingAverages for `data` and save to YAML file.
+
+    Parameters
+    ----------
+    data : global_classes.DLogData
+        Data to calculate averages for.
+    distribution_path : pathlib.Path
+        Path to folder to save distribution plots to.
+    averages_path : pathlib.Path
+        Path to YAML file to save averages to.
+
+    Returns
+    -------
+    inputs.InfillingAverages
+        Calculated averages and ratios.
+    """
+
+    def get_data(key: str) -> pd.DataFrame:
+        return getattr(data, f"{key}_data")
+
+    dwelling_datatypes = ["residential", "mixed"]
+
+    dwelling_area_ratio = unit_area_ratio_mean(
         dict((k, get_data(k)) for k in dwelling_datatypes),
         {"residential": "total_units", "mixed": "dwellings"},
         dict((k, _AREA_COLUMNS[k]) for k in dwelling_datatypes),
@@ -234,25 +408,81 @@ def _average_factors(
     )
 
     fs_datatypes = ["employment", "mixed"]
-    floorspace_area_ratio = unit_area_ratio(
+    floorspace_area_ratio = unit_area_ratio_mean(
         dict((k, get_data(k)) for k in fs_datatypes),
         {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
         dict((k, _AREA_COLUMNS[k]) for k in fs_datatypes),
         distribution_path / "GFA_site_area_ratio_dist.png",
     )
 
-    average_area = calculate_average(data, _AREA_COLUMNS_LIST, distribution_path)
+    mean_area = calculate_mean(data, _AREA_COLUMNS_LIST, distribution_path)
 
-    infill_averages = inputs.InfillingAverages(
-        average_res_area=average_area["residential"],
-        average_emp_area=average_area["employment"],
-        average_mix_area=average_area["mixed"],
-        average_gfa_site_area_ratio=floorspace_area_ratio,
-        average_dwelling_site_area_ratio=dwelling_area_ratio,
+    infill_means = inputs.InfillingMeans(
+        mean_res_area=mean_area["residential"],
+        mean_emp_area=mean_area["employment"],
+        mean_mix_area=mean_area["mixed"],
+        mean_gfa_site_area_ratio=floorspace_area_ratio,
+        mean_dwelling_site_area_ratio=dwelling_area_ratio,
     )
 
-    infill_averages.save_yaml(averages_path)
-    return infill_averages
+    infill_means.save_yaml(means_path)
+    return infill_means
+
+
+def _median_factors(
+    data: global_classes.DLogData,
+    distribution_path: pathlib.Path,
+    medians_path: pathlib.Path,
+) -> inputs.InfillingAverages:
+    """Calculate InfillingAverages for `data` and save to YAML file.
+
+    Parameters
+    ----------
+    data : global_classes.DLogData
+        Data to calculate averages for.
+    distribution_path : pathlib.Path
+        Path to folder to save distribution plots to.
+    averages_path : pathlib.Path
+        Path to YAML file to save averages to.
+
+    Returns
+    -------
+    inputs.InfillingAverages
+        Calculated averages and ratios.
+    """
+
+    def get_data(key: str) -> pd.DataFrame:
+        return getattr(data, f"{key}_data")
+
+    dwelling_datatypes = ["residential", "mixed"]
+
+    dwelling_area_ratio = unit_area_ratio_median(
+        dict((k, get_data(k)) for k in dwelling_datatypes),
+        {"residential": "total_units", "mixed": "dwellings"},
+        dict((k, _AREA_COLUMNS[k]) for k in dwelling_datatypes),
+        distribution_path / "dwelling_site_area_ratio_dist_median.png",
+    )
+
+    fs_datatypes = ["employment", "mixed"]
+    floorspace_area_ratio = unit_area_ratio_median(
+        dict((k, get_data(k)) for k in fs_datatypes),
+        {"employment": "total_area_sqm", "mixed": "floorspace_sqm"},
+        dict((k, _AREA_COLUMNS[k]) for k in fs_datatypes),
+        distribution_path / "GFA_site_area_ratio_dist_median.png",
+    )
+
+    median_area = calculate_median(data, _AREA_COLUMNS_LIST, distribution_path)
+
+    infill_medians = inputs.InfillingMedians(
+        median_res_area=median_area["residential"],
+        median_emp_area=median_area["employment"],
+        median_mix_area=median_area["mixed"],
+        median_gfa_site_area_ratio=floorspace_area_ratio,
+        median_dwelling_site_area_ratio=dwelling_area_ratio,
+    )
+
+    infill_medians.save_yaml(medians_path)
+    return infill_medians
 
 
 def _average_area_infill(
@@ -276,6 +506,23 @@ def _average_area_infill(
             "mixed": infill_averages.average_mix_area,
         },
     )
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["dwellings", "units_(dwellings)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_averages.average_dwelling_site_area_ratio},
+    )["mixed"]
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["floorspace_sqm", "units_(floorspace)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_averages.average_gfa_site_area_ratio},
+    )["mixed"]
+
     corrected_format = infill_units(
         corrected_format,
         _UNITS_COLUMNS,
@@ -287,14 +534,110 @@ def _average_area_infill(
             "mixed": infill_averages.average_gfa_site_area_ratio,
         },
     )
+    return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
+
+
+def _mean_area_infill(
+    data: global_classes.DLogData, infill_means: inputs.InfillingMeans
+) -> global_classes.DLogData:
+    """Infill the site area and units columns using mean areas.
+
+    Saves KDE plots of the areas to `output_folder`.
+    """
+    LOG.info("Infilling site area, total area and floorspaces using MEAN")
+    data_dict = data.data_dict()
+
+    # infill values
+    corrected_format = infill_missing_site_area(
+        data_dict,
+        _AREA_COLUMNS_LIST,
+        [0, "-"],
+        {
+            "residential": infill_means.mean_res_area,
+            "employment": infill_means.mean_emp_area,
+            "mixed": infill_means.mean_mix_area,
+        },
+    )
 
     corrected_format["mixed"] = infill_units(
         {"mixed": corrected_format["mixed"]},
         {"mixed": ["dwellings", "units_(dwellings)"]},
         {"mixed": "total_area_ha"},
         ["-", 0],
-        {"mixed": infill_averages.average_dwelling_site_area_ratio},
+        {"mixed": infill_means.mean_dwelling_site_area_ratio},
     )["mixed"]
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["floorspace_sqm", "units_(floorspace)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_means.mean_gfa_site_area_ratio},
+    )["mixed"]
+
+    corrected_format = infill_units(
+        corrected_format,
+        _UNITS_COLUMNS,
+        _AREA_COLUMNS,
+        ["-", 0],
+        {
+            "residential": infill_means.mean_dwelling_site_area_ratio,
+            "employment": infill_means.mean_gfa_site_area_ratio,
+            "mixed": infill_means.mean_gfa_site_area_ratio,
+        },
+    )
+    return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
+
+
+def _median_area_infill(
+    data: global_classes.DLogData, infill_medians: inputs.InfillingMedians
+) -> global_classes.DLogData:
+    """Infill the site area and units columns using mean areas.
+
+    Saves KDE plots of the areas to `output_folder`.
+    """
+    LOG.info("Infilling site area, total area and floorspaces using MEDIAN")
+    data_dict = data.data_dict()
+
+    # infill values
+    corrected_format = infill_missing_site_area(
+        data_dict,
+        _AREA_COLUMNS_LIST,
+        [0, "-"],
+        {
+            "residential": infill_medians.median_res_area,
+            "employment": infill_medians.median_emp_area,
+            "mixed": infill_medians.median_mix_area,
+        },
+    )
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["dwellings", "units_(dwellings)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_medians.median_dwelling_site_area_ratio},
+    )["mixed"]
+
+    corrected_format["mixed"] = infill_units(
+        {"mixed": corrected_format["mixed"]},
+        {"mixed": ["floorspace_sqm", "units_(floorspace)"]},
+        {"mixed": "total_area_ha"},
+        ["-", 0],
+        {"mixed": infill_medians.median_gfa_site_area_ratio},
+    )["mixed"]
+
+    corrected_format = infill_units(
+        corrected_format,
+        _UNITS_COLUMNS,
+        _AREA_COLUMNS,
+        ["-", 0],
+        {
+            "residential": infill_medians.median_dwelling_site_area_ratio,
+            "employment": infill_medians.median_gfa_site_area_ratio,
+            "mixed": infill_medians.median_gfa_site_area_ratio,
+        },
+    )
 
     return global_classes.DLogData.from_data_dict(corrected_format, data.lookup)
 
@@ -499,10 +842,17 @@ def incorrect_luc_formatting(
     ]
     format_lookup = pd.DataFrame([possible_error_codes, wrong_format_check]).transpose()
     format_lookup.columns = ["land_use_code", "incorrect_format"]
-    format_lookup = format_lookup.append(
-        {"land_use_code": "sg", "incorrect_format": "suigeneris"},
-        ignore_index=True,
+
+    # Replace append with pd.concat
+    new_row = pd.DataFrame(
+        [["sg", "suigeneris"]], columns=["land_use_code", "incorrect_format"]
     )
+    format_lookup = pd.concat([format_lookup, new_row], ignore_index=True)
+
+    # format_lookup = format_lookup.append(
+    #     {"land_use_code": "sg", "incorrect_format": "suigeneris"},
+    #     ignore_index=True,
+    # )
 
     fixed_format = {}
 
@@ -556,11 +906,11 @@ def calc_average_years_webtag_certainty(
             filtered_value = value[value["missing_years"] == False]
             filtered_value = filtered_value[value["web_tag_certainty_id"] == id_]
 
-            all_start_years = all_start_years.append(
-                filtered_value["start_year_id"], ignore_index=True
+            all_start_years = pd.concat(
+                [all_start_years, filtered_value["start_year_id"]], ignore_index=True
             )
-            all_end_years = all_end_years.append(
-                filtered_value["end_year_id"], ignore_index=True
+            all_end_years = pd.concat(
+                [all_end_years, filtered_value["end_year_id"]], ignore_index=True
             )
         mode_start_year = all_start_years.mode().values[0]
         mode_end_year = all_end_years.mode().values[0]
@@ -662,9 +1012,9 @@ def infill_missing_tag(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
 
         # infill
         to_be_infilled.loc[missing_tag_permissioned.index, :] = missing_tag_permissioned
-        to_be_infilled.loc[
-            missing_tag_not_permissioned.index, :
-        ] = missing_tag_not_permissioned
+        to_be_infilled.loc[missing_tag_not_permissioned.index, :] = (
+            missing_tag_not_permissioned
+        )
         to_be_infilled.loc[missing_tag_not_spec.index, :] = missing_tag_not_spec
 
         infilled_data[key] = to_be_infilled
@@ -732,9 +1082,9 @@ def infill_one_missing_year(
 
             # set start to end if applying period will set value out of bounds
             mask_end = end_no_start_values["end_year_id"] <= period
-            end_no_start_values.loc[
-                mask_end, "start_year_id"
-            ] = end_no_start_values.loc[mask_end, "end_year_id"]
+            end_no_start_values.loc[mask_end, "start_year_id"] = (
+                end_no_start_values.loc[mask_end, "end_year_id"]
+            )
             # set start to end - period if result in bounds
             end_no_start_values.loc[~mask_end, "start_year_id"] = (
                 end_no_start_values.loc[~mask_end, "end_year_id"] - period
@@ -915,7 +1265,7 @@ def infill_missing_site_area(
     return fixed_data
 
 
-def calculate_average(
+def calculate_mean(
     data: global_classes.DLogData,
     columns: dict[str, list[str]],
     output_path: pathlib.Path,
@@ -951,6 +1301,44 @@ def calculate_average(
                 output_path / (key + "_site_area_dist.png"),
             )
     return mean_values
+
+
+def calculate_median(
+    data: global_classes.DLogData,
+    columns: dict[str, list[str]],
+    output_path: pathlib.Path,
+) -> dict[str, float]:
+    """calculate the mean value
+
+    will calculate the total average across all the columns
+
+    Parameters
+    ----------
+    data : global_classes.DLogData
+        data to analyse
+    columns : dict[str, list[str]]
+        columns to include within the average
+
+    Returns
+    -------
+    dict[str, float]
+        mean values
+    """
+    median_values = {}
+    for key, df in data.data_dict().items():
+        if key not in columns or df is None:
+            continue
+
+        for column in columns[key]:
+            na_filter = ~df[column].isna()
+
+            median_values[key] = df.loc[na_filter, column].median()
+            distribution_plots_median(
+                df.loc[na_filter, column].to_numpy(),
+                f"{key.title()} Site Area Distribution",
+                output_path / (key + "_site_area_dist_median.png"),
+            )
+    return median_values
 
 
 def old_incomplete_known_luc(
@@ -1114,7 +1502,59 @@ def fix_undefined_invalid_luc(
     return fixed_codes
 
 
-def unit_area_ratio(
+def unit_area_ratio_glb_average(
+    data: dict[str, pd.DataFrame],
+    unit_columns: dict[str, str],
+    area_columns: dict[str, str],
+) -> float:
+    """calculate the ratio for unit to area
+
+    Only give identical units i.e. all dwelling or all floorspace
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to be analysed
+    unit_columns : dict[str, str]
+        columns with unit (e.g. total_dwelling for residental)
+        for each sheet, same keys as data
+    area_columns : dict[str, str]
+        columns with site area for each sheet, same keys as data
+
+    Returns
+    -------
+    float
+        Calculate the ratio of total units to total are.
+    """
+
+    total_units = 0
+    total_area = 0
+
+    for key, value in data.items():
+        units_col = unit_columns[key]
+        area_col = area_columns[key]
+
+        # Filter out NaN values and zero values
+        data_subset = value.loc[
+            (~value[units_col].isna())
+            & (~value[area_col].isna())
+            & (value[units_col] != 0)
+            & (value[area_col] != 0),
+            :,
+        ]
+
+        # Sum up the units and area
+        total_units += data_subset[units_col].sum()
+        total_area += data_subset[area_col].sum()
+
+    # Avoid division by zero
+    if total_area == 0:
+        return np.nan  # or return 0, depending on how you want to handle it
+
+    return total_units / total_area  # Return the aggregated ratio
+
+
+def unit_area_ratio_mean(
     data: dict[str, pd.DataFrame],
     unit_columns: dict[str, str],
     area_columns: dict[str, str],
@@ -1163,6 +1603,55 @@ def unit_area_ratio(
     return all_ratios.mean()
 
 
+def unit_area_ratio_median(
+    data: dict[str, pd.DataFrame],
+    unit_columns: dict[str, str],
+    area_columns: dict[str, str],
+    plot_path: pathlib.Path,
+) -> float:
+    """calculate the ratio for unit to area
+
+    Only give identical units i.e. all dwelling or all floorspace
+
+    Parameters
+    ----------
+    data : dict[str, pd.DataFrame]
+        data to be analysed
+    unit_columns : dict[str, str]
+        columns with unit (e.g. total_dwelling for residental)
+        for each sheet, same keys as data
+    area_columns : dict[str, str]
+        columns with site area for each sheet, same keys as data
+
+    Returns
+    -------
+    float
+        Mean ratio between units column and area column.
+    """
+    all_ratios = np.array([])
+    for key, value in data.items():
+        units_col = unit_columns[key]
+        area_col = area_columns[key]
+
+        # data subset only contains entries with site area and dwelling/floorspace
+        data_subset = value.loc[
+            (~value[units_col].isna()) & (~value[area_col].isna()), :
+        ]
+        all_ratios = np.append(
+            all_ratios,
+            np.divide(
+                data_subset[units_col],
+                data_subset[area_col],
+                where=data_subset[area_col] != 0,
+                out=np.full_like(data_subset[units_col], np.nan),
+            ),
+        )
+
+    all_ratios = all_ratios[np.isfinite(all_ratios)]
+    distribution_plots_median(all_ratios, "Unit-Site Area Ratio Plot_Median", plot_path)
+    return np.median(all_ratios)
+
+
 def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> None:
     """create a Kernel Distribution Estimation plot for data
 
@@ -1189,6 +1678,40 @@ def distribution_plots(data: np.ndarray, title: str, save_as: pathlib.Path) -> N
     mean = data.mean()
     height = np.interp(mean, xs, ys)
     ax.vlines(mean, 0, height, ls="--", label="Mean")
+
+    ax.legend()
+    fig.savefig(save_as)
+    plt.close()
+
+
+def distribution_plots_median(
+    data: np.ndarray, title: str, save_as: pathlib.Path
+) -> None:
+    """create a Kernel Distribution Estimation plot for data
+
+    plots KDE line and mean for data
+
+    Parameters
+    ----------
+    data : np.ndarray
+        data to plot
+    title : str
+        title given to plot
+    save_as : pathlib.Path
+        path to save plot to
+    """
+
+    fig, ax = plt.subplots()
+    ax.set_title(title)
+    # KDE plot
+    sns.kdeplot(data, ax=ax, label="Kerbel Distribution Estimation")
+    # calculate and ploy mean
+    kdeline = ax.lines[0]
+    xs = kdeline.get_xdata()
+    ys = kdeline.get_ydata()
+    median = np.median(data)
+    height = np.interp(median, xs, ys)
+    ax.vlines(median, 0, height, ls="--", label="Median")
 
     ax.legend()
     fig.savefig(save_as)
@@ -1289,6 +1812,71 @@ def _infill_comparison_figure(
 
     fig.savefig(output_file)
     LOG.info("Written: %s", output_file)
+
+    # """Plot a KDE or Histogram comparing the `before` and `after` values."""
+
+    # def tidy_name(name: str) -> str:
+    #     return " ".join(name.split("_")).title()
+
+    # plot_type = plot_type.lower().strip()
+
+    # fig, axes = plt.subplots(
+    #     len(plot_columns), layout="constrained", figsize=(10, 7 * len(plot_columns))
+    # )
+    # fig.suptitle(title, fontsize="x-large")
+
+    # data = {"before": before, "after": after}
+
+    # for ax, column in zip(axes, plot_columns):
+    #     if plot_type == "kde":
+    #         for nm, df in data.items():
+    #             sns.kdeplot(
+    #                 df[column],
+    #                 ax=ax,
+    #                 fill=True,
+    #                 hatch="/" if nm == "before" else "\\",
+    #                 label=f"{nm.title()} Infilling",
+    #             )
+
+    #     elif plot_type in ("hist", "histogram"):
+    #         # Calculate bins across all data so the same bins are used for both plots
+    #         combined = np.concatenate([before[column].values, after[column].values])
+    #         combined = combined[np.isfinite(combined)]
+    #         hist_bins = np.histogram_bin_edges(combined, bins=50)
+    #         patches = []  # Store patches to apply hatching later
+
+    #         for i, (nm, df) in enumerate(data.items()):
+    #             # Ensure the color string is valid
+    #             color = f"C{i % 10}"  # Modulo to ensure within valid range
+    #             rgb_color = colors.to_rgb(color)  # Get RGB color
+    #             rgba_color = colors.to_rgba(rgb_color, alpha=0.3)  # Convert to RGBA with transparency
+
+    #             # Plot histogram and get patch collection
+    #             _, _, patches_tmp = ax.hist(
+    #                 df[column],
+    #                 bins=hist_bins,
+    #                 histtype="bar",
+    #                 edgecolor=rgba_color,
+    #                 facecolor=rgba_color,
+    #                 density=True,
+    #                 label=f"{nm.title()} Infilling",
+    #             )
+    #             patches.extend(patches_tmp)
+
+    #         # Apply hatching manually to patches
+    #         for patch, nm in zip(patches, ["before"] * len(data["before"]) + ["after"] * len(data["after"])):
+    #             patch.set_hatch(hatches[nm])
+
+    #     else:
+    #         raise ValueError(f"invalid plot type: {plot_type}")
+
+    #     ax.legend()
+    #     ax.set_title(tidy_name(column))
+    #     ax.set_ylabel("Density")
+    #     ax.set_xlabel(tidy_name(column))
+
+    # fig.savefig(output_file)
+    # LOG.info("Written: %s", output_file)
 
 
 def find_and_replace_luc(
@@ -1403,7 +1991,8 @@ def infill_year_units(
     distribution_column: str,
     unit_column: str,
     unit_year_column: list[str],
-    years_lookup: pd.DataFrame,
+    lookup: global_classes.DLogValueLookup,
+    assumed_distribution: int = 2,
 ) -> pd.DataFrame:
     """infills build out profile
 
@@ -1420,8 +2009,10 @@ def infill_year_units(
         column that contains total units
     unit_year_column : list[str]
         columns to infill
-    years_lookup : pd.DataFrame
-        years lookup from unit
+    lookup : global_classes.DLogValueLookup
+            D-Log lookup data.
+    assumed_distribution : str
+        the distribution to use when no compatibile distribution is provided
 
     Returns
     -------
@@ -1441,16 +2032,27 @@ def infill_year_units(
     years_defined = data[data[distribution_column] == 1]
 
     if len(not_specified) != 0 or len(years_defined) != 0:
-        raise ValueError("distrubtion contains not specified or defined years values")
+        # raise ValueError("distrubtion contains not specified or defined years values")
+        ad_str = lookup.distribution_profile.loc[
+            assumed_distribution, "distribution_profile"
+        ]
+        LOG.warning(  # pylint: disable=logging-fstring-interpolation
+            f"{len(not_specified) + len(years_defined)} undefined or invalid distributions"
+            f" found in '{distribution_column}'\n"
+            f"Assuming '{ad_str}' distribution."
+        )
+        data.loc[data[distribution_column].isin([0, 1]), distribution_column] = (
+            assumed_distribution
+        )
 
     flat = data[data[distribution_column] == 2]
-    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], years_lookup)
+    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], lookup.years)
     early = data[data[distribution_column] == 3]
-    early_years = strip_year(early["start_year_id"], early["end_year_id"], years_lookup)
+    early_years = strip_year(early["start_year_id"], early["end_year_id"], lookup.years)
     late = data[data[distribution_column] == 4]
-    late_years = strip_year(late["start_year_id"], late["end_year_id"], years_lookup)
+    late_years = strip_year(late["start_year_id"], late["end_year_id"], lookup.years)
     mid = data[data[distribution_column] == 5]
-    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], years_lookup)
+    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], lookup.years)
 
     for column in unit_year_column:
         year = int(column.split("_")[2])

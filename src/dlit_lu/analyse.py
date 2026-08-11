@@ -95,6 +95,7 @@ def data_report(
     non_fatal_columns = [
         "inactive_entries",
         "missing_area",
+        "all_invalid_expected_land_use_code",
         "contradictory_construction_planning_tag",
     ]
 
@@ -554,44 +555,20 @@ def luc_ratio(
                 continue
 
             have_floorspace = pd.DataFrame(
-                [
-                    code_in_entry["missing_gfa_or_dwellings_no_site_area"].reset_index(
-                        drop=True
-                    ),
-                    code_in_entry[
-                        "missing_gfa_or_dwellings_with_site_area"
-                    ].reset_index(drop=True),
-                ]
-            ).transpose()
+                [code_in_entry["missing_gfa_or_dwellings_no_site_area"].reset_index(drop=True),
+                 code_in_entry["missing_gfa_or_dwellings_with_site_area"].reset_index(drop=True),]).transpose()
             have_floorspace.index = code_in_entry.index
             have_floorspace = code_in_entry[~have_floorspace.any(axis=1)]
 
-            have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace[
-                "units_(floorspace)"
-            ] / have_floorspace[column].apply(lambda x: len(x))
+            if column == "expected_land_use":
+                have_floorspace["units_(floorspace)"] *= have_floorspace["expected_split"].apply(lambda x: x[code]).fillna(0)
+            else:
+                have_floorspace.loc[:, "units_(floorspace)"] = have_floorspace["units_(floorspace)"] / have_floorspace[column].apply(lambda x: len(x))
 
             total_floorspace = have_floorspace["units_(floorspace)"].sum()
-
-            land_use_codes_count.loc[
-                land_use_codes_count["land_use_codes"] == code, "count"
-            ] = land_use_codes_count.loc[
-                land_use_codes_count["land_use_codes"] == code, "count"
-            ] + len(
-                have_floorspace
-            )
-
-            land_use_codes_count.loc[
-                land_use_codes_count["land_use_codes"] == code, "total_floorspace"
-            ] = (
-                land_use_codes_count.loc[
-                    land_use_codes_count["land_use_codes"] == code, "total_floorspace"
-                ]
-                + total_floorspace
-            )
-
-    land_use_codes_count["average_floorspace"] = (
-        land_use_codes_count["total_floorspace"] / land_use_codes_count["count"]
-    )
+            land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "count"] += len(have_floorspace)
+            land_use_codes_count.loc[land_use_codes_count["land_use_codes"] == code, "total_floorspace"] += total_floorspace
+    land_use_codes_count["average_floorspace"] = land_use_codes_count["total_floorspace"] / land_use_codes_count["count"]
     return land_use_codes_count
 
 
@@ -770,97 +747,71 @@ def invalid_land_use_report(
     # existing
     # residential - do not expect any land use to be given
     res_invalid_e_land_use = find_invalid_land_use_codes(
-        res_data,
-        auxiliary_data.allowed_codes["land_use_codes"],
-        ["existing_land_use"],
-    )
-
+        res_data, auxiliary_data.allowed_codes["land_use_codes"], ["existing_land_use"],)
     emp_invalid_e_land_use = find_invalid_land_use_codes(
-        emp_data,
-        auxiliary_data.allowed_codes["land_use_codes"],
-        ["existing_land_use"],
-    )
-
+        emp_data, auxiliary_data.allowed_codes["land_use_codes"], ["existing_land_use"],)
     mix_invalid_e_land_use = find_invalid_land_use_codes(
-        mix_data,
-        auxiliary_data.allowed_codes["land_use_codes"],
-        ["existing_land_use"],
-    )
+        mix_data, auxiliary_data.allowed_codes["land_use_codes"], ["existing_land_use"],)
     # proposed
+    res_invalid_p_land_use = find_invalid_land_use_codes(
+        res_data, auxiliary_data.allowed_codes["land_use_codes"], ["proposed_land_use"],)
     emp_invalid_p_land_use = find_invalid_land_use_codes(
-        emp_data,
-        auxiliary_data.allowed_codes["land_use_codes"],
-        ["proposed_land_use"],
-    )
-
+        emp_data, auxiliary_data.allowed_codes["land_use_codes"], ["proposed_land_use"],)
     mix_invalid_p_land_use = find_invalid_land_use_codes(
-        mix_data,
-        auxiliary_data.allowed_codes["land_use_codes"],
-        ["proposed_land_use"],
-    )
+        mix_data, auxiliary_data.allowed_codes["land_use_codes"], ["proposed_land_use"],)
+    # expected
+    res_invalid_x_land_use = find_invalid_land_use_codes(
+        res_data, auxiliary_data.allowed_codes["land_use_codes"], ["expected_land_use"],)
+    emp_invalid_x_land_use = find_invalid_land_use_codes(
+        emp_data, auxiliary_data.allowed_codes["land_use_codes"], ["expected_land_use"],)
+    mix_invalid_x_land_use = find_invalid_land_use_codes(
+        mix_data, auxiliary_data.allowed_codes["land_use_codes"], ["expected_land_use"],)
 
     # parse invalid land use code results
     results_report.append_analysis_results(
-        {
-            "residential": res_invalid_e_land_use,
-            "employment": emp_invalid_e_land_use,
-            "mixed": mix_invalid_e_land_use,
-        },
+        {"residential": res_invalid_e_land_use, "employment": emp_invalid_e_land_use, "mixed": mix_invalid_e_land_use,},
         "all_invalid_existing_land_use_code",
         "Entries which contain existing land use code(s) that is not"
-        " in the land use code table in lookup",
-    )
+        " in the land use code table in lookup",)
     results_report.append_analysis_results(
-        {
-            "residential": pd.DataFrame(
-                columns=res_data.columns
-            ),  # empty df as place holder
-            "employment": emp_invalid_p_land_use,
-            "mixed": mix_invalid_p_land_use,
-        },
+        {"residential": res_invalid_p_land_use, "employment": emp_invalid_p_land_use, "mixed": mix_invalid_p_land_use,},
         "all_invalid_proposed_land_use_code",
         "Entries which contain proposed land use code(s) that is not in the land"
-        " use code table in lookup (residential proposed land use code ignored)",
-    )
+        " use code table in lookup",)
+    results_report.append_analysis_results(
+        {"residential": res_invalid_x_land_use, "employment": emp_invalid_x_land_use, "mixed": mix_invalid_x_land_use,},
+        "all_invalid_expected_land_use_code",
+        "Entries which contain expected land use code(s) that is not in the land"
+        " use code table in lookup",)
+
     # -----------------perform indepth luc analysis-----------------------
     eluc_analysis = analyse_invalid_luc(
-        {
-            "residential": res_invalid_e_land_use,
-            "employment": emp_invalid_e_land_use,
-            "mixed": mix_invalid_e_land_use,
-        },
-        {
-            "residential": ["existing_land_use"],
-            "employment": ["existing_land_use"],
-            "mixed": ["existing_land_use"],
-        },
+        {"residential": res_invalid_e_land_use, "employment": emp_invalid_e_land_use, "mixed": mix_invalid_e_land_use,},
+        {"residential": ["existing_land_use"], "employment": ["existing_land_use"], "mixed": ["existing_land_use"],},
         auxiliary_data.allowed_codes["land_use_codes"],
         auxiliary_data.out_of_date_luc["out_of_date_land_use_codes"].str.lower(),
-        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),
-    )
+        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),)
     pluc_analysis = analyse_invalid_luc(
-        {
-            "employment": emp_invalid_p_land_use,
-            "mixed": mix_invalid_p_land_use,
-        },
-        {
-            "employment": ["proposed_land_use"],
-            "mixed": ["proposed_land_use"],
-        },
+        {"residential": res_invalid_p_land_use, "employment": emp_invalid_p_land_use, "mixed": mix_invalid_p_land_use,},
+        {"residential": ["proposed_land_use"], "employment": ["proposed_land_use"], "mixed": ["proposed_land_use"],},
         auxiliary_data.allowed_codes["land_use_codes"],
         auxiliary_data.out_of_date_luc["out_of_date_land_use_codes"].str.lower(),
-        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),
-    )
+        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),)
+    xluc_analysis = analyse_invalid_luc(
+        {"residential": res_invalid_x_land_use, "employment": emp_invalid_x_land_use, "mixed": mix_invalid_x_land_use,},
+        {"residential": ["expected_land_use"], "employment": ["expected_land_use"], "mixed": ["expected_land_use"],},
+        auxiliary_data.allowed_codes["land_use_codes"],
+        auxiliary_data.out_of_date_luc["out_of_date_land_use_codes"].str.lower(),
+        auxiliary_data.incomplete_luc["incomplete_land_use_codes"].str.lower(),)
+
     # create empty df's since these columns exist in the data report
     # TODO alter code so this is not necessary
-    pluc_analysis["wrong_format"]["residential"] = pd.DataFrame(
-        columns=res_data.columns
-    )
-    pluc_analysis["incomplete"]["residential"] = pd.DataFrame(columns=res_data.columns)
-    pluc_analysis["out_of_date"]["residential"] = pd.DataFrame(columns=res_data.columns)
-    pluc_analysis["other_issues"]["residential"] = pd.DataFrame(
-        columns=res_data.columns
-    )
+    # pluc_analysis["wrong_format"]["residential"] = pd.DataFrame(
+    #     columns=res_data.columns
+    # )
+    # pluc_analysis["incomplete"]["residential"] = pd.DataFrame(columns=res_data.columns)
+    # pluc_analysis["out_of_date"]["residential"] = pd.DataFrame(columns=res_data.columns)
+    # pluc_analysis["other_issues"]["residential"] = pd.DataFrame(columns=res_data.columns)
     # ------------------------parse eluc-------------------
     results_report.append_analysis_results(
         eluc_analysis["wrong_format"],
@@ -910,6 +861,30 @@ def invalid_land_use_report(
         pluc_analysis["other_issues"],
         "other_issues_proposed_land_use_code",
         "Entries which have a invalid proposed land use code not defined" " above",
+    )
+    # ------------------------------parse xluc-----------------------
+    results_report.append_analysis_results(
+        xluc_analysis["wrong_format"],
+        "wrong_format_expected_land_use_code",
+        "Entries which contain expected land use code with incorrect syntax e.g."
+        " Egi instead of E(g)(i) *codes are case insensitive*",
+    )
+
+    results_report.append_analysis_results(
+        xluc_analysis["out_of_date"],
+        "out_of_date_expected_land_use_code",
+        "Entries which contain expected land use code which have been revoked/replaced, eg. B1(a)",
+    )
+    results_report.append_analysis_results(
+        xluc_analysis["incomplete"],
+        "incomplete_expected_land_use_code",
+        "Entries which contain expected land use code which are incomplete"
+        " e.g. E(g) instead of E(g)(i)",
+    )
+    results_report.append_analysis_results(
+        xluc_analysis["other_issues"],
+        "other_issues_expected_land_use_code",
+        "Entries which have a invalid expected land use code not defined" " above",
     )
 
     return results_report
@@ -1651,16 +1626,8 @@ def find_invalid_land_use_codes(
     """
     invalid_land_use = []
     for column in columns:
-        exploded_land_use_codes = (
-            record[column].str.join(",").str.split(",", expand=True)
-        )
-        invalid_land_use.append(
-            record.loc[
-                ~exploded_land_use_codes.isin(land_use_codes.tolist() + [None]).all(
-                    axis=1
-                )
-            ]
-        )
+        exploded_land_use_codes = (record[column].str.join(",").str.split(",", expand=True))
+        invalid_land_use.append(record.loc[~exploded_land_use_codes.isin(land_use_codes.tolist() + [None]).all(axis=1)])
     if len(invalid_land_use) == 0:
         raise ValueError("No columns found")
 
@@ -1887,5 +1854,5 @@ def find_inactivate_entries(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataF
     """
     inactive = {}
     for key, value in data.items():
-        inactive[key] = value[value["active"] != "t"]
+        inactive[key] = value[~value["active"].isin(["t", "TRUE"])]  # Corrected filtering
     return inactive
