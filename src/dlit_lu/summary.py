@@ -20,7 +20,7 @@ from dlit_lu import inputs, mapping
 
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
-LAND_USE_ZONING = "msoa"
+LAND_USE_ZONING = "lsoa2021"
 PLOT_YEAR_GAP = 10
 
 
@@ -54,8 +54,8 @@ def load_summary_lookup(
         Geospatial data for summary zone system.
     """
 
-    from_zone = f"{LAND_USE_ZONING}_zone_id"
-    to_zone = f"{parameters.summary_zone_name}_zone_id"
+    from_zone = f"{LAND_USE_ZONING}_id"
+    to_zone = f"{parameters.summary_zone_name}_id"
     split_column = f"{LAND_USE_ZONING}_to_{parameters.summary_zone_name}"
     lookup = pd.read_csv(
         parameters.lookup_file,
