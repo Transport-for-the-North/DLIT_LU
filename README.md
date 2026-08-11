@@ -11,6 +11,21 @@ It outputs analysis results as an Excel workbook with summary maps.
 The land use module converts DLog into MSOA base build-out profiles disaggregated by SIC
 code for employment and, census dwelling type and TfN traveller type for residential. 
 
+## Dev Pattern
+The Dev pattern module defines and categorizes large-scale developments that have the 
+potential to influence existing travel patterns, ensuring they are appropriately 
+integrated into demand forecasting.
+
+## Constraint 
+The constrain module merges future-year growth from the Development Log (D-Log)
+with EDGE growth for rail and NTEM growth for other modes, 
+constraining combined LAD or LAD-level growth appropriately.
+
+## Trip End
+The Trip End module converts the development-related population and employment
+ data into trip ends for use in forecasting demand matrices.
+
+
 # Environment
 Setup the Python environment using your preferred Python package / environment manager tool.
 This section will assume you're using [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
@@ -83,13 +98,50 @@ These parameters are all mandatory with no default values.
 | Parameter                      |            Type            | Description                                                                                                                                            |
 | :----------------------------- | :------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | land_use_input                 |    File Path (Optional)    | Path to Excel Worksheet to use as Land Use input, usually post fix data output from infilling module (required if running land use without infilling). |
-| msoa_shapefile_path            |         File Path          | Path to MSOA shape file.                                                                                                                               |
-| msoa_dwelling_pop_path         |         File Path          | Path to CSV containing TfN’s dwelling population data by MSOA.                                                                                         |
-| msoa_traveller_type_path       |         File Path          | Path to CSV containing TfN’s Traveller Type split by MSOA CSV.                                                                                         |
-| msoa_jobs_path                 |         File Path          | Path to CSV containing TfN's employment data by MSOA.                                                                                                  |
+| lsoa_shapefile_path            |         File Path          | Path to LSOA shape file.                                                                                                                               |
+| lsoa_dwelling_pop_path         |         File Path          | Path to CSV containing TfN’s dwelling population data by MSOA.                                                                                         |
+| lsoa_traveller_type_path       |         File Path          | Path to CSV containing TfN’s Traveller Type split by MSOA CSV.                                                                                         |
+| lsoa_jobs_path                 |         File Path          | Path to CSV containing TfN's employment data by MSOA.                                                                                                  |
 | employment_density_matrix_path |         File Path          | Path to the CSV containing the employment density matrix.                                                                                              |
 | luc_sic_conversion_path        |         File Path          | Path to CSV containing land use code to standard industrial code conversion.                                                                           |
 | demolition_dampener            | Real 0 - 1.0 (default 1.0) | Factor to apply to GFA when calculating demolitions of existing land use values, 0 indicates no implied demolitions.                                   |
+
+
+## Dev Pattern
+
+| Parameter                      |            Type            | Description                                                                                                                                                |
+| :----------------------------- | :------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------     |
+| base_year                      |    Text                    | Base Year                                                                                  |
+| geo_boundary                   |    Text                    | Model zone , among the options of lsoa, normits, noham, norms, msoa                        |
+| assessment_input               |    File Path (optional)    | Path to inputs exported from previous infilling module                                     |
+| emp_site_data                  |    File Path (optional)    | Path to inputs exported from previous land use module,site level total jobs from D-log     |
+| res_site_data                  |    File Path (optional)    | Path to inputs exported from previous land use module,site level total dwellings from D-log| 
+| lsoa_data_path                 |    File Path (optional)    | Path to CSV containing TfN’s base year total population,household and jobs                 | 
+| pop_tt_site_data               |    File Path (optional)    | Path to inputs exported from previous land use module,site level population by tt          |
+| emp_sic_soc_site_data          |    File Path (optional)    | Path to inputs exported from previous land use module,site level jobs by SIC, SOC          |
+| normits_shapefile_path         |         File Path          | Path to normits zone shape file                                                            |
+| noham_shapefile_path           |         File Path          | Path to normits zone shape file                                                            |
+| norms_shapefile_path           |         File Path          | Path to normits zone shape file                                                            |
+| msoa_shapefile_path            |         File Path          | Path to normits zone shape file                                                            |
+| lsoa_hh_centroids              |         File Path          | Path to hh weighted lsoa centroids                                                         |
+| lsoa_emp_centroids             |         File Path          | Path to emp weighted lsoa centroids                                                        |
+| lsoa_pop_centroids             |         File Path          | Path to pop weighted lsoa centroids                                                        |
+| normits_hh_centroids           |         File Path          | Path to hh weighted normits centroids                                                      |
+| normits_emp_centroids          |         File Path          | Path to emp weighted normits centroids                                                     |
+| normits_pop_centroids          |         File Path          | Path to pop weighted normits centroids                                                     |
+| noham_hh_centroids             |         File Path          | Path to hh weighted noham centroids                                                        |
+| noham_emp_centroids            |         File Path          | Path to emp weighted noham centroids                                                       |
+| noham_pop_centroids            |         File Path          | Path to pop weighted noham centroids                                                       |
+| norms_hh_centroids             |         File Path          | Path to hh weighted norms centroids                                                        |
+| norms_emp_centroids            |         File Path          | Path to emp weighted norms centroids                                                       |
+| norms_pop_centroids            |         File Path          | Path to pop weighted norms centroids                                                       |
+| msoa_hh_centroids              |         File Path          | Path to hh weighted msoa centroids                                                         |
+| msoa_emp_centroids             |         File Path          | Path to emp weighted msoa centroids                                                        |
+| msoa_pop_centroids             |         File Path          | Path to pop weighted msoa centroids                                                        |
+| lsoa_to_normits                |         File Path          | Path to translation file bewteen lsoa and normits                                          |
+| lsoa_to_noham                  |         File Path          | Path to translation file bewteen lsoa and noham                                            |
+| lsoa_to_norms                  |         File Path          | Path to translation file bewteen lsoa and norms                                            |
+| lsoa_to_msoa                   |         File Path          | Path to translation file bewteen lsoa and msoa                                             |
 
 ### Summary Data
 Optional parameters for creating the land use summaries workbooks and heatmaps. MSOA land use data
@@ -97,8 +149,14 @@ will be aggregated to given summary zone system.
 
 | Parameter                   |        Type        | Description                                                              |
 | :-------------------------- | :----------------: | :----------------------------------------------------------------------- |
-| summary_zone_name           |        Text        | Name of the summary zone system.                                         |
-| lookup_file                 |     File Path      | Path to CSV file containing lookup between MSOA and summary zone system. |
-| shapefile                   |     File Path      | Path to summary zone system shapefile.                                   |
+| summary_lad                 |        Text        | Name of LAD version.                                                     |
+| summary_region              |        Text        | Name of Region version.                                                  |
+| lad_to_region_file          |     File Path      | Path to translation file bewteen lad and region                          |
+| lsoa_to_lad_file            |     File Path      | Path to translation file bewteen lsoa and LAD                            |
+| msoa_to_lad_file            |     File Path      | Path to translation file bewteen msoa and LAD                            |
+| norms_to_lad_file           |     File Path      | Path to translation file bewteen norms and LAD                           |
+| noham_to_lad_file           |     File Path      | Path to translation file bewteen noham and LAD                           |
+| normits_to_lad_file         |     File Path      | Path to translation file bewteen normits and LAD                         |
+| lad_shapefile               |     File Path      | Path to LAD shapefile.                                                   |
 | shapefile_id_column         |        Text        | Name of ID column in shapefile.                                          |
 | geometry_simplify_tolerance | Integer (Optional) | Optional tolerance parameter to simplify the shapefile to.               |

@@ -32,9 +32,9 @@ _UNITS_COLUMNS = {
     "mixed": ["floorspace_sqm", "units_(floorspace)", "dwellings", "units_(dwellings)"],
 }
 _LAND_USE_COLUMNS = {
-    "residential": ["existing_land_use"],
-    "employment": ["existing_land_use", "proposed_land_use"],
-    "mixed": ["existing_land_use", "proposed_land_use"],
+    "residential": ["existing_land_use", "proposed_land_use", "expected_land_use"],
+    "employment": ["existing_land_use", "proposed_land_use", "expected_land_use"],
+    "mixed": ["existing_land_use", "proposed_land_use", "expected_land_use"],
 }
 
 
@@ -111,10 +111,65 @@ def infill_landuse_codes(
         {
             "existing_land_use": "other_issues_existing_land_use_code",
             "proposed_land_use": "other_issues_proposed_land_use_code",
+            "expected_land_use": "other_issues_expected_land_use_code",
         },
     )
 
     return global_classes.DLogData.from_data_dict(luc_infilling, data.lookup)
+
+
+def infill_expected_landuse(
+    auxiliary_data: global_classes.AuxiliaryData
+) -> global_classes.DLogData:
+    """Infill expected landuse columns using known land use columns.
+
+    Infills with full list of valid land use codes if no
+    known lookups are found.
+
+    Returns
+    -------
+    global_classes.DLogData
+        A new instance of DLogData with expected landuse column infilled.
+    """
+
+    filled_expecations = {}
+
+    for k in _LAND_USE_COLUMNS:
+        v = getattr(auxiliary_data, f"{k}_data").copy()
+        v.loc[v["expected_land_use"].str.len() == 0, "expected_land_use"] = v["proposed_land_use"]
+        filled_expecations[k] = v.copy()
+    return global_classes.DLogData.from_data_dict(filled_expecations, auxiliary_data.lookup)
+
+
+def fix_expected_split(
+    auxiliary_data: global_classes.AuxiliaryData
+) -> global_classes.DLogData:
+    """Infill expected landuse columns using known land use columns.
+
+    Infills with full list of valid land use codes if no
+    known lookups are found.
+
+    Returns
+    -------
+    global_classes.DLogData
+        A new instance of DLogData with expected landuse column infilled.
+    """
+
+    split_expecations = {}
+    for k in _LAND_USE_COLUMNS:
+        v = getattr(auxiliary_data, f"{k}_data").copy()
+
+        v["compatible_splits"] = v.apply(lambda x:
+            ((set(x["expected_split"].keys()) <= set(x["expected_land_use"])) | (x["expected_land_use"] == ["unknown"]))
+            & (len(x["expected_split"]) != 0), axis=1)
+        v["divisor"] = v['expected_land_use'].str.len().clip(lower=1)
+        v.loc[~v["compatible_splits"], "expected_split"] = v.apply(lambda x: {i: f"{1/x['divisor']}" for i in x["expected_land_use"]}, axis=1)
+        v["divisor"] = v['expected_split'].str.len().clip(lower=1)
+        v["expected_split"] = v.apply(lambda x: {i: float(f"{1/x['divisor']}") if j == "" else float(j.replace("%", "e-2")) for i, j in x["expected_split"].items()}, axis=1)
+        v["expected_land_use"] = v["expected_split"].apply(lambda x: list(x.keys()))
+        v = v.drop(columns=["compatible_splits", "divisor"])
+        split_expecations[k] = v.copy()
+    return global_classes.DLogData.from_data_dict(split_expecations, auxiliary_data.lookup)
 
 
 def infill_data(
@@ -1403,7 +1458,8 @@ def infill_year_units(
     distribution_column: str,
     unit_column: str,
     unit_year_column: list[str],
-    years_lookup: pd.DataFrame,
+    lookup: global_classes.DLogValueLookup,
+    assumed_distribution: int = 2,
 ) -> pd.DataFrame:
     """infills build out profile
 
@@ -1420,8 +1476,10 @@ def infill_year_units(
         column that contains total units
     unit_year_column : list[str]
         columns to infill
-    years_lookup : pd.DataFrame
-        years lookup from unit
+    lookup : global_classes.DLogValueLookup
+            D-Log lookup data.
+    assumed_distribution : str
+        the distribution to use when no compatibile distribution is provided
 
     Returns
     -------
@@ -1441,16 +1499,22 @@ def infill_year_units(
     years_defined = data[data[distribution_column] == 1]
 
     if len(not_specified) != 0 or len(years_defined) != 0:
-        raise ValueError("distrubtion contains not specified or defined years values")
+        # raise ValueError("distrubtion contains not specified or defined years values")
+        ad_str = lookup.distribution_profile.loc[assumed_distribution, 'distribution_profile']
+        LOG.warning(  # pylint: disable=logging-fstring-interpolation
+                    f"{len(not_specified) + len(years_defined)} undefined or invalid distributions"
+                    f" found in '{distribution_column}'\n"
+                    f"Assuming '{ad_str}' distribution.")
+        data.loc[data[distribution_column].isin([0, 1]), distribution_column] = assumed_distribution
 
     flat = data[data[distribution_column] == 2]
-    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], years_lookup)
+    flat_years = strip_year(flat["start_year_id"], flat["end_year_id"], lookup.years)
     early = data[data[distribution_column] == 3]
-    early_years = strip_year(early["start_year_id"], early["end_year_id"], years_lookup)
+    early_years = strip_year(early["start_year_id"], early["end_year_id"], lookup.years)
     late = data[data[distribution_column] == 4]
-    late_years = strip_year(late["start_year_id"], late["end_year_id"], years_lookup)
+    late_years = strip_year(late["start_year_id"], late["end_year_id"], lookup.years)
     mid = data[data[distribution_column] == 5]
-    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], years_lookup)
+    mid_years = strip_year(mid["start_year_id"], mid["end_year_id"], lookup.years)
 
     for column in unit_year_column:
         year = int(column.split("_")[2])

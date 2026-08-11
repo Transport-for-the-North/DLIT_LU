@@ -33,48 +33,70 @@ def parse_dlog(config: inputs.DLitConfig) -> global_classes.DLogData:
         the parsed data
     """
     # read in column names
-
     column_names = pd.read_csv(config.infill.dlog_column_names_path)
-
-    res_column_names = (
-        column_names.loc[:, "residential_column_names"].dropna(how="any").tolist()
-    )
-    emp_column_names = (
-        column_names.loc[:, "employment_column_names"].dropna(how="any").tolist()
-    )
-    mix_column_names = (
-        column_names.loc[:, "mixed_column_names"].dropna(how="any").tolist()
-    )
+    res_column_names = (column_names.loc[:, "residential_column_names"].dropna(how="any").tolist())
+    emp_column_names = (column_names.loc[:, "employment_column_names"].dropna(how="any").tolist())
+    mix_column_names = (column_names.loc[:, "mixed_column_names"].dropna(how="any").tolist())
     # column to remove from data
-    ignore_columns = (
-        column_names.loc[:, "ignore_column_names"].dropna(how="any").tolist()
-    )
 
-    # parse sheets
-    LOG.info("Parsing Residential sheet")
-    residential_data = parse_sheet(
-        config.dlog_input_file,
-        config.infill.residential_sheet_name,
-        2,
-        res_column_names,
-        ignore_columns,
-    )
-    LOG.info("Parsing Employment sheet")
-    employment_data = parse_sheet(
-        config.dlog_input_file,
-        config.infill.employment_sheet_name,
-        2,
-        emp_column_names,
-        ignore_columns,
-    )
-    LOG.info("Parsing Mixed sheet")
-    mixed_data = parse_sheet(
-        config.dlog_input_file,
-        config.infill.mixed_sheet_name,
-        2,
-        mix_column_names,
-        ignore_columns,
-    )
+    loaded_sheet = pd.read_excel(config.dlog_input_file,
+                                 sheet_name="Development Sites", engine="openpyxl", skiprows=14, header=[0, 1])
+
+    def cols_to_list(df, col_group):
+        df[col_group] = df[col_group].fillna(0)
+        for name in df[col_group].columns:
+            check = df[(col_group, name)] == 1
+            df.loc[check, (col_group, name)] = name.lower()
+            df.loc[~check, (col_group, name)] = ""
+        df[("All", col_group)] = df[col_group].apply(lambda x: list(filter(None, list(x))), axis=1)
+        df = df.drop(columns=[col_group])
+        return df
+    loaded_sheet = cols_to_list(df=loaded_sheet, col_group="existing_land_use")
+    loaded_sheet = cols_to_list(df=loaded_sheet, col_group="proposed_land_use")
+    loaded_sheet = cols_to_list(df=loaded_sheet, col_group="expected_land_use")
+    splt_col = ("All", "expected_split")
+    loaded_sheet[splt_col] = loaded_sheet[("All", "Revised_landuse_split")].fillna("").str.lower()
+    loaded_sheet[splt_col] = loaded_sheet[splt_col].str.split(";").apply(lambda x: list(filter(None, x)))
+    loaded_sheet[splt_col] = loaded_sheet[splt_col].apply(lambda x: {i.split(" ")[0]: f"{i} ".split(" ")[1] for i in x})
+
+    # Emp
+    temp = loaded_sheet["Employment + mixed"].rename(columns={"Total Area/Floorspace": "Units_(floorspace)"})
+    temp.columns = [f"emp_year_{x}" if isinstance(x, int) else f"emp_{x.lower()}" for x in temp.columns]
+    loaded_sheet = loaded_sheet.drop(columns=["Employment + mixed"])
+    for col in temp.columns:
+        loaded_sheet[("All", col)] = temp[col]
+    # Pop
+    temp = loaded_sheet["Housing and mixed"].rename(columns={"Units/Dwellings": "Units_(dwellings)"})
+    temp.columns = [f"res_year_{x}" if isinstance(x, int) else f"res_{x.lower()}" for x in temp.columns]
+    loaded_sheet = loaded_sheet.drop(columns=["Housing and mixed"])
+    for col in temp.columns:
+        loaded_sheet[("All", col)] = temp[col]
+
+    loaded_sheet[("All", "res_distribution_profile_id")] = loaded_sheet[("Housing", "distribution_profile_id")]
+    loaded_sheet[("All", "res_distribution_profile")] = loaded_sheet[("Housing", "distribution_profile")]
+    loaded_sheet[("All", "emp_distribution_profile_id")] = loaded_sheet[("Employment", "distribution_profile_id-2")]
+    loaded_sheet[("All", "emp_distribution_profile")] = loaded_sheet[("Employment", "distribution_profile")]
+    loaded_sheet[("All", "mix_distribution_profile_id")] = loaded_sheet[("Mixed", "distribution_profile_id-3")]
+    loaded_sheet[("All", "mix_distribution_profile")] = loaded_sheet[("Mixed", "distribution_profile")]
+
+    loaded_sheet[("All", "units_(dwellings)")] = loaded_sheet[("All", "res_units_(dwellings)")]
+    loaded_sheet[("All", "units_(floorspace)")] = loaded_sheet[("All", "emp_units_(floorspace)")]
+    loaded_sheet[("All", "emp_sector_type_id")] = loaded_sheet[("Employment", "sector_type_id")]
+    loaded_sheet[("All", "mix_sector_type_id")] = loaded_sheet[("Mixed", "sector_type_id-2")]
+
+    loaded_sheet[("All", "total_site_area_size_hectares")] = loaded_sheet[("Housing", "total_site_area_size_hectares")]
+    loaded_sheet[("All", "total_units")] = loaded_sheet[("Housing", "total_units")]
+    loaded_sheet[("All", "total_area_sqm")] = loaded_sheet[("Employment", "total_area_sqm")]
+    loaded_sheet[("All", "site_area_ha")] = loaded_sheet[("Employment", "site_area_ha")]
+    loaded_sheet[("All", "total_area_ha")] = loaded_sheet[("Mixed", "total_area_ha")]
+    loaded_sheet[("All", "floorspace_sqm")] = loaded_sheet[("Mixed", "floorspace_sqm")]
+    loaded_sheet[("All", "dwellings")] = loaded_sheet[("Mixed", "dwellings")]
+    loaded_sheet = loaded_sheet["All"]
+
+    residential_data = loaded_sheet.loc[loaded_sheet["Type of Record"] == "Residential", res_column_names].copy()
+    employment_data = loaded_sheet.loc[loaded_sheet["Type of Record"] == "Employment", emp_column_names].copy()
+    mixed_data = loaded_sheet.loc[loaded_sheet["Type of Record"] == "Mixed", mix_column_names].copy()
+
     LOG.info("Parsing Lookup sheet")
     lookup = parse_lookup(config.dlog_input_file, config.lookups_sheet_name)
 
@@ -135,6 +157,42 @@ def parse_land_use_input(config: inputs.DLitConfig) -> global_classes.DLogData:
         lookup=lookup,
         existing_land_use_split=existing_split,
         proposed_land_use_split=proposed_split,
+    )
+    return data_output
+
+def parse_dev_pattern_input(config: inputs.DLitConfig) -> global_classes.AssessData:
+    """Parse land use input data from a given input path.
+
+    Parameters:
+    ----------
+    config (inputs.DLitConfig): Input configuration object
+
+    Returns:
+    ----------
+    data_output (global_classes.DLogData): Parsed land use data in a DLogData object
+
+    """
+    LOG.info(f"Parsing {str(config.dev_pattern.assessment_input)}")
+    # parse sheets
+    LOG.info("Parsing Residential sheet")
+    residential_data = parse_sheet(config.dev_pattern.assessment_input, "Residential")
+    LOG.info("Parsing Employment sheet")
+    employment_data = parse_sheet(config.dev_pattern.assessment_input, "Employment")
+    LOG.info("Parsing Mixed sheet")
+    mixed_data = parse_sheet(config.dev_pattern.assessment_input, "Mixed")
+
+    for frame in [
+        residential_data,
+        employment_data,
+        mixed_data,
+    ]:
+        if "unnamed: 0" in frame.columns:
+            frame.drop(columns=["unnamed: 0"], inplace=True)
+
+    data_output = global_classes.AssessData(
+        residential_data=residential_data,
+        employment_data=employment_data,
+        mixed_data=mixed_data,
     )
     return data_output
 
@@ -238,7 +296,8 @@ def parse_lookup(
         "development_type": "M:N",
         "years": "P:Q",
         "distribution_profile": "S:T",
-        "adoption_status": "X:Y",
+        "land_use": "V:W",
+        "adoption_status": "AA:AB",
     }
     # parse standard format sheets
     standard_format_tables = {}
@@ -272,11 +331,11 @@ def parse_lookup(
         sheet_name=lookup_sheet_name,
         header=None,
         engine="openpyxl",
-        usecols="Z:AA",
+        usecols="AD:AE",
     )
     # ^ No header in worksheet, id and value switched wrt others
 
-    local_authority.columns = ["id", "local_authority"]
+    local_authority.columns = ["local_authority", "id"]
     local_authority.set_index("id", drop=True, inplace=True)
     local_authority.dropna(how="any", inplace=True)
 
@@ -377,16 +436,14 @@ def read_auxiliary_data(
     )
 
 
-def parse_zone(file_path: pathlib.Path, north_only: bool = True) -> gpd.GeoDataFrame:
-    """parse zone shape file
+def parse_zone(file_path: pathlib.Path) -> gpd.GeoDataFrame:
+    """parse msoa shape file
 
 
     Parameters
     ----------
     file_path : pathlib.Path
-        file path for zone shapefile
-    north_only : bool
-        Select only northern zones
+        file path for msoa shapefile
 
     Returns
     -------
@@ -394,6 +451,4 @@ def parse_zone(file_path: pathlib.Path, north_only: bool = True) -> gpd.GeoDataF
         msoa
     """
     zone = gpd.read_file(file_path)
-    if north_only:
-        zone = zone[~zone["north_msoa"].isna()]
     return zone

@@ -1,23 +1,22 @@
 #Set Up Parameters
 run_infill: True
 run_land_use: True
+run_dev_pattern: False
+run_constraint: False
+run_tripend: False
 
 #Mandatory Parameters
 #--str
 lookups_sheet_name: "Lookups"
 #--Read file paths
-dlog_input_file: I:\Data\D-Log\DLIT\Inputs\DLog21_v8_issued_v1.xlsx
+dlog_input_file: I:\Data\D-Log\DLIT\Inputs\D-Log24_infill_v4.xlsx
 #--Write file paths
-output_folder: I:\Data\D-Log\DLIT\Outputs\Test
-proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\proposed_luc_split_path.csv
-existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\Test\existing_luc_split_path.csv
+output_folder: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean
+proposed_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\proposed_luc_split_path.csv
+existing_luc_split_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\existing_luc_split_path.csv
 
 infill:
   user_infill: False
-  combined_sheet_name: "2021 Combined"
-  residential_sheet_name: "2021 Residential"
-  employment_sheet_name: "2021 Employment"
-  mixed_sheet_name: "2021 Mixed"
   #--Read file paths
   dlog_column_names_path: inputs\DLog_column_names.csv
   valid_luc_path: inputs\valid_luc.csv
@@ -26,23 +25,91 @@ infill:
   known_invalid_luc_path: inputs\known_invalid_luc.csv
   regions_shapefiles_path: inputs\LPA_shapefiles\Local_Planning_Authorities_(April_2020)_UK_BFE.shp
   #--write file paths
-  user_input_path: I:\Data\D-Log\DLIT\Outputs\Test\user_input.xlsx
-  gfa_infill_method: regression_no_negatives
+  user_input_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\user_input.xlsx
+  gfa_infill_method: regression # mean, regression, regression_no_negatives
 
 land_use:
-  land_use_input: I:\Data\D-Log\DLIT\Outputs\Test\03_post_fixes\post_fix_data.xlsx
-  zone_shapefile_path: I:\Data\D-Log\DLIT\Inputs\zone_shapefile\NorMITsZoneV3.3\NorMITs_zoning_v3.3.shp
-  zone_data_path: I:\Data\D-Log\DLIT\Inputs\NorMITs2023\totals.csv
-  msoa_shapefile_path: I:\Data\D-Log\DLIT\Inputs\MSOA_shapefile\uk_ew_msoa_s_iz_north_flags.shp
-  msoa_dwelling_pop_path: I:\Data\D-Log\DLIT\Inputs\gb_msoa_agg_prt_2018_hh_pop.csv
-  msoa_traveller_type_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_pop.csv
-  msoa_jobs_path: I:\Data\D-Log\DLIT\Inputs\land_use_2018_emp.csv
+  land_use_input: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\03_post_fixes\post_fix_data.xlsx
+  lsoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\LSOA\LSOA_2021\LSOA_2021_EW_BFC_V8.shp
+  lsoa_dwelling_pop_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_hh_dlit.csv
+  lsoa_traveller_type_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\pop_tt.csv
+  lsoa_jobs_path: I:\NorMITs Land Use\DLIT-23\Land Use inputs\v2 LSOA\Output E4_3.csv
   employment_density_matrix_path: inputs\emp_density_matrix.csv
   luc_sic_conversion_path: inputs\luc_sic_conversion.csv
   demolition_dampener: 0
+  luti: True
+  luti_zone_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NLUTI_v4_shapefiles\NLUTI_v4_zones_refactored.shp    
+
+
+dev_pattern:
+  # Key input paths
+  base_year: 2023
+  geo_boundary: normits # lsoa, normits, noham, norms, mosa
+  assessment_input: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\01_initial_assessment\initial_DLOG_data_quality_assessment.xlsx
+  emp_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\jobs_sites_uncertainty_build_out.csv
+  res_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\dwelling_sites_uncertainty_build_out.csv
+  lsoa_data_path: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\tot_by_data_out.csv
+  pop_tt_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\population_segmented_sites_uncertainty_build_out.csv.bz2
+  emp_sic_soc_site_data: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\04_land_use_outputs\jobs_segmented_sites_uncertainty_build_out.csv.bz2
+  # shape file paths
+  normits_shapefile_path: Y:\Data Strategy\GIS Shapefiles\NorMITs 2024 zone system\NorMITs zone\v3.3\NorMITs_zoning_v3.3.shp
+  noham_shapefile_path: P:\02_NorTMS Rebase\01_Highway\03.Data\06. Confirmed Zone Structure\2.NoHAM_zone_updates-TfN\NoHAM_zones_v3.7\NoHAM_Zones_v3.7.shp
+  norms_shapefile_path: P:\02_NorTMS Rebase\02_Rail\02_Data_Sys_to_TfN\1.NorTMS_zones\NorTMS_zones_v3.3\NorTMS_zoning_3.3_OA21.shp
+  msoa_shapefile_path: Y:\Data Strategy\GIS Shapefiles\Middle_Layer_Super_Output_Areas_MSOA\MSOA_2021_EW\MSOA_2021_EW_BGC.shp
+  # centroids paths
+  lsoa_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_hh_centroids.csv
+  lsoa_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_emp_centroids.csv
+  lsoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\lsoa_2021_pop_centroids.csv
+  normits_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_hh_centroids.csv
+  normits_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_emp_centroids.csv
+  normits_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\normits_v3.3_pop_centroids.csv
+  noham_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_hh_centroids.csv
+  noham_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_emp_centroids.csv
+  noham_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\noham_v3.7_pop_centroids.csv
+  norms_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\norms_v3.3_hh_centroids.csv
+  norms_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\norms_v3.3_emp_centroids.csv
+  norms_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\norms_v3.3_pop_centroids.csv
+  msoa_hh_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_hh_centroids.csv
+  msoa_emp_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_emp_centroids.csv
+  msoa_pop_centroids: I:\Data\D-Log\DLIT\Inputs\zone_centroids\msoa_2021_pop_centroids.csv
+  # lookup paths
+  lsoa_to_normits: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_normits_v3.3\lsoa2021_normits_v3.3_spatial.csv
+  lsoa_to_noham: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_noham_v3.7\lsoa_2021_noham_v3.7_spatial.csv
+  lsoa_to_norms: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa_2021_norms_v3.3\lsoa_2021_norms_v3.3_spatial.csv
+  lsoa_to_msoa: I:\Data\D-Log\DLIT\Inputs\lsoa2021_zone\lsoa2021_msoa2021\lsoa2021_to_msoa2021_spatial.csv
+  viz_distribution: True
   summary_data:
-    summary_zone_name: lad_2020
-    lookup_file: I:\Data\D-Log\DLIT\Inputs\msoa_to_lad_2020_lookup.csv
-    shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2020_December\Local_Authority_Districts_(December_2020)_UK_BGC.shp
-    shapefile_id_column: LAD20CD
+    summary_lad: lad2013 # lad2013
+    summary_region: ntem_region
+    lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
+    ###### 2011 LAD #######
+    # lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\lsoa2021_lad2011\lsoa_2021_lad2011_spatial.csv
+    # msoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\msoa2021_lad2011\msoa_2021_lad2011_spatial.csv
+    # norms_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normsv3.3_lad2011\norms_v3.3_lad2011_spatial.csv
+    # noham_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\nohamv3.7_lad2011\noham_v3.7_lad2011_spatial.csv
+    # normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2011\normits_v3.3_lad2011\normits_v3.3_lad2011_spatial.csv
+    ###### 2013 LAD #######
+    lsoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\lsoa2021_lad2013\lsoa2021_lad2013_spatial.csv
+    msoa_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\msoa2021_lad2013\msoa2021_lad2013_spatial.csv
+    norms_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\normsv3.3_lad2013\norms_v3.3_lad2013_spatial.csv
+    noham_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\nohamv3.7_lad2013\noham_v3.7_lad2013_spatial.csv
+    normits_to_lad_file: I:\Data\D-Log\DLIT\Inputs\zone_lad2013\normitsv3.3_lad2013\normits_v3.3_lad2013_spatial.csv
+    # shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2011_December\Local_Authority_Districts_December_2011_GB_BFC.shp
+    lad_shapefile: Y:\Data Strategy\GIS Shapefiles\Local_Authority_District_LAD\LAD_2013\LAD_DEC_2013_GB_BFC_-119125151109105358\LAD_DEC_2013_GB_BFC.shp
+    shapefile_id_column: LAD13CD 
     geometry_simplify_tolerance: 100
+
+constraint:
+  # Zone names
+  lad_name: I:\Data\D-Log\DLIT\Inputs\zone_name\lad_2013\zoning.csv
+  region_name: I:\Data\D-Log\DLIT\Inputs\zone_name\region_ntem\zoning.csv
+  # Key input paths from ddg
+  ddg_pop: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Pop_LA.csv
+  ddg_emp: I:\NorMITs Demand\import\edge_replicant\edge_inputs\Drivers\Jan 24 central DDG drivers\DD_Jan24_Central_Emp_LA.csv
+  # Inputs from previous module dev_pattern
+  dlog_household: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_household.csv
+  dlog_employment: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_job.csv
+  dlog_population: I:\Data\D-Log\DLIT\Outputs\LUTI_Dlog24_mean\05_aggregation\lad_population.csv
+  sector: region #region, combined_lad 
+  lad_to_region_file: I:\Data\D-Log\DLIT\Inputs\lad2013_region\lad13_ntem_region_spatial.csv
+
